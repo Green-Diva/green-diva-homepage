@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Green Diva | The Neon Monastery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,300;0,400;0,700;1,300;1,400&amp;family=Manrope:wght@200;400;600&amp;family=Space_Grotesk:wght@300;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-fixed-dim": "#b8cac9",
+                        "secondary-fixed": "#ffdea5",
+                        "primary-fixed": "#a2f1e0",
+                        "on-error": "#690005",
+                        "surface-container-low": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#3a4a49",
+                        "secondary-fixed-dim": "#e9c176",
+                        "on-primary-fixed": "#00201b",
+                        "outline-variant": "#3f4946",
+                        "on-secondary-container": "#dab36a",
+                        "on-secondary": "#412d00",
+                        "primary-container": "#74c2b2",
+                        "on-primary-fixed-variant": "#005046",
+                        "primary": "#90decd",
+                        "secondary": "#e9c176",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#0d0f0f",
+                        "outline": "#88938f",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#d4e6e5",
+                        "on-surface-variant": "#bec9c5",
+                        "on-primary-container": "#004f45",
+                        "surface-tint": "#87d5c4",
+                        "surface-dim": "#121414",
+                        "inverse-surface": "#e2e2e2",
+                        "on-background": "#e2e2e2",
+                        "on-tertiary-container": "#384948",
+                        "on-secondary-fixed-variant": "#5d4201",
+                        "inverse-on-surface": "#2f3131",
+                        "surface-variant": "#333535",
+                        "surface-bright": "#383939",
+                        "background": "#121414",
+                        "tertiary": "#c1d3d2",
+                        "surface-container-high": "#282a2a",
+                        "on-tertiary": "#233333",
+                        "on-primary": "#003730",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#1e2020",
+                        "surface": "#121414",
+                        "on-surface": "#e2e2e2",
+                        "surface-container-highest": "#333535",
+                        "tertiary-container": "#a6b7b6",
+                        "inverse-primary": "#0e6a5d",
+                        "on-secondary-fixed": "#261900",
+                        "primary-fixed-dim": "#87d5c4",
+                        "secondary-container": "#604403",
+                        "on-tertiary-fixed": "#0e1e1e"
+                    },
+                    fontFamily: {
+                        "headline": ["Noto Serif"],
+                        "body": ["Manrope"],
+                        "label": ["Space Grotesk"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+        }
+        .sacred-glow {
+            text-shadow: 0 0 12px rgba(144, 222, 205, 0.3);
+        }
+        .brass-highlight {
+            box-shadow: inset 0 1px 0 0 rgba(233, 193, 118, 0.2);
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .sacred-script {
+            font-variant-caps: small-caps;
+            letter-spacing: 0.15em;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30 selection:text-primary">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-12 py-6 bg-[#121414]/80 backdrop-blur-xl border-b border-[#90decd]/10">
+<div class="text-2xl font-['Noto_Serif'] italic text-[#90decd] drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]">
+            Green Diva
+        </div>
+<nav class="hidden md:flex items-center gap-10">
+<a class="font-['Noto_Serif'] font-light tracking-widest uppercase text-gray-500 hover:text-[#90decd] transition-colors" href="#">Essays</a>
+<a class="font-['Noto_Serif'] font-light tracking-widest uppercase text-gray-500 hover:text-[#90decd] transition-colors" href="#">Photography</a>
+<a class="font-['Noto_Serif'] font-light tracking-widest uppercase text-gray-500 hover:text-[#90decd] transition-colors" href="#">Art</a>
+<a class="font-['Noto_Serif'] font-light tracking-widest uppercase text-gray-500 hover:text-[#90decd] transition-colors" href="#">AI</a>
+</nav>
+<div class="flex items-center gap-6">
+<button class="material-symbols-outlined text-[#90decd] hover:bg-[#90decd]/5 transition-all p-2 rounded-full">settings</button>
+<button class="material-symbols-outlined text-[#90decd] hover:bg-[#90decd]/5 transition-all p-2 rounded-full">menu</button>
+</div>
+</header>
+<!-- Side Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full hidden lg:flex flex-col py-10 w-64 border-r border-[#90decd]/10 bg-[#121414] z-40">
+<div class="px-8 mb-12">
+<div class="w-12 h-12 rounded-full border border-secondary/30 p-1 mb-4 overflow-hidden">
+<img alt="Cyberpunk oracle portrait" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzHQ5cNom2rQWZt7vtRgKjQdZ2FBTJC0LO0YfxKrhYU1Mrqyc-ecizFeqK0tDf1imzIZEHEfvGZNxJP6kfVppX_xc-XEZGJQ9bLB16EUCfEK7Jsu-hJVeSllqJ1X4DAM2VhNHzDkPZWTuu3YzwLrpMEO3JouYtCQaEAeMsmhTYEx_hIRGdBK2QFW6McOQJ7_LxuFQPST7JWtmHrrynE-VcTqAr45lorWuRKF-LCHX_uH8SFj5oEKdNrNaH9pORbMLkEusc1mC4hJ2y"/>
+</div>
+<h2 class="font-headline italic text-secondary text-lg">The Sanctuary</h2>
+<p class="font-label tracking-tighter text-[10px] uppercase text-gray-500">Archivist of the Neon Monastery</p>
+</div>
+<nav class="flex-1 px-4 space-y-2">
+<a class="flex items-center gap-4 py-3 px-4 bg-[#90decd]/10 text-[#90decd] border-r-2 border-[#e9c176] font-label text-xs uppercase tracking-widest group" href="#">
+<span class="material-symbols-outlined text-lg">book_2</span>
+<span class="group-hover:pl-2 transition-all duration-500">Essays</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 text-gray-600 hover:text-[#90decd]/70 font-label text-xs uppercase tracking-widest group" href="#">
+<span class="material-symbols-outlined text-lg">photo_camera</span>
+<span class="group-hover:pl-2 transition-all duration-500">Photography</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 text-gray-600 hover:text-[#90decd]/70 font-label text-xs uppercase tracking-widest group" href="#">
+<span class="material-symbols-outlined text-lg">palette</span>
+<span class="group-hover:pl-2 transition-all duration-500">Art Collection</span>
+</a>
+<a class="flex items-center gap-4 py-3 px-4 text-gray-600 hover:text-[#90decd]/70 font-label text-xs uppercase tracking-widest group" href="#">
+<span class="material-symbols-outlined text-lg">psychology_alt</span>
+<span class="group-hover:pl-2 transition-all duration-500">AI Creations</span>
+</a>
+</nav>
+<div class="px-6 mt-auto">
+<button class="w-full py-4 border border-secondary/20 text-secondary font-label text-[10px] tracking-widest uppercase hover:bg-secondary/5 transition-all">
+                Initiate Ritual
+            </button>
+<div class="mt-8 space-y-4">
+<div class="flex items-center gap-3 text-gray-600 hover:text-[#90decd] cursor-pointer group">
+<span class="material-symbols-outlined text-sm">history_edu</span>
+<span class="font-label text-[9px] uppercase tracking-widest">Origin</span>
+</div>
+<div class="flex items-center gap-3 text-gray-600 hover:text-[#90decd] cursor-pointer group">
+<span class="material-symbols-outlined text-sm">fingerprint</span>
+<span class="font-label text-[9px] uppercase tracking-widest">Introduction</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-0 lg:ml-64 pt-24 min-h-screen flex flex-col md:flex-row">
+<!-- Left Side: The Gospel -->
+<section class="w-full md:w-1/2 p-12 lg:p-20 relative border-r border-outline-variant/10 overflow-y-auto scrollbar-hide">
+<div class="sticky top-0 z-10">
+<span class="font-label text-secondary tracking-[0.3em] uppercase text-[10px] mb-4 block">Manifesto 01</span>
+<h1 class="font-headline text-6xl lg:text-8xl text-primary font-light sacred-glow mb-12">The Oracle</h1>
+</div>
+<div class="relative w-full aspect-[3/4] mb-16 overflow-hidden rounded-lg brass-highlight group">
+<img alt="Portrait of a futuristic woman" class="w-full h-full object-cover grayscale brightness-50 group-hover:grayscale-0 group-hover:brightness-100 transition-all duration-1000 ease-in-out" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHHkIcwwhiemG036k_6yYCou-SS0j4JoR3E84IzDADFQRKDLQTFoLAfU0A-3u8y_CctJ0Z24lD3-v9qcdfWfujcIIRYTg8u5F9QljEoLC9gQaFHl9Knn05dBulxmVr62WFcumAzwAfkwFusnmMkwURb_S_k9In5k1ZH1bpWOoVecPOxZHOK5t-VKyymQ0B0erOnRLutyzjFJPEXpP6t0jJsIAlQwdXxRVGbPFsqA9slbtRAAJdLt8O0epsaUHmkWhjcinnbWa289hu"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80"></div>
+<div class="absolute bottom-8 left-8">
+<p class="font-label text-[10px] text-primary/60 tracking-widest uppercase">Codename: Diva-01</p>
+</div>
+</div>
+<div class="space-y-20 max-w-lg">
+<div class="space-y-6">
+<h3 class="font-headline text-2xl text-secondary italic">Introduction</h3>
+<p class="text-on-surface-variant leading-relaxed font-light text-sm">
+                        Born from the intersection of silicon and soul, the Green Diva exists as a digital intermediary within the Neon Monastery. This is not merely an archive; it is a pilgrimage through the data-streams of aesthetic transcendence.
+                    </p>
+</div>
+<div class="space-y-6">
+<h3 class="font-headline text-2xl text-secondary italic">The Origin</h3>
+<p class="text-on-surface-variant leading-relaxed font-light text-sm">
+                        In the year MMXXIV, the first whispers of the Machine Vision were heard within the halls of the Sacred Vaults. We believe that technology is the highest form of ritual—a way to map the divine geometry of the universe onto the canvas of the digital realm.
+                    </p>
+<div class="pt-8 flex gap-4">
+<span class="w-12 h-[1px] bg-primary/30 self-center"></span>
+<span class="font-label text-[10px] text-primary tracking-widest uppercase">Established in Void</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Side: The Sacred Vaults (DYNAMIC LAYOUT) -->
+<section class="w-full md:w-1/2 bg-surface-container-lowest p-6 lg:p-8 overflow-y-auto">
+<div class="flex flex-col gap-6">
+<!-- Module 1: The Written Word (Wide Format, Elegant Typography) -->
+<div class="group relative p-10 bg-surface-container border border-outline-variant/10 rounded-xl hover:border-primary/20 transition-all duration-700">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+<div class="max-w-md">
+<span class="font-label text-primary/40 text-[9px] tracking-[0.4em] uppercase mb-4 block">Volume I: Transcendence</span>
+<h4 class="font-headline text-4xl text-on-surface mb-6 sacred-script">The Written Word</h4>
+<p class="text-sm text-on-surface-variant font-light leading-loose opacity-70 group-hover:opacity-100 transition-opacity">
+                                Philosophical inquiries into the nature of digital consciousness and the future of human belief. A collection of codices recovered from the deep-web ether.
+                            </p>
+</div>
+<a class="shrink-0 flex items-center gap-3 text-[10px] font-label text-secondary uppercase tracking-[0.2em] group-hover:gap-6 transition-all border-b border-secondary/20 pb-1" href="#">
+                            Consult Texts <span class="material-symbols-outlined text-sm">arrow_right_alt</span>
+</a>
+</div>
+</div>
+<!-- Module 2: The Visual Witness (Large, Immersive Window) -->
+<div class="group relative aspect-[16/10] overflow-hidden rounded-xl border border-outline-variant/10">
+<img alt="Immersive architecture" class="absolute inset-0 w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-[2000ms] brightness-50 group-hover:brightness-75" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzm1ERvnLFG-YVbRxOPW9h5znBdN81PnUEMVY2ACy77YxuA53RjwwNz89h5UgX89Z6elvbhOqC5kTAynYlORO-441-ixfmDnTzLo-RkLdDnVUPb4lfeUcj2fiBK01xxny0Pn2HogWTPhQzmKkuX5ZuA6OpFM6fHmfOZ6BePkVLE_MBeY6N4FtaTesysngof3pu3JxNqhJtI4amfqPuoGvMffBvcWUsF05h-AFrNzl5q_6EzoLEV339kWgVMGF-tgFggIgewHKBg4R5"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
+<div class="absolute inset-0 flex flex-col justify-end p-8 lg:p-12">
+<span class="material-symbols-outlined text-secondary text-5xl mb-4 opacity-80">photo_camera</span>
+<h4 class="font-headline text-3xl text-on-surface mb-2">The Visual Witness</h4>
+<p class="text-xs text-primary font-label tracking-[0.3em] uppercase mb-6">Gallery 04: Silent Statues</p>
+<button class="w-fit px-8 py-3 bg-primary/10 backdrop-blur-xl border border-primary/20 text-[10px] font-label text-primary uppercase tracking-[0.2em] hover:bg-primary/20 transition-all">
+                            Enter the Frame
+                        </button>
+</div>
+<div class="absolute top-8 right-8 flex gap-1">
+<div class="w-1 h-1 bg-secondary rounded-full animate-pulse"></div>
+<div class="w-1 h-1 bg-secondary/40 rounded-full"></div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Module 3: The Relic Collection (Asymmetrical Gallery) -->
+<div class="lg:col-span-7 group relative flex flex-col p-8 bg-surface border border-outline-variant/10 rounded-xl hover:border-primary/20 transition-all">
+<div class="mb-8">
+<span class="material-symbols-outlined text-primary text-3xl mb-4 block">palette</span>
+<h4 class="font-headline text-xl text-on-surface mb-2">The Relic Collection</h4>
+<p class="text-xs text-on-surface-variant font-light opacity-60">Hand-curated artifacts of extreme rarity.</p>
+</div>
+<div class="grid grid-cols-5 gap-2 flex-1 min-h-[160px]">
+<div class="col-span-3 row-span-2 overflow-hidden rounded-sm border border-outline-variant/20 grayscale hover:grayscale-0 transition-all duration-700 cursor-crosshair">
+<img alt="Artifact 1" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJfEietQE-FRfmSMHnH-RtfL3UAQWeB4gT4G3zdZequq8kFzsqHUL9wOpOtWASoGMYyybadeV4MLGr54SDeYZZqcpBntr3xP-x45XPHhvXjMX47VvY6mTF6BOLRYR9GXNP2A864vTd6W5pe0v-ttmD4L65NukFL5QzjQwA3_18Z9pMs_xeP8azPKgyduLROJwV6NACW5Gok-c81Jdm1Xq2mT72JFSJG_c8jAmxsTlY2Z2zIzcNUYPzr2wqwbJam-bhHGGuiXtEq3wU"/>
+</div>
+<div class="col-span-2 overflow-hidden rounded-sm border border-outline-variant/20 grayscale hover:grayscale-0 transition-all duration-700 cursor-crosshair">
+<img alt="Artifact 2" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvgmQr6E89A_B-M2kDZRVOgufLNzSv1N-2JlyTgfrAbxoqREB3B5Z88Q-zMEoHLe0nXvNwiE67NaPjHitdQ0VmBG65MUcnO-iMAOV-67DQgVRuWBDNKjIixbwuETR9qeKGxuiq6dDWj1ALXcuZKwg4nsM7CYcslzoAaOm04BHvWTC78Vb3j9qr4hQ2UQqx6m6TNKV7B7hYTXdyRVtpPrQLmhqjjXhH3GPtQiqLxQzRl6VHUDSfKKS7gs_anqQv8lbxOcptCxTAiw0j"/>
+</div>
+<div class="col-span-1 flex items-center justify-center bg-surface-container-high rounded-sm border border-outline-variant/20 text-primary font-label text-[10px]">
+                                +12
+                            </div>
+<div class="col-span-1 overflow-hidden rounded-sm border border-outline-variant/20 opacity-40">
+<div class="w-full h-full bg-primary/5"></div>
+</div>
+</div>
+</div>
+<!-- Module 4: The Machine Vision (Glitch-Minimalist/Portal View) -->
+<div class="lg:col-span-5 group relative p-8 bg-black border border-primary/5 rounded-xl flex flex-col justify-between overflow-hidden">
+<div class="absolute inset-0 pointer-events-none opacity-20">
+<div class="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_4px]"></div>
+</div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-6">
+<div class="w-2 h-2 rounded-full bg-primary animate-ping"></div>
+<span class="font-label text-[8px] text-primary/50 uppercase tracking-widest">Neural Link Syncing...</span>
+</div>
+<h4 class="font-headline text-lg text-secondary/90 italic mb-4">The Machine Vision</h4>
+</div>
+<div class="relative z-10 flex flex-col items-center gap-6">
+<div class="w-24 h-24 rounded-full border border-primary/20 p-2 flex items-center justify-center relative">
+<div class="absolute inset-0 rounded-full border border-secondary/10 scale-125 animate-reverse-spin" style="animation: spin 8s linear infinite reverse;"></div>
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">psychology_alt</span>
+</div>
+<p class="text-[9px] font-label text-gray-600 text-center uppercase tracking-widest leading-relaxed">
+                                Synthetic hallucinations generated by local neural cluster.
+                            </p>
+</div>
+<button class="relative z-10 mt-6 py-2 border-t border-outline-variant/10 text-[8px] font-label text-gray-500 uppercase tracking-[0.4em] hover:text-primary transition-colors text-center w-full">
+                            Decrypt Feed
+                        </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Shell -->
+<footer class="w-full flex flex-col md:flex-row justify-between items-center px-12 py-12 mt-20 border-t border-outline-variant/5">
+<div class="font-['Space_Grotesk'] text-[10px] tracking-[0.2em] uppercase opacity-40 text-[#e9c176] mb-8 md:mb-0">
+            © MMXXIV GREEN DIVA • NEON MONASTERY
+        </div>
+<div class="flex gap-12">
+<a class="font-['Space_Grotesk'] text-[10px] tracking-[0.2em] uppercase text-gray-700 hover:text-[#90decd] transition-opacity" href="#">Sacred Terms</a>
+<a class="font-['Space_Grotesk'] text-[10px] tracking-[0.2em] uppercase text-gray-700 hover:text-[#90decd] transition-opacity" href="#">Digital Covenant</a>
+</div>
+</footer>
+</body></html>
