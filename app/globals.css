@@ -67,8 +67,113 @@ body {
   }
 }
 .animate-reverse-spin {
-  animation: gd-spin 12s linear infinite reverse;
+  animation:
+    gd-spin 12s linear infinite reverse,
+    relic-border-bright 24s linear infinite;
   animation-play-state: running;
+}
+
+@keyframes relic-border-bright {
+  0%,
+  100% {
+    border-color: rgba(144, 222, 205, 0.7);
+  }
+  50% {
+    border-color: rgba(233, 193, 118, 0.7);
+  }
+}
+@keyframes relic-border-dim {
+  0%,
+  100% {
+    border-color: rgba(144, 222, 205, 0.4);
+  }
+  50% {
+    border-color: rgba(233, 193, 118, 0.4);
+  }
+}
+@keyframes relic-text-color {
+  0%,
+  100% {
+    color: rgb(144, 222, 205);
+  }
+  50% {
+    color: rgb(233, 193, 118);
+  }
+}
+@keyframes relic-text-color-70 {
+  0%,
+  100% {
+    color: rgba(144, 222, 205, 0.7);
+  }
+  50% {
+    color: rgba(233, 193, 118, 0.7);
+  }
+}
+@keyframes relic-text-color-80 {
+  0%,
+  100% {
+    color: rgba(144, 222, 205, 0.8);
+  }
+  50% {
+    color: rgba(233, 193, 118, 0.8);
+  }
+}
+@keyframes relic-bg-color {
+  0%,
+  100% {
+    background-color: rgb(144, 222, 205);
+  }
+  50% {
+    background-color: rgb(233, 193, 118);
+  }
+}
+.animate-relic-border-dim {
+  animation: relic-border-dim 24s linear infinite;
+}
+.animate-relic-text {
+  animation: relic-text-color 24s linear infinite;
+}
+.animate-relic-text-70 {
+  animation: relic-text-color-70 24s linear infinite;
+}
+.animate-relic-text-80 {
+  animation: relic-text-color-80 24s linear infinite;
+}
+.animate-pulse-relic {
+  animation:
+    pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite,
+    relic-bg-color 24s linear infinite;
+}
+.animate-ping-relic {
+  animation:
+    ping 1s cubic-bezier(0, 0, 0.2, 1) infinite,
+    relic-bg-color 24s linear infinite;
+}
+
+@keyframes matrix-rain {
+  from {
+    transform: translateY(-50%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-matrix-rain {
+  animation: matrix-rain 3s linear infinite;
+  will-change: transform;
+}
+
+@keyframes matrix-rain-x {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.animate-matrix-rain-x {
+  animation: matrix-rain-x 3s linear infinite;
+  will-change: transform;
 }
 
 @keyframes sync-ellipsis-v2 {
@@ -87,7 +192,7 @@ body {
 }
 .animate-sync-ellipsis::after {
   content: "";
-  animation: sync-ellipsis-v2 1s steps(1, end) infinite;
+  animation: sync-ellipsis-v2 1.6s steps(1, end) infinite;
   display: inline-block;
   min-width: 0.6em;
 }

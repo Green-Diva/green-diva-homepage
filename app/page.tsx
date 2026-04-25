@@ -12,6 +12,26 @@ const NAV_ITEMS = [
   { label: "Vessels", href: "#vessels" },
 ];
 
+const MATRIX_GLYPHS = "01ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ";
+
+const MATRIX_COLUMNS: string[][] = [0, 1, 2].map((col) => {
+  const out: string[] = [];
+  for (let i = 0; i < 14; i++) {
+    out.push(MATRIX_GLYPHS[(i * 7 + col * 11) % MATRIX_GLYPHS.length]);
+  }
+  return [...out, ...out];
+});
+
+const DIGIT_COLUMN_SEEDS = [
+  "47159028361472",
+  "83625071948350",
+  "90548716230491",
+];
+const DIGIT_COLUMNS: string[][] = DIGIT_COLUMN_SEEDS.map((s) => {
+  const arr = s.split("");
+  return [...arr, ...arr];
+});
+
 export default async function Home() {
   const featured = await prisma.project.findFirst({
     where: { published: true },
@@ -164,10 +184,10 @@ export default async function Home() {
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
                 menu_book
               </span>
-              <h4 className="font-headline text-4xl text-primary font-light leading-[1.05] mb-3">
+              <h4 className="font-headline text-4xl text-secondary font-light leading-[1.05] mb-3">
                 The Written Word
               </h4>
-              <span className="font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase mb-5 block">
+              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
                 Volume I: Digital Asceticism
               </span>
               <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-on-surface uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
@@ -175,7 +195,7 @@ export default async function Home() {
               </span>
             </div>
             <div className="absolute top-6 right-6 flex gap-3 z-20">
-              <div className="w-2 h-2 bg-secondary/30 rounded-full"></div>
+              <div className="w-2 h-2 rounded-full border border-secondary"></div>
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse"></div>
             </div>
           </Link>
@@ -194,10 +214,10 @@ export default async function Home() {
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
                 photo_camera
               </span>
-              <h4 className="font-headline text-4xl text-primary font-light leading-[1.05] mb-3">
+              <h4 className="font-headline text-4xl text-secondary font-light leading-[1.05] mb-3">
                 The Visual Witness
               </h4>
-              <span className="font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase mb-5 block">
+              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
                 Gallery 04: Silent Statues
               </span>
               <button className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-on-surface uppercase tracking-[0.2em] whitespace-nowrap hover:bg-primary/20 transition-all">
@@ -219,8 +239,8 @@ export default async function Home() {
               <div className="scanline-overlay absolute inset-0 z-10"></div>
               <div className="relative z-20 animate-floating">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-breathing"></div>
-                <div className="relative w-16 h-16 flex items-center justify-center border border-primary/40 rounded-full">
-                  <div className="absolute w-9 h-9 border border-primary/70 animate-reverse-spin"></div>
+                <div className="relative w-16 h-16 flex items-center justify-center border rounded-full animate-relic-border-dim">
+                  <div className="absolute w-9 h-9 border animate-reverse-spin"></div>
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
@@ -228,7 +248,7 @@ export default async function Home() {
                     strokeWidth="1.4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="w-6 h-6 text-secondary relative"
+                    className="w-6 h-6 relative animate-relic-text"
                     aria-label="Holy Chalice"
                   >
                     <path d="M8 3h8" />
@@ -240,7 +260,7 @@ export default async function Home() {
                   </svg>
                 </div>
               </div>
-              <span className="block font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase z-20 text-center">
+              <span className="block font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase z-20 text-center">
                 Sacred Artifact
               </span>
               <div aria-hidden="true" className="z-20 flex items-center gap-2">
@@ -248,7 +268,7 @@ export default async function Home() {
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse [animation-delay:0.66s]" />
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse [animation-delay:1.32s]" />
               </div>
-              <h4 className="font-headline text-xl text-primary italic relic-text-glow z-20 text-center">
+              <h4 className="font-headline text-xl text-secondary italic relic-text-glow z-20 text-center">
                 The Relic Collection
               </h4>
             </div>
@@ -266,27 +286,67 @@ export default async function Home() {
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1.5s]"></div>
               </div>
               <div className="z-20 space-y-2">
-                <h4 className="font-headline text-xl text-primary italic leading-tight">
+                <h4 className="font-headline text-xl text-secondary italic leading-tight">
                   The Machine Vision
                 </h4>
-                <p className="font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase">
+                <p className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
                   Synthetic Hallucinations
                 </p>
               </div>
               <div className="flex-1 flex items-center justify-between gap-4 z-20">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-secondary animate-ping"></div>
-                  <span className="font-label text-[11px] text-secondary/70 uppercase tracking-[0.2em] truncate">
+                  <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-primary animate-ping [animation-duration:1.6s]"></div>
+                  <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em] truncate">
                     Neural Sync<span className="animate-sync-ellipsis" aria-hidden="true" />
                   </span>
                 </div>
-                <div className="w-14 h-14 shrink-0 rounded-xl border border-primary/40 flex items-center justify-center module-image">
-                  <span
-                    className="material-symbols-outlined text-primary text-2xl"
-                    style={{ fontVariationSettings: '"FILL" 1' }}
-                  >
-                    psychology_alt
-                  </span>
+                <div className="flex gap-2 shrink-0">
+                  {/* Left box: vertical Matrix rain (0/1 + half-width katakana) */}
+                  <div className="relative w-14 h-14 rounded-xl border overflow-hidden bg-background/80 animate-relic-border-dim">
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 grid grid-cols-3 gap-x-px font-mono text-[8px] leading-[1.05] animate-relic-text-80 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
+                    >
+                      {MATRIX_COLUMNS.map((col, ci) => (
+                        <div
+                          key={ci}
+                          className="flex flex-col items-center animate-matrix-rain"
+                          style={{
+                            animationDelay: `${(ci * 0.7).toFixed(2)}s`,
+                            animationDuration: `${(2.6 + ci * 0.6).toFixed(2)}s`,
+                          }}
+                        >
+                          {col.map((c, i) => (
+                            <span key={i}>{c}</span>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="scanline-overlay absolute inset-0 z-10 pointer-events-none"></div>
+                  </div>
+                  {/* Right box: vertical columns of digits */}
+                  <div className="relative w-14 h-14 rounded-xl border overflow-hidden bg-background/80 animate-relic-border-dim">
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 grid grid-cols-3 gap-x-px font-mono text-[8px] leading-[1.05] animate-relic-text-80 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
+                    >
+                      {DIGIT_COLUMNS.map((col, ci) => (
+                        <div
+                          key={ci}
+                          className="flex flex-col items-center animate-matrix-rain"
+                          style={{
+                            animationDelay: `${(0.5 + ci * 0.7).toFixed(2)}s`,
+                            animationDuration: `${(2.6 + ci * 0.6).toFixed(2)}s`,
+                          }}
+                        >
+                          {col.map((c, i) => (
+                            <span key={i}>{c}</span>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="scanline-overlay absolute inset-0 z-10 pointer-events-none"></div>
+                  </div>
                 </div>
               </div>
             </div>
