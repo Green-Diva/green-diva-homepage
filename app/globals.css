@@ -37,6 +37,7 @@ body {
 
 body {
   overflow-x: hidden;
+  zoom: 0.88 !important;
 }
 
 .material-symbols-outlined {
@@ -67,6 +68,28 @@ body {
 }
 .animate-reverse-spin {
   animation: gd-spin 12s linear infinite reverse;
+  animation-play-state: running;
+}
+
+@keyframes sync-ellipsis-v2 {
+  0%, 24% {
+    content: "";
+  }
+  25%, 49% {
+    content: ".";
+  }
+  50%, 74% {
+    content: "..";
+  }
+  75%, 100% {
+    content: "...";
+  }
+}
+.animate-sync-ellipsis::after {
+  content: "";
+  animation: sync-ellipsis-v2 1s steps(1, end) infinite;
+  display: inline-block;
+  min-width: 0.6em;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -113,7 +136,7 @@ body {
     border-color: rgba(144, 222, 205, 0.3);
   }
 }
-.animate-breathing {
+.module-card:hover .animate-breathing {
   animation: breathing-glow 4s ease-in-out infinite;
 }
 
@@ -181,7 +204,7 @@ body {
     transform: translateY(-8px);
   }
 }
-.animate-floating {
+.module-card:hover .animate-floating {
   animation: floating 3s ease-in-out infinite;
 }
 
@@ -212,18 +235,3 @@ body {
   animation: machine-scan 2s linear infinite;
 }
 
-@keyframes flicker {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 0.3;
-  }
-  80% {
-    opacity: 0.9;
-  }
-}
-.animate-sync-flicker {
-  animation: flicker 0.15s infinite alternate;
-}

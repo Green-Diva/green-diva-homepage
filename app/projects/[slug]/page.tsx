@@ -30,7 +30,7 @@ export default async function ProjectDetail({ params }: Params) {
           Green Diva
         </Link>
         <Link
-          href="/#chronicles"
+          href="/#chronicle"
           className="font-label text-[10px] tracking-[0.4em] uppercase text-primary/70 hover:text-primary transition-colors"
         >
           ← Return to Sanctuary
