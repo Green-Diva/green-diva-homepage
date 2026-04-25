@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HeroPortrait from "@/components/HeroPortrait";
 
 const HERO_PORTRAIT = "/images/hero-portrait.jpg";
 const AVATAR = "/images/avatar.jpg";
@@ -130,21 +131,8 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-5 min-h-0">
-              <div className="group relative w-full h-full lg:aspect-auto aspect-[4/5] overflow-hidden rounded-xl border border-secondary/20 hover:border-secondary/40 shadow-[0_0_40px_rgba(233,193,118,0.05)] hover:shadow-[0_0_60px_rgba(233,193,118,0.15)] transition-[border-color,box-shadow] duration-[1500ms] ease-out">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt="The Green Diva Portrait"
-                  className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 group-hover:brightness-100 transition-[filter] duration-[1500ms] ease-out"
-                  src={HERO_PORTRAIT}
-                />
-                <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-100 group-hover:opacity-50 transition-opacity duration-[1500ms] ease-out pointer-events-none"></div>
-                <div className="absolute bottom-6 left-0 right-0 text-center">
-                  <span className="font-label text-[11px] text-primary/40 group-hover:text-primary/70 tracking-[0.3em] uppercase transition-colors duration-[1500ms] ease-out">
-                    Codename · Diva-01
-                  </span>
-                </div>
-              </div>
+            <div className="lg:col-span-5 min-h-0 flex items-center justify-center">
+              <HeroPortrait src={HERO_PORTRAIT} />
             </div>
           </div>
           <div className="lg:row-span-1 flex items-center gap-6 flex-wrap">
