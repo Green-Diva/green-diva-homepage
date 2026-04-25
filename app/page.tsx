@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db";
 const HERO_PORTRAIT = "/images/hero-portrait.svg";
 const AVATAR = "/images/avatar.jpg";
 const VISUAL_WITNESS = "/images/visual-witness.jpg";
-const RELIC = "/images/relic.svg";
 
 export default async function Home() {
   const featured = await prisma.project.findFirst({
@@ -66,7 +65,20 @@ export default async function Home() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Left Side: Hero Information */}
-        <section className="w-[58%] overflow-y-auto custom-scrollbar px-10 py-8 flex items-start border-r border-primary/5">
+        <section className="w-[58%] overflow-y-auto scrollbar-hidden px-10 py-8 flex items-start relative">
+          {/* Sacred Divider — gradient line + center diamond glyph */}
+          <div
+            aria-hidden
+            className="absolute top-0 right-0 h-full w-px bg-gradient-to-b from-transparent via-primary/40 to-transparent"
+          />
+          <div
+            aria-hidden
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 flex items-center justify-center"
+          >
+            <span className="absolute w-3 h-3 rounded-full bg-primary/10 blur-md"></span>
+            <span className="block w-2 h-2 rotate-45 border border-primary/60 bg-[#121414]"></span>
+          </div>
+
           <div className="grid grid-cols-12 gap-8 items-start w-full">
             <div className="col-span-6 space-y-7">
               <div className="space-y-3">
@@ -143,7 +155,7 @@ export default async function Home() {
           {/* Module 1: The Written Word */}
           <Link
             href={featured ? `/projects/${featured.slug}` : "#"}
-            className="module-card group relative flex-1 min-h-0 overflow-hidden rounded-xl border border-primary/10 animate-sacred-reveal bg-[#0d0f0f] hover:bg-black block"
+            className="module-card group relative flex-1 min-h-0 overflow-hidden rounded-xl border border-primary/20 animate-sacred-reveal bg-[#0d0f0f] block"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/10 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -169,11 +181,11 @@ export default async function Home() {
           </Link>
 
           {/* Module 2: The Visual Witness */}
-          <div className="module-card group relative flex-1 min-h-0 overflow-hidden rounded-xl border border-primary/10 bg-black">
+          <div className="module-card group relative flex-1 min-h-0 overflow-hidden rounded-xl border border-primary/20 animate-sacred-reveal bg-[#0d0f0f]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="The Visual Witness"
-              className="module-image absolute inset-0 w-full h-full object-cover opacity-40 grayscale brightness-90 group-hover:opacity-50"
+              className="module-image absolute inset-0 w-full h-full object-cover brightness-[0.35] group-hover:brightness-50 transition-[filter] duration-[2000ms]"
               src={VISUAL_WITNESS}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
@@ -201,23 +213,31 @@ export default async function Home() {
           {/* Row: Relic & Machine Vision */}
           <div className="grid grid-cols-2 gap-5 flex-1 min-h-0">
             {/* Relic Collection */}
-            <div className="module-card group relative bg-[#0d0f0f] border border-primary/10 rounded-xl overflow-hidden flex flex-col items-center justify-center p-5">
+            <div className="module-card group relative bg-[#0d0f0f] border border-primary/20 rounded-xl overflow-hidden animate-sacred-reveal flex flex-col items-center justify-center p-5">
               <div className="noise-overlay absolute inset-0"></div>
               <div className="containment-field absolute inset-0 opacity-10"></div>
               <div className="scanline-overlay absolute inset-0 z-10"></div>
               <div className="relative mb-4 z-20 animate-floating">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-breathing"></div>
-                <div className="relative w-16 h-16 flex items-center justify-center border border-primary/20 rounded-full overflow-hidden">
-                  <div
-                    className="absolute inset-1 border border-primary/10 rounded-full animate-reverse-spin"
-                    style={{ animationDuration: "20s" }}
-                  ></div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt="Sacred Relic"
-                    className="w-full h-full object-cover grayscale brightness-125 module-image"
-                    src={RELIC}
-                  />
+                <div className="relative w-16 h-16 flex items-center justify-center border border-primary/30 rounded-full">
+                  <div className="absolute w-9 h-9 border border-primary/70 animate-reverse-spin"></div>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-6 h-6 text-primary relative"
+                    aria-label="Holy Chalice"
+                  >
+                    <path d="M8 3h8" />
+                    <path d="M8 3v2" />
+                    <path d="M16 3v2" />
+                    <path d="M7 5h10l-1 5a4 4 0 0 1-8 0L7 5z" />
+                    <path d="M12 14v5" />
+                    <path d="M9 19h6" />
+                  </svg>
                 </div>
               </div>
               <div className="text-center space-y-2 z-20">
@@ -231,7 +251,7 @@ export default async function Home() {
             </div>
 
             {/* Machine Vision */}
-            <div className="module-card group relative bg-black border border-primary/5 rounded-xl flex flex-col justify-between p-5 overflow-hidden">
+            <div className="module-card group relative bg-[#0d0f0f] border border-primary/20 rounded-xl animate-sacred-reveal flex flex-col justify-between p-5 overflow-hidden">
               <div className="absolute inset-0 pointer-events-none opacity-10">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_8px]"></div>
               </div>

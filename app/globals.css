@@ -79,6 +79,13 @@ body {
   background: #3f4946;
 }
 
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes sacred-reveal {
   0% {
     opacity: 0;
@@ -88,7 +95,7 @@ body {
   100% {
     opacity: 1;
     transform: translateY(0);
-    clip-path: inset(0 0 0 0);
+    clip-path: inset(-40px);
   }
 }
 .animate-sacred-reveal {

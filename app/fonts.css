@@ -6,7 +6,7 @@
   font-style: normal;
   font-weight: 100 700;
   font-display: swap;
-  src: url("/fonts/material-symbols-outlined.woff2") format("woff2");
+  src: url("/fonts/material-symbols-outlined.v2.woff2") format("woff2");
 }
 
 .material-symbols-outlined {
@@ -21,6 +21,7 @@
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  font-feature-settings: "liga";
   -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
 }
