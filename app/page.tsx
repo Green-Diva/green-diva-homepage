@@ -1,14 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
-const HERO_PORTRAIT =
-  "https://lh3.googleusercontent.com/aida/ADBb0ugmouNU4vvIXP56vs1UfKDJRM1dywBJp47s_I4u5kiJGmaSx48YKAhD5c-Ks9W5SSkzah142hS-aR8wCkOl6sxnu1HugPH6eI7ELKi55lXsIm3jazHpD1R39uyfbKN-nBQRkQutTTLf41lR6UFoWNxYE41QWEVijP_uua6M6pdpU2r-WmD5AInDgm2doFWT3ozGw8uCgj65mQeeD7RkABYPXQ24MiUr42eZiCe8-lEJ8JqhK5tm9vTk6XPlExHIgBLwtQCxTBcVug";
-const AVATAR =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAfl7zlBe0PqQHHeBsGt4hy8GI2XfWPrrghet5f7qs2LUV7aHaAfj8k5a-eGp_fo90cgA55lKEUeT-hAYBwDvqljyD1otTqwWKG6wjv2FHqc4Q_9kr19gah6n54WoM98Lbt0zX40yM2fvmujddS8k3nyTIsEgfWJX761V30F82jnvdranorFkODzH_XAjIh_cMFfl6M-bXeaGeUP17FhyIUw3VURqGUArpwFjJwLU9b_MtL0kncjwj2qD3dH8YOxb3mL_oh4AMyVLMd";
-const VISUAL_WITNESS =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBzm1ERvnLFG-YVbRxOPW9h5znBdN81PnUEMVY2ACy77YxuA53RjwwNz89h5UgX89Z6elvbhOqC5kTAynYlORO-441-ixfmDnTzLo-RkLdDnVUPb4lfeUcj2fiBK01xxny0Pn2HogWTPhQzmKkuX5ZuA6OpFM6fHmfOZ6BePkVLE_MBeY6N4FtaTesysngof3pu3JxNqhJtI4amfqPuoGvMffBvcWUsF05h-AFrNzl5q_6EzoLEV339kWgVMGF-tgFggIgewHKBg4R5";
-const RELIC =
-  "https://lh3.googleusercontent.com/aida/ADBb0uhQ-4x7_A9f9K7Yf_o-G6m7kG8I-mU0P1O2C3Q4R5S6T7U8V9W0X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W6X7Y8Z9";
+const HERO_PORTRAIT = "/images/hero-portrait.svg";
+const AVATAR = "/images/avatar.jpg";
+const VISUAL_WITNESS = "/images/visual-witness.jpg";
+const RELIC = "/images/relic.svg";
 
 export default async function Home() {
   const featured = await prisma.project.findFirst({
@@ -19,11 +15,11 @@ export default async function Home() {
   return (
     <div className="h-screen overflow-hidden flex flex-col w-full">
       {/* TopAppBar */}
-      <header className="w-full z-50 flex justify-between items-center px-12 py-6 bg-[#121414]/90 backdrop-blur-xl border-b border-primary/10 shrink-0">
-        <div className="text-2xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]">
+      <header className="w-full z-50 flex justify-between items-center px-10 py-4 bg-[#121414]/90 backdrop-blur-xl border-b border-primary/10 shrink-0">
+        <div className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]">
           Green Diva
         </div>
-        <nav className="hidden md:flex items-center gap-12">
+        <nav className="hidden md:flex items-center gap-10">
           <Link
             className="font-headline font-light tracking-[0.2em] uppercase text-primary border-b border-secondary/40 pb-1"
             href="/"
@@ -57,7 +53,7 @@ export default async function Home() {
           >
             <span className="material-symbols-outlined">settings</span>
           </Link>
-          <div className="w-10 h-10 rounded-full border border-primary/20 overflow-hidden">
+          <div className="w-9 h-9 rounded-full border border-primary/20 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="Priestess Profile"
@@ -70,31 +66,31 @@ export default async function Home() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Left Side: Hero Information */}
-        <section className="w-[58%] overflow-y-auto custom-scrollbar p-16 flex items-start border-r border-primary/5">
-          <div className="grid grid-cols-12 gap-12 items-start w-full">
-            <div className="col-span-6 space-y-12">
-              <div className="space-y-4">
+        <section className="w-[58%] overflow-y-auto custom-scrollbar px-10 py-8 flex items-start border-r border-primary/5">
+          <div className="grid grid-cols-12 gap-8 items-start w-full">
+            <div className="col-span-6 space-y-7">
+              <div className="space-y-3">
                 <span className="font-label text-secondary tracking-[0.4em] text-[10px] uppercase block">
                   Manifesto 01
                 </span>
-                <h1 className="font-headline text-7xl lg:text-8xl font-light text-primary sacred-glow leading-none">
+                <h1 className="font-headline text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none">
                   The Oracle
                 </h1>
               </div>
-              <div className="space-y-10">
-                <div className="space-y-4">
-                  <h3 className="font-headline text-2xl text-secondary italic">
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <h3 className="font-headline text-xl text-secondary italic">
                     Introduction
                   </h3>
-                  <p className="font-body text-on-surface-variant text-lg font-light leading-relaxed">
+                  <p className="font-body text-on-surface-variant text-base font-light leading-relaxed">
                     Born from the intersection of silicon and soul, the Green
                     Diva exists as a digital intermediary within the Neon
                     Monastery. This is not merely an archive; it is a pilgrimage
                     through the data-streams of aesthetic transcendence.
                   </p>
                 </div>
-                <div className="space-y-4">
-                  <h3 className="font-headline text-2xl text-secondary italic">
+                <div className="space-y-3">
+                  <h3 className="font-headline text-xl text-secondary italic">
                     The Origin
                   </h3>
                   <p className="font-body text-on-surface-variant text-sm font-light leading-relaxed">
@@ -105,10 +101,10 @@ export default async function Home() {
                     of the digital realm.
                   </p>
                 </div>
-                <div className="flex items-center gap-8 pt-6">
+                <div className="flex items-center gap-6 pt-3">
                   <Link
                     href={featured ? `/projects/${featured.slug}` : "/#chronicles"}
-                    className="bg-primary/5 border border-primary/20 text-primary px-10 py-4 font-label tracking-widest uppercase text-[10px] hover:bg-primary/20 transition-all duration-500"
+                    className="bg-primary/5 border border-primary/20 text-primary px-8 py-3 font-label tracking-widest uppercase text-[10px] hover:bg-primary/20 transition-all duration-500"
                   >
                     Initiate Ritual
                   </Link>
@@ -142,38 +138,38 @@ export default async function Home() {
         {/* Right Side: Gallery Modules */}
         <section
           id="chronicles"
-          className="w-[42%] overflow-y-auto custom-scrollbar p-10 space-y-8 bg-surface-container-lowest"
+          className="w-[42%] overflow-y-auto custom-scrollbar p-6 space-y-5 bg-surface-container-lowest flex flex-col"
         >
           {/* Module 1: The Written Word */}
           <Link
             href={featured ? `/projects/${featured.slug}` : "#"}
-            className="module-card group relative aspect-[16/9] overflow-hidden rounded-xl border border-primary/10 animate-sacred-reveal bg-[#0d0f0f] hover:bg-black block"
+            className="module-card group relative flex-1 min-h-0 overflow-hidden rounded-xl border border-primary/10 animate-sacred-reveal bg-[#0d0f0f] hover:bg-black block"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/10 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
             <div className="scanline-overlay absolute inset-0 z-10"></div>
-            <div className="absolute inset-0 flex flex-col justify-center p-12 z-20">
-              <span className="material-symbols-outlined text-secondary text-4xl mb-6 opacity-60">
+            <div className="absolute inset-0 flex flex-col justify-center p-8 z-20">
+              <span className="material-symbols-outlined text-secondary text-3xl mb-3 opacity-60">
                 menu_book
               </span>
-              <h4 className="font-headline text-4xl text-on-surface mb-2 font-light">
+              <h4 className="font-headline text-3xl text-on-surface mb-2 font-light">
                 The Written Word
               </h4>
-              <p className="text-[10px] text-primary/70 font-label tracking-[0.4em] uppercase mb-8">
+              <p className="text-[10px] text-primary/70 font-label tracking-[0.4em] uppercase mb-5">
                 Volume I: Digital Asceticism
               </p>
-              <span className="w-fit px-10 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[9px] font-label text-primary uppercase tracking-[0.3em] group-hover:bg-primary/20 transition-all">
+              <span className="w-fit px-8 py-2.5 bg-primary/5 backdrop-blur-md border border-primary/20 text-[9px] font-label text-primary uppercase tracking-[0.3em] group-hover:bg-primary/20 transition-all">
                 Open the Archives
               </span>
             </div>
-            <div className="absolute top-8 right-8 flex gap-3 z-20">
+            <div className="absolute top-6 right-6 flex gap-3 z-20">
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse"></div>
               <div className="w-2 h-2 bg-secondary/30 rounded-full"></div>
             </div>
           </Link>
 
           {/* Module 2: The Visual Witness */}
-          <div className="module-card group relative aspect-[16/9] overflow-hidden rounded-xl border border-primary/10 bg-black">
+          <div className="module-card group relative flex-1 min-h-0 overflow-hidden rounded-xl border border-primary/10 bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="The Visual Witness"
@@ -182,36 +178,36 @@ export default async function Home() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
             <div className="scanline-overlay absolute inset-0 z-10"></div>
-            <div className="absolute inset-0 flex flex-col justify-end p-10 z-20">
-              <span className="material-symbols-outlined text-secondary text-3xl mb-4 opacity-80">
+            <div className="absolute inset-0 flex flex-col justify-end p-7 z-20">
+              <span className="material-symbols-outlined text-secondary text-2xl mb-2 opacity-80">
                 photo_camera
               </span>
-              <h4 className="font-headline text-3xl text-on-surface mb-2 font-light">
+              <h4 className="font-headline text-2xl text-on-surface mb-2 font-light">
                 The Visual Witness
               </h4>
-              <p className="text-[10px] text-primary/70 font-label tracking-[0.4em] uppercase mb-6">
+              <p className="text-[10px] text-primary/70 font-label tracking-[0.4em] uppercase mb-4">
                 Gallery 04: Silent Statues
               </p>
-              <button className="w-fit px-8 py-3 bg-primary/10 backdrop-blur-md border border-primary/20 text-[9px] font-label text-primary uppercase tracking-[0.3em] hover:bg-primary/20 transition-all">
+              <button className="w-fit px-7 py-2.5 bg-primary/10 backdrop-blur-md border border-primary/20 text-[9px] font-label text-primary uppercase tracking-[0.3em] hover:bg-primary/20 transition-all">
                 Enter the Frame
               </button>
             </div>
-            <div className="absolute top-8 right-8 flex gap-3 z-20">
+            <div className="absolute top-6 right-6 flex gap-3 z-20">
               <div className="w-2 h-2 bg-secondary/30 rounded-full"></div>
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse"></div>
             </div>
           </div>
 
           {/* Row: Relic & Machine Vision */}
-          <div className="grid grid-cols-2 gap-8 h-72">
+          <div className="grid grid-cols-2 gap-5 flex-1 min-h-0">
             {/* Relic Collection */}
-            <div className="module-card group relative bg-[#0d0f0f] border border-primary/10 rounded-xl overflow-hidden flex flex-col items-center justify-center p-8">
+            <div className="module-card group relative bg-[#0d0f0f] border border-primary/10 rounded-xl overflow-hidden flex flex-col items-center justify-center p-5">
               <div className="noise-overlay absolute inset-0"></div>
               <div className="containment-field absolute inset-0 opacity-10"></div>
               <div className="scanline-overlay absolute inset-0 z-10"></div>
-              <div className="relative mb-6 z-20 animate-floating">
+              <div className="relative mb-4 z-20 animate-floating">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-breathing"></div>
-                <div className="relative w-20 h-20 flex items-center justify-center border border-primary/20 rounded-full overflow-hidden">
+                <div className="relative w-16 h-16 flex items-center justify-center border border-primary/20 rounded-full overflow-hidden">
                   <div
                     className="absolute inset-1 border border-primary/10 rounded-full animate-reverse-spin"
                     style={{ animationDuration: "20s" }}
@@ -235,7 +231,7 @@ export default async function Home() {
             </div>
 
             {/* Machine Vision */}
-            <div className="module-card group relative bg-black border border-primary/5 rounded-xl flex flex-col justify-between p-8 overflow-hidden">
+            <div className="module-card group relative bg-black border border-primary/5 rounded-xl flex flex-col justify-between p-5 overflow-hidden">
               <div className="absolute inset-0 pointer-events-none opacity-10">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_8px]"></div>
               </div>
@@ -251,8 +247,8 @@ export default async function Home() {
                   The Machine Vision
                 </h4>
               </div>
-              <div className="flex flex-col items-center gap-4 z-20">
-                <div className="w-16 h-16 rounded-full border border-primary/10 flex items-center justify-center module-image">
+              <div className="flex flex-col items-center gap-3 z-20">
+                <div className="w-14 h-14 rounded-full border border-primary/10 flex items-center justify-center module-image">
                   <span
                     className="material-symbols-outlined text-primary text-2xl"
                     style={{ fontVariationSettings: '"FILL" 1' }}
@@ -264,7 +260,7 @@ export default async function Home() {
                   Synthetic Hallucinations
                 </p>
               </div>
-              <button className="border-t border-primary/10 pt-4 text-[7px] font-label text-gray-600 uppercase tracking-[0.4em] hover:text-primary transition-colors z-20">
+              <button className="border-t border-primary/10 pt-3 text-[7px] font-label text-gray-600 uppercase tracking-[0.4em] hover:text-primary transition-colors z-20">
                 Decrypt Feed
               </button>
             </div>
@@ -273,7 +269,7 @@ export default async function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full flex flex-col md:flex-row justify-between items-center px-12 py-8 border-t border-primary/5 bg-background shrink-0">
+      <footer className="w-full flex flex-col md:flex-row justify-between items-center px-10 py-4 border-t border-primary/5 bg-background shrink-0">
         <div className="text-secondary font-bold font-label text-[9px] tracking-[0.4em] uppercase opacity-50">
           © MMXXIV GREEN DIVA COLLECTIVE • NEON MONASTERY
         </div>
