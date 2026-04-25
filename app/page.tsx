@@ -164,13 +164,13 @@ export default async function Home() {
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
                 menu_book
               </span>
-              <h4 className="font-headline text-4xl text-on-surface font-light leading-[1.05] mb-3">
+              <h4 className="font-headline text-4xl text-primary font-light leading-[1.05] mb-3">
                 The Written Word
               </h4>
-              <span className="font-label text-[11px] text-primary tracking-[0.3em] uppercase mb-5 block">
+              <span className="font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase mb-5 block">
                 Volume I: Digital Asceticism
               </span>
-              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
+              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-on-surface uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
                 Open the Archives
               </span>
             </div>
@@ -194,13 +194,13 @@ export default async function Home() {
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
                 photo_camera
               </span>
-              <h4 className="font-headline text-4xl text-on-surface font-light leading-[1.05] mb-3">
+              <h4 className="font-headline text-4xl text-primary font-light leading-[1.05] mb-3">
                 The Visual Witness
               </h4>
-              <span className="font-label text-[11px] text-primary tracking-[0.3em] uppercase mb-5 block">
+              <span className="font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase mb-5 block">
                 Gallery 04: Silent Statues
               </span>
-              <button className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap hover:bg-primary/20 transition-all">
+              <button className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-on-surface uppercase tracking-[0.2em] whitespace-nowrap hover:bg-primary/20 transition-all">
                 Enter the Frame
               </button>
             </div>
@@ -228,7 +228,7 @@ export default async function Home() {
                     strokeWidth="1.4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="w-6 h-6 text-primary relative"
+                    className="w-6 h-6 text-secondary relative"
                     aria-label="Holy Chalice"
                   >
                     <path d="M8 3h8" />
@@ -266,18 +266,21 @@ export default async function Home() {
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1.5s]"></div>
               </div>
               <div className="z-20 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></div>
-                  <span className="font-label text-[11px] text-secondary/70 uppercase tracking-[0.2em]">
-                    Neural Sync<span className="animate-sync-ellipsis" aria-hidden="true" />
-                  </span>
-                </div>
                 <h4 className="font-headline text-xl text-primary italic leading-tight">
                   The Machine Vision
                 </h4>
+                <p className="font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase">
+                  Synthetic Hallucinations
+                </p>
               </div>
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 z-20">
-                <div className="w-14 h-14 rounded-full border border-primary/40 flex items-center justify-center module-image">
+              <div className="flex-1 flex items-center justify-between gap-4 z-20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-secondary animate-ping"></div>
+                  <span className="font-label text-[11px] text-secondary/70 uppercase tracking-[0.2em] truncate">
+                    Neural Sync<span className="animate-sync-ellipsis" aria-hidden="true" />
+                  </span>
+                </div>
+                <div className="w-14 h-14 shrink-0 rounded-xl border border-primary/40 flex items-center justify-center module-image">
                   <span
                     className="material-symbols-outlined text-primary text-2xl"
                     style={{ fontVariationSettings: '"FILL" 1' }}
@@ -285,9 +288,6 @@ export default async function Home() {
                     psychology_alt
                   </span>
                 </div>
-                <p className="font-label text-[11px] text-on-surface-variant text-center uppercase tracking-[0.2em] leading-[1.4] max-w-[140px]">
-                  Synthetic Hallucinations
-                </p>
               </div>
             </div>
           </div>
