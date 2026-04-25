@@ -158,12 +158,12 @@ body {
   }
 }
 .containment-field {
-  background: radial-gradient(circle, #74c2b2 0%, transparent 70%);
+  background: radial-gradient(circle, #90decd 0%, transparent 70%);
   animation: containment-pulse 8s ease-in-out infinite;
 }
 
 .relic-text-glow {
-  text-shadow: 0 0 8px rgba(116, 194, 178, 0.4);
+  text-shadow: 0 0 8px rgba(144, 222, 205, 0.4);
 }
 
 .module-card {

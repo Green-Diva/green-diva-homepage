@@ -240,7 +240,7 @@ export default async function Home() {
                   </svg>
                 </div>
               </div>
-              <span className="block font-label text-[11px] text-primary/40 tracking-[0.3em] uppercase z-20 text-center">
+              <span className="block font-label text-[11px] text-secondary/70 tracking-[0.3em] uppercase z-20 text-center">
                 Sacred Artifact
               </span>
               <div aria-hidden="true" className="z-20 flex items-center gap-2">
@@ -267,12 +267,12 @@ export default async function Home() {
               </div>
               <div className="z-20 space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></div>
-                  <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></div>
+                  <span className="font-label text-[11px] text-secondary/70 uppercase tracking-[0.2em]">
                     Neural Sync<span className="animate-sync-ellipsis" aria-hidden="true" />
                   </span>
                 </div>
-                <h4 className="font-headline text-xl text-secondary italic leading-tight">
+                <h4 className="font-headline text-xl text-primary italic leading-tight">
                   The Machine Vision
                 </h4>
               </div>
