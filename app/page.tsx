@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 
 const HERO_PORTRAIT = "/images/hero-portrait.jpg";
 const AVATAR = "/images/avatar.jpg";
@@ -7,9 +6,9 @@ const VISUAL_WITNESS = "/images/visual-witness.jpg";
 
 const NAV_ITEMS = [
   { label: "Sanctuary", href: "/", active: true },
-  { label: "Rituals", href: "#rituals" },
-  { label: "Chronicle", href: "#chronicle" },
-  { label: "Vessels", href: "#vessels" },
+  { label: "Rituals", href: "/rituals" },
+  { label: "Chronicle", href: "/chronicle" },
+  { label: "Vessels", href: "/vessels" },
 ];
 
 const MATRIX_GLYPHS = "01ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ";
@@ -32,12 +31,7 @@ const DIGIT_COLUMNS: string[][] = DIGIT_COLUMN_SEEDS.map((s) => {
   return [...arr, ...arr];
 });
 
-export default async function Home() {
-  const featured = await prisma.project.findFirst({
-    where: { published: true },
-    orderBy: { order: "asc" },
-  });
-
+export default function Home() {
   return (
     <div className="min-h-screen flex flex-col w-full">
       {/* TopAppBar */}
@@ -46,22 +40,20 @@ export default async function Home() {
           Green Diva
         </div>
         <nav className="group hidden md:flex items-center gap-11">
-          {NAV_ITEMS.map((item) => {
-            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 ${
-              item.active
-                ? "text-primary border-secondary/40 group-has-[button:hover]:text-on-surface-variant group-has-[button:hover]:border-transparent"
-                : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40 cursor-pointer"
-            }`;
-            return item.active ? (
-              <Link key={item.label} href={item.href} className={className}>
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} type="button" className={className}>
-                {item.label}
-              </button>
-            );
-          })}
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 ${
+                item.active
+                  ? "text-primary border-secondary/40 group-has-[a:not([data-active]):hover]:text-on-surface-variant group-has-[a:not([data-active]):hover]:border-transparent"
+                  : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40"
+              }`}
+              {...(item.active ? { "data-active": true } : {})}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
         <div className="flex items-center gap-7">
           <Link
@@ -71,14 +63,18 @@ export default async function Home() {
           >
             <span className="material-symbols-outlined text-[26px]">settings</span>
           </Link>
-          <div className="w-10 h-10 rounded-full border border-primary/20 overflow-hidden">
+          <Link
+            href="/profile"
+            aria-label="Profile"
+            className="w-10 h-10 rounded-full border border-primary/20 overflow-hidden block hover:border-primary/40 transition-colors"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="Priestess Profile"
-              className="w-full h-full object-cover grayscale"
+              className="w-full h-full object-cover grayscale hover:grayscale-0 transition-[filter] duration-500"
               src={AVATAR}
             />
-          </div>
+          </Link>
         </div>
       </header>
 
@@ -153,7 +149,7 @@ export default async function Home() {
           </div>
           <div className="lg:row-span-1 flex items-center gap-6 flex-wrap">
             <Link
-              href={featured ? `/projects/${featured.slug}` : "#chronicle"}
+              href="/initiate-ritual"
               className="bg-primary/5 border border-primary/20 text-primary px-8 py-3 font-label tracking-[0.2em] uppercase text-[11px] whitespace-nowrap hover:bg-primary/20 transition-all duration-500"
             >
               Initiate Ritual
@@ -174,12 +170,24 @@ export default async function Home() {
         >
           {/* Module 1: The Written Word */}
           <Link
-            href={featured ? `/projects/${featured.slug}` : "#"}
-            className="module-card group relative flex-1 min-h-[210px] overflow-hidden rounded-xl border border-primary/20 animate-sacred-reveal bg-background block"
+            href="/written-word"
+            className="module-card glitch-host group relative flex-1 min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
             <div className="scanline-overlay absolute inset-0 z-10"></div>
+            <div
+              aria-hidden="true"
+              className="green-noise glitch-noise absolute inset-0 z-30 pointer-events-none mix-blend-screen opacity-0"
+            ></div>
+            <div
+              aria-hidden="true"
+              className="yellow-noise glitch-noise absolute inset-0 z-30 pointer-events-none mix-blend-screen opacity-0"
+            ></div>
+            <div
+              aria-hidden="true"
+              className="glitch-bars absolute inset-0 z-30 pointer-events-none bg-[repeating-linear-gradient(0deg,rgba(144,222,205,0.22)_0px,rgba(144,222,205,0.22)_1px,transparent_1px,transparent_3px)] mix-blend-screen opacity-0"
+            ></div>
             <div className="absolute inset-0 flex flex-col justify-center p-6 z-20">
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
                 menu_book
@@ -190,7 +198,7 @@ export default async function Home() {
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
                 Volume I: Digital Asceticism
               </span>
-              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-on-surface uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
+              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
                 Open the Archives
               </span>
             </div>
@@ -201,7 +209,10 @@ export default async function Home() {
           </Link>
 
           {/* Module 2: The Visual Witness */}
-          <div className="module-card group relative flex-1 min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background">
+          <Link
+            href="/visual-witness"
+            className="module-card group relative flex-1 min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="The Visual Witness"
@@ -220,20 +231,23 @@ export default async function Home() {
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
                 Gallery 04: Silent Statues
               </span>
-              <button className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-on-surface uppercase tracking-[0.2em] whitespace-nowrap hover:bg-primary/20 transition-all">
+              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
                 Enter the Frame
-              </button>
+              </span>
             </div>
             <div className="absolute top-6 right-6 flex gap-3 z-20">
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:0s]"></div>
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1s]"></div>
             </div>
-          </div>
+          </Link>
 
           {/* Row: Relic & Machine Vision */}
           <div className="grid grid-cols-2 gap-6 flex-1 min-h-[210px]">
             {/* Relic Collection */}
-            <div className="module-card group relative bg-background border border-primary/20 rounded-xl overflow-hidden flex flex-col items-center justify-center gap-4 p-5">
+            <Link
+              href="/relic-collection"
+              className="module-card group relative bg-background border border-primary/20 rounded-xl overflow-hidden flex flex-col items-center justify-center gap-4 p-5"
+            >
               <div className="noise-overlay absolute inset-0"></div>
               <div className="containment-field absolute inset-0 opacity-20"></div>
               <div className="scanline-overlay absolute inset-0 z-10"></div>
@@ -271,10 +285,13 @@ export default async function Home() {
               <h4 className="font-headline text-xl text-secondary italic relic-text-glow z-20 text-center">
                 The Relic Collection
               </h4>
-            </div>
+            </Link>
 
             {/* Machine Vision */}
-            <div className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden">
+            <Link
+              href="/machine-vision"
+              className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden"
+            >
               <div className="absolute inset-0 pointer-events-none opacity-20">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_8px]"></div>
               </div>
@@ -349,7 +366,7 @@ export default async function Home() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           </div>
         </section>
       </main>
@@ -360,18 +377,18 @@ export default async function Home() {
           © MMXXIV GREEN DIVA COLLECTIVE · NEON MONASTERY
         </div>
         <div className="flex gap-6">
-          <a
+          <Link
             className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300"
-            href="#"
+            href="/sacred-terms"
           >
             Sacred Terms
-          </a>
-          <a
+          </Link>
+          <Link
             className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300"
-            href="#"
+            href="/privacy-covenant"
           >
             Privacy Covenant
-          </a>
+          </Link>
         </div>
         <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
           <span className="material-symbols-outlined text-primary text-sm">
