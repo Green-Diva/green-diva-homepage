@@ -2,7 +2,7 @@ import type { Dictionary } from "../types";
 
 export const zh: Dictionary = {
   metadata: {
-    title: "李欣翰 | 霓虹修道院",
+    title: "李昕翰 | 霓虹修道院",
     titleTemplate: "%s | 霓虹修道院",
     description:
       "Green Diva — 霓虹修道院中的数字使者。一场穿越数据流的美学朝圣。",
@@ -54,13 +54,13 @@ export const zh: Dictionary = {
     sanctumEntrance: "圣所入口",
     pageTitle: "信徒登入",
     descBefore: "把 ",
-    descTokenName: "欣翰的令牌",
+    descTokenName: "昕翰的令牌",
     descMiddle: " 呈给 ",
     descDiva: "Green Diva",
     descSeparator: "——",
     descGoddess: "女神",
     descAfter: "，让她为你开启圣殿之门。此圣令将仅在你的 cookies 中封存 7 天。",
-    tokenPlaceholder: "欣翰的令牌",
+    tokenPlaceholder: "昕翰的令牌",
     enterSanctuary: "进入圣殿",
     pending: "…",
     invalidToken: "圣库拒绝了你的献祭。",
