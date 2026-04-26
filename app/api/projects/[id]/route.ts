@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { projectUpdateSchema } from "@/lib/validators";
-import { requireAdmin } from "@/lib/auth";
+import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
+  try {
+    await requireUser();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   const { id } = await params;
   const project = await prisma.project.findFirst({
     where: { OR: [{ id }, { slug: id }] },
@@ -15,8 +21,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const auth = requireAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 
   const { id } = await params;
   const json = await req.json().catch(() => null);
@@ -34,9 +44,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: Ctx) {
-  const auth = requireAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 
   const { id } = await params;
   try {

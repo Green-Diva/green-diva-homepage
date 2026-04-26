@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { projectCreateSchema } from "@/lib/validators";
-import { requireAdmin } from "@/lib/auth";
+import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const includeUnpublished = url.searchParams.get("all") === "1";
-  const auth = includeUnpublished ? requireAdmin(req) : { ok: true as const };
-  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
+  try {
+    if (includeUnpublished) {
+      await requireAdmin();
+    } else {
+      await requireUser();
+    }
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 
   const projects = await prisma.project.findMany({
     where: includeUnpublished ? {} : { published: true },
@@ -17,8 +25,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
+  try {
+    await requireAdmin();
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 
   const json = await req.json().catch(() => null);
   const parsed = projectCreateSchema.safeParse(json);
