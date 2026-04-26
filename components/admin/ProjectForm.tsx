@@ -40,7 +40,6 @@ export function ProjectForm({ initial, mode }: { initial?: Partial<ProjectFormVa
     e.preventDefault();
     setBusy(true);
     setErr(null);
-    const token = localStorage.getItem("admin_token") ?? "";
 
     const body = {
       ...values,
@@ -55,10 +54,7 @@ export function ProjectForm({ initial, mode }: { initial?: Partial<ProjectFormVa
 
     const r = await fetch(url, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 

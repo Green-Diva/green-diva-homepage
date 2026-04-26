@@ -1,10 +1,15 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ProjectForm } from "@/components/admin/ProjectForm";
 import { prisma } from "@/lib/db";
+import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function EditProjectPage({ params }: Params) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.level < ADMIN_LEVEL) redirect("/admin");
+
   const { id } = await params;
   const p = await prisma.project.findUnique({ where: { id } });
   if (!p) notFound();

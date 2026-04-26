@@ -1,8 +1,9 @@
 import Link from "next/link";
 import HeroPortrait from "@/components/HeroPortrait";
+import UserMenu from "@/components/UserMenu";
+import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 
 const HERO_PORTRAIT = "/images/hero-portrait.jpg";
-const AVATAR = "/images/avatar.jpg";
 const VISUAL_WITNESS = "/images/visual-witness.jpg";
 
 const NAV_ITEMS = [
@@ -32,7 +33,8 @@ const DIGIT_COLUMNS: string[][] = DIGIT_COLUMN_SEEDS.map((s) => {
   return [...arr, ...arr];
 });
 
-export default function Home() {
+export default async function Home() {
+  const user = await getCurrentUser();
   return (
     <div className="min-h-screen flex flex-col w-full">
       {/* TopAppBar */}
@@ -57,25 +59,17 @@ export default function Home() {
           ))}
         </nav>
         <div className="flex items-center gap-7">
-          <Link
-            href="/admin"
-            className="text-primary hover:bg-primary/5 p-2 rounded-full transition-all duration-300"
-            aria-label="Admin"
-          >
-            <span className="material-symbols-outlined text-[26px]">settings</span>
-          </Link>
-          <Link
-            href="/profile"
-            aria-label="Profile"
-            className="w-10 h-10 rounded-full border border-primary/20 overflow-hidden block hover:border-primary/40 transition-colors"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt="Priestess Profile"
-              className="w-full h-full object-cover grayscale hover:grayscale-0 transition-[filter] duration-500"
-              src={AVATAR}
+          {user ? (
+            <UserMenu
+              user={{
+                name: user.name,
+                level: user.level,
+                avatarUrl: user.avatarUrl,
+                gender: user.gender,
+              }}
+              isAdmin={user.level >= ADMIN_LEVEL}
             />
-          </Link>
+          ) : null}
         </div>
       </header>
 
