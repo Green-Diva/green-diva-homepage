@@ -190,8 +190,7 @@ export default function Home() {
                 Open the Archives
               </span>
             </div>
-            <div className="absolute top-6 right-6 flex gap-3 z-20">
-              <div className="w-2 h-2 rounded-full border border-secondary"></div>
+            <div className="absolute top-6 right-6 flex gap-2 z-20">
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse"></div>
             </div>
           </Link>
@@ -223,7 +222,7 @@ export default function Home() {
                 Enter the Frame
               </span>
             </div>
-            <div className="absolute top-6 right-6 flex gap-3 z-20">
+            <div className="absolute top-6 right-6 flex gap-2 z-20">
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:0s]"></div>
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1s]"></div>
             </div>
@@ -239,6 +238,15 @@ export default function Home() {
               <div className="noise-overlay absolute inset-0"></div>
               <div className="containment-field absolute inset-0 opacity-20"></div>
               <div className="scanline-overlay absolute inset-0 z-10"></div>
+              <div
+                aria-hidden="true"
+                className="absolute top-6 right-6 grid grid-cols-2 gap-1.5 z-20"
+              >
+                <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "0s" }} />
+                <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "-3s" }} />
+                <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "-1s" }} />
+                <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "-2s" }} />
+              </div>
               <div className="relative z-20 animate-floating">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-breathing"></div>
                 <div className="relative w-16 h-16 flex items-center justify-center border rounded-full animate-relic-border-dim">
@@ -265,14 +273,25 @@ export default function Home() {
               <span className="block font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase z-20 text-center">
                 Sacred Artifact
               </span>
-              <div aria-hidden="true" className="z-20 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse [animation-delay:0s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse [animation-delay:0.66s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse [animation-delay:1.32s]" />
+              <div className="z-20 flex flex-col items-center gap-4 w-fit">
+                <div
+                  aria-hidden="true"
+                  className="flex items-center gap-3 w-full"
+                >
+                  <span className="flex-1 h-px bg-gradient-to-r from-transparent to-primary/60"></span>
+                  <span
+                    className="block w-2.5 h-2.5 rounded-full shadow-[0_0_9px_rgba(180,210,160,0.45)]"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(circle at 30% 28%, rgba(255,255,255,0.55), transparent 45%), linear-gradient(to right, #90decd, #e9c176)",
+                    }}
+                  ></span>
+                  <span className="flex-1 h-px bg-gradient-to-r from-secondary/60 to-transparent"></span>
+                </div>
+                <h4 className="font-headline text-xl text-secondary italic relic-text-glow text-center">
+                  The Relic Collection
+                </h4>
               </div>
-              <h4 className="font-headline text-xl text-secondary italic relic-text-glow z-20 text-center">
-                The Relic Collection
-              </h4>
             </Link>
 
             {/* Machine Vision */}

@@ -68,75 +68,112 @@ body {
 }
 .animate-reverse-spin {
   animation:
-    gd-spin 12s linear infinite reverse,
-    relic-border-bright 24s linear infinite;
+    gd-spin 9s linear infinite reverse,
+    relic-border-bright 18s linear infinite;
   animation-play-state: running;
 }
+/* relic v4 */
 
 @keyframes relic-border-bright {
   0%,
-  21%,
+  22%,
   100% {
     border-color: rgba(144, 222, 205, 0.7);
   }
+  36% {
+    border-color: rgba(190, 210, 160, 0.55);
+  }
   50%,
-  71% {
+  72% {
     border-color: rgba(233, 193, 118, 0.7);
+  }
+  86% {
+    border-color: rgba(190, 210, 160, 0.55);
   }
 }
 @keyframes relic-border-dim {
   0%,
-  21%,
+  22%,
   100% {
     border-color: rgba(144, 222, 205, 0.4);
   }
+  36% {
+    border-color: rgba(190, 210, 160, 0.3);
+  }
   50%,
-  71% {
+  72% {
     border-color: rgba(233, 193, 118, 0.4);
+  }
+  86% {
+    border-color: rgba(190, 210, 160, 0.3);
   }
 }
 @keyframes relic-text-color {
   0%,
-  21%,
+  22%,
   100% {
     color: rgb(144, 222, 205);
   }
+  36% {
+    color: rgb(190, 210, 160);
+  }
   50%,
-  71% {
+  72% {
     color: rgb(233, 193, 118);
+  }
+  86% {
+    color: rgb(190, 210, 160);
   }
 }
 @keyframes relic-text-color-70 {
   0%,
-  21%,
+  22%,
   100% {
     color: rgba(144, 222, 205, 0.7);
   }
+  36% {
+    color: rgba(190, 210, 160, 0.7);
+  }
   50%,
-  71% {
+  72% {
     color: rgba(233, 193, 118, 0.7);
+  }
+  86% {
+    color: rgba(190, 210, 160, 0.7);
   }
 }
 @keyframes relic-text-color-80 {
   0%,
-  21%,
+  22%,
   100% {
     color: rgba(144, 222, 205, 0.8);
   }
+  36% {
+    color: rgba(190, 210, 160, 0.8);
+  }
   50%,
-  71% {
+  72% {
     color: rgba(233, 193, 118, 0.8);
+  }
+  86% {
+    color: rgba(190, 210, 160, 0.8);
   }
 }
 @keyframes relic-bg-color {
   0%,
-  21%,
+  22%,
   100% {
     background-color: rgb(144, 222, 205);
   }
+  36% {
+    background-color: rgb(190, 210, 160);
+  }
   50%,
-  71% {
+  72% {
     background-color: rgb(233, 193, 118);
+  }
+  86% {
+    background-color: rgb(190, 210, 160);
   }
 }
 @keyframes written-glitch {
@@ -251,27 +288,118 @@ body {
 }
 
 .animate-relic-border-dim {
-  animation: relic-border-dim 24s linear infinite;
+  animation: relic-border-dim 18s linear infinite;
 }
 .animate-relic-text {
-  animation: relic-text-color 24s linear infinite;
+  animation: relic-text-color 18s linear infinite;
 }
 /* relic v3 hold */
+
+/* ccw v4 tri-state rotation */
 .animate-relic-text-70 {
-  animation: relic-text-color-70 24s linear infinite;
+  animation: relic-text-color-70 18s linear infinite;
 }
 .animate-relic-text-80 {
-  animation: relic-text-color-80 24s linear infinite;
+  animation: relic-text-color-80 18s linear infinite;
 }
 .animate-pulse-relic {
   animation:
     pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite,
-    relic-bg-color 24s linear infinite;
+    relic-bg-color 18s linear infinite;
 }
+
+@keyframes ccw-rotate-tl {
+  0%,
+  22.5% {
+    opacity: 0;
+  }
+  27.5%,
+  47.5% {
+    opacity: 1;
+  }
+  52.5%,
+  97.5% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ccw-rotate-tr {
+  0%,
+  22.5% {
+    opacity: 0.4;
+  }
+  27.5%,
+  47.5% {
+    opacity: 0;
+  }
+  52.5%,
+  72.5% {
+    opacity: 1;
+  }
+  77.5%,
+  100% {
+    opacity: 0.4;
+  }
+}
+@keyframes ccw-rotate-bl {
+  0%,
+  22.5% {
+    opacity: 1;
+  }
+  27.5%,
+  72.5% {
+    opacity: 0.4;
+  }
+  77.5%,
+  97.5% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes ccw-rotate-br {
+  0%,
+  47.5% {
+    opacity: 0.4;
+  }
+  52.5%,
+  72.5% {
+    opacity: 0;
+  }
+  77.5%,
+  97.5% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+@keyframes cw-stair {
+  0% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0;
+  }
+  90% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.cw-stair {
+  animation: cw-stair 4s linear infinite;
+}
+/* cw stair v3 asymmetric */
+/* cw stair v1 */
 .animate-ping-relic {
   animation:
     ping 1s cubic-bezier(0, 0, 0.2, 1) infinite,
-    relic-bg-color 24s linear infinite;
+    relic-bg-color 18s linear infinite;
 }
 
 @keyframes matrix-rain {
