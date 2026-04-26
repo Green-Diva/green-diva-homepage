@@ -318,7 +318,7 @@ export default function Home() {
                           className="flex flex-col items-center animate-matrix-rain"
                           style={{
                             animationDelay: `${(ci * 0.7).toFixed(2)}s`,
-                            animationDuration: `${(2.6 + ci * 0.6).toFixed(2)}s`,
+                            animationDuration: `${[5, 8, 10][ci]}s`,
                           }}
                         >
                           {col.map((c, i) => (
@@ -341,7 +341,7 @@ export default function Home() {
                           className="flex flex-col items-center animate-matrix-rain"
                           style={{
                             animationDelay: `${(0.5 + ci * 0.7).toFixed(2)}s`,
-                            animationDuration: `${(2.6 + ci * 0.6).toFixed(2)}s`,
+                            animationDuration: `${[5, 8, 10][ci]}s`,
                           }}
                         >
                           {col.map((c, i) => (

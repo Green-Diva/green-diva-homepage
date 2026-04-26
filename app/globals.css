@@ -75,55 +75,67 @@ body {
 
 @keyframes relic-border-bright {
   0%,
+  21%,
   100% {
     border-color: rgba(144, 222, 205, 0.7);
   }
-  50% {
+  50%,
+  71% {
     border-color: rgba(233, 193, 118, 0.7);
   }
 }
 @keyframes relic-border-dim {
   0%,
+  21%,
   100% {
     border-color: rgba(144, 222, 205, 0.4);
   }
-  50% {
+  50%,
+  71% {
     border-color: rgba(233, 193, 118, 0.4);
   }
 }
 @keyframes relic-text-color {
   0%,
+  21%,
   100% {
     color: rgb(144, 222, 205);
   }
-  50% {
+  50%,
+  71% {
     color: rgb(233, 193, 118);
   }
 }
 @keyframes relic-text-color-70 {
   0%,
+  21%,
   100% {
     color: rgba(144, 222, 205, 0.7);
   }
-  50% {
+  50%,
+  71% {
     color: rgba(233, 193, 118, 0.7);
   }
 }
 @keyframes relic-text-color-80 {
   0%,
+  21%,
   100% {
     color: rgba(144, 222, 205, 0.8);
   }
-  50% {
+  50%,
+  71% {
     color: rgba(233, 193, 118, 0.8);
   }
 }
 @keyframes relic-bg-color {
   0%,
+  21%,
   100% {
     background-color: rgb(144, 222, 205);
   }
-  50% {
+  50%,
+  71% {
     background-color: rgb(233, 193, 118);
   }
 }
@@ -244,6 +256,7 @@ body {
 .animate-relic-text {
   animation: relic-text-color 24s linear infinite;
 }
+/* relic v3 hold */
 .animate-relic-text-70 {
   animation: relic-text-color-70 24s linear infinite;
 }
