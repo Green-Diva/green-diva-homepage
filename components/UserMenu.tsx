@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
+import { format } from "@/lib/i18n/format";
 
 type Props = {
   user: {
@@ -41,8 +43,12 @@ export default function UserMenu({ user, isAdmin }: Props) {
     router.refresh();
   }
 
+  const t = useT();
   const initial = user.name.trim().charAt(0).toUpperCase() || "·";
-  const tier = user.level >= 100 ? "High Lord" : `Acolyte · L${user.level}`;
+  const tier =
+    user.level >= 100
+      ? t.tier.highLord
+      : format(t.tier.acolyte, { level: user.level });
 
   return (
     <div ref={wrapRef} className="relative">
@@ -51,7 +57,7 @@ export default function UserMenu({ user, isAdmin }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={t.userMenu.aria}
         className="flex items-center gap-3 group cursor-pointer"
       >
         <div className="hidden sm:flex flex-col items-end leading-tight">
@@ -94,12 +100,12 @@ export default function UserMenu({ user, isAdmin }: Props) {
           </Link>
           {isAdmin ? (
             <Link
-              href="/admin"
+              href="/admin/users"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="block px-4 py-3 font-label text-[10px] tracking-[0.3em] uppercase text-primary/80 hover:text-primary hover:bg-primary/10 transition-colors"
             >
-              Member Review
+              {t.userMenu.memberReview}
             </Link>
           ) : null}
           <button
@@ -108,7 +114,7 @@ export default function UserMenu({ user, isAdmin }: Props) {
             onClick={onLogout}
             className="block w-full text-left px-4 py-3 font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
           >
-            Log out
+            {t.userMenu.logOut}
           </button>
         </div>
       ) : null}

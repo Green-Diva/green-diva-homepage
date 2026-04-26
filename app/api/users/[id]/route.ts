@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { userUpdateSchema } from "@/lib/validators";
 import { ADMIN_LEVEL, AuthError, generateToken, requireAdmin } from "@/lib/auth";
+import { getDictionary } from "@/lib/i18n/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -47,8 +48,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         where: { level: { gte: ADMIN_LEVEL }, NOT: { id } },
       });
       if (remaining === 0) {
+        const t = await getDictionary();
         return NextResponse.json(
-          { error: "Cannot demote the only remaining priestess." },
+          { error: t.errors.cannotDemoteOnlyPriestess },
           { status: 400 },
         );
       }
@@ -94,8 +96,9 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   }
 
   const { id } = await params;
+  const t = await getDictionary();
   if (id === me.id) {
-    return NextResponse.json({ error: "Cannot remove yourself." }, { status: 400 });
+    return NextResponse.json({ error: t.errors.cannotRemoveSelf }, { status: 400 });
   }
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -105,7 +108,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
     });
     if (remaining === 0) {
       return NextResponse.json(
-        { error: "Cannot remove the only remaining priestess." },
+        { error: t.errors.cannotRemoveOnlyPriestess },
         { status: 400 },
       );
     }

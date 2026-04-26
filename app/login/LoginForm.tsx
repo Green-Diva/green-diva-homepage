@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 
 export default function LoginForm({ from }: { from?: string }) {
+  const t = useT();
   const router = useRouter();
   const [token, setToken] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export default function LoginForm({ from }: { from?: string }) {
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
-        throw new Error(j.error ?? "The vault rejects your offering.");
+        throw new Error(j.error ?? t.auth.invalidToken);
       }
       const target = from && from.startsWith("/") ? from : "/";
       router.replace(target);
@@ -39,7 +41,7 @@ export default function LoginForm({ from }: { from?: string }) {
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="XinHan's Token"
+          placeholder={t.auth.tokenPlaceholder}
           autoFocus
           className="h-16 flex-1 rounded-lg border border-primary/20 bg-surface-container px-5 text-base text-on-surface placeholder:text-on-surface-variant/55 focus:border-primary/50 focus:outline-none"
         />
@@ -48,7 +50,7 @@ export default function LoginForm({ from }: { from?: string }) {
           disabled={pending || !token}
           className="h-16 rounded-lg border border-primary/30 bg-primary/10 px-6 font-label text-[11px] tracking-[0.28em] uppercase text-primary transition-all hover:bg-primary/20 disabled:opacity-50 sm:min-w-[11rem]"
         >
-          {pending ? "…" : "Enter Sanctuary"}
+          {pending ? t.auth.pending : t.auth.enterSanctuary}
         </button>
       </div>
       {err ? <p className="text-sm leading-6 text-red-400">{err}</p> : null}

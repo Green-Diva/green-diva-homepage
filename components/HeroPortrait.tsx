@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 
 type Props = {
   src: string;
 };
 
 export default function HeroPortrait({ src }: Props) {
+  const t = useT();
   const [revealed, setRevealed] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -36,7 +38,7 @@ export default function HeroPortrait({ src }: Props) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        alt="The Green Diva Portrait"
+        alt={t.hero.portraitAlt}
         className={`w-full h-full object-cover transition-[filter] duration-[1000ms] ease-out ${filterClass}`}
         src={src}
       />
@@ -59,7 +61,7 @@ export default function HeroPortrait({ src }: Props) {
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-100 group-hover:opacity-50 transition-opacity duration-[1000ms] ease-out pointer-events-none"></div>
       <div className="absolute bottom-6 left-0 right-0 text-center">
         <span className="font-label text-[11px] text-primary/50 group-hover:text-primary/80 tracking-[0.3em] uppercase transition-colors duration-[1000ms] ease-out">
-          Codename · Diva-01
+          {t.hero.codename}
         </span>
       </div>
     </div>

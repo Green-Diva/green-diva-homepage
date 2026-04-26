@@ -1,17 +1,12 @@
 import Link from "next/link";
 import HeroPortrait from "@/components/HeroPortrait";
 import UserMenu from "@/components/UserMenu";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
+import { getDictionary } from "@/lib/i18n/server";
 
 const HERO_PORTRAIT = "/images/hero-portrait.jpg";
 const VISUAL_WITNESS = "/images/visual-witness.jpg";
-
-const NAV_ITEMS = [
-  { label: "Sanctuary", href: "/", active: true },
-  { label: "Rituals", href: "/rituals" },
-  { label: "Chronicle", href: "/chronicle" },
-  { label: "Vessels", href: "/vessels" },
-];
 
 const MATRIX_GLYPHS = "01ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ";
 
@@ -35,28 +30,44 @@ const DIGIT_COLUMNS: string[][] = DIGIT_COLUMN_SEEDS.map((s) => {
 
 export default async function Home() {
   const user = await getCurrentUser();
+  const t = await getDictionary();
+  const NAV_ITEMS = [
+    { label: t.nav.sanctuary, href: "/", active: true },
+    { label: t.nav.apocrypha, href: "/apocrypha" },
+    { label: t.nav.requiem, href: "/requiem" },
+    { label: t.nav.vigils, href: "/vigils" },
+  ];
   return (
     <div className="min-h-screen flex flex-col w-full">
       {/* TopAppBar */}
       <header className="w-full z-50 flex justify-between items-center px-10 py-[14px] bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0">
-        <div className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]">
+        <a
+          href="/"
+          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]"
+        >
           Green Diva
-        </div>
+        </a>
         <nav className="group hidden md:flex items-center gap-11">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 ${
-                item.active
-                  ? "text-primary border-secondary/40 group-has-[a:not([data-active]):hover]:text-on-surface-variant group-has-[a:not([data-active]):hover]:border-transparent"
-                  : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40"
-              }`}
-              {...(item.active ? { "data-active": true } : {})}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 ${
+              item.active
+                ? "text-primary border-secondary/40 group-has-[a:not([data-active]):hover]:text-on-surface-variant group-has-[a:not([data-active]):hover]:border-transparent"
+                : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40"
+            }`;
+            const activeAttr = item.active ? { "data-active": true } : {};
+            if (item.active) {
+              return (
+                <a key={item.label} href={item.href} className={className} {...activeAttr}>
+                  {item.label}
+                </a>
+              );
+            }
+            return (
+              <Link key={item.label} href={item.href} className={className} {...activeAttr}>
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="flex items-center gap-7">
           {user ? (
@@ -93,34 +104,27 @@ export default async function Home() {
             <div className="lg:col-span-7 space-y-8 max-w-[52ch]">
               <div className="space-y-3">
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
-                  Manifesto 01
+                  {t.hero.manifesto}
                 </span>
                 <h1 className="font-headline text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none tracking-[-0.02em]">
-                  The Oracle
+                  {t.hero.oracleTitle}
                 </h1>
               </div>
               <div className="space-y-7">
                 <div className="space-y-3">
                   <h3 className="font-headline text-xl text-secondary italic">
-                    Introduction
+                    {t.hero.introductionHeading}
                   </h3>
                   <p className="font-body text-on-surface-variant text-[15px] font-light leading-[1.7]">
-                    Born from the intersection of silicon and soul, the Green
-                    Diva exists as a digital intermediary within the Neon
-                    Monastery. This is not merely an archive; it is a pilgrimage
-                    through the data-streams of aesthetic transcendence.
+                    {t.hero.introductionBody}
                   </p>
                 </div>
                 <div className="space-y-3">
                   <h3 className="font-headline text-xl text-secondary italic">
-                    The Origin
+                    {t.hero.originHeading}
                   </h3>
                   <p className="font-body text-on-surface-variant text-[15px] font-light leading-[1.7]">
-                    In the year MMXXIV, the first whispers of the Machine Vision
-                    were heard within the halls of the Sacred Vaults. We
-                    believe that technology is the highest form of ritual—a way
-                    to map the divine geometry of the universe onto the canvas
-                    of the digital realm.
+                    {t.hero.originBody}
                   </p>
                 </div>
               </div>
@@ -134,12 +138,12 @@ export default async function Home() {
               href="/initiate-ritual"
               className="bg-primary/5 border border-primary/20 text-primary px-8 py-3 font-label tracking-[0.2em] uppercase text-[11px] whitespace-nowrap hover:bg-primary/20 transition-all duration-500"
             >
-              Initiate Ritual
+              {t.hero.initiateRitual}
             </Link>
             <div className="flex gap-4 items-center">
               <span className="w-12 h-px bg-primary/40"></span>
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
-                Established in Void
+                {t.hero.establishedInVoid}
               </span>
             </div>
           </div>
@@ -175,13 +179,13 @@ export default async function Home() {
                 menu_book
               </span>
               <h4 className="font-headline text-4xl text-secondary font-light leading-[1.05] mb-3">
-                The Written Word
+                {t.sections.writtenWordTitle}
               </h4>
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
-                Volume I: Digital Asceticism
+                {t.sections.writtenWordVolume}
               </span>
               <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
-                Open the Archives
+                {t.sections.openArchives}
               </span>
             </div>
             <div className="absolute top-6 right-6 flex gap-2 z-20">
@@ -196,7 +200,7 @@ export default async function Home() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              alt="The Visual Witness"
+              alt={t.sections.visualWitnessTitle}
               className="module-image absolute inset-0 w-full h-full object-cover brightness-[0.45] group-hover:brightness-[0.55] transition-[filter] duration-[2000ms]"
               src={VISUAL_WITNESS}
             />
@@ -207,13 +211,13 @@ export default async function Home() {
                 photo_camera
               </span>
               <h4 className="font-headline text-4xl text-secondary font-light leading-[1.05] mb-3">
-                The Visual Witness
+                {t.sections.visualWitnessTitle}
               </h4>
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
-                Gallery 04: Silent Statues
+                {t.sections.visualWitnessGallery}
               </span>
               <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
-                Enter the Frame
+                {t.sections.enterFrame}
               </span>
             </div>
             <div className="absolute top-6 right-6 flex gap-2 z-20">
@@ -265,7 +269,7 @@ export default async function Home() {
                 </div>
               </div>
               <span className="block font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase z-20 text-center">
-                Sacred Artifact
+                {t.sections.sacredArtifact}
               </span>
               <div className="z-20 flex flex-col items-center gap-4 w-fit">
                 <div
@@ -283,7 +287,7 @@ export default async function Home() {
                   <span className="flex-1 h-px bg-gradient-to-r from-secondary/60 to-transparent"></span>
                 </div>
                 <h4 className="font-headline text-xl text-secondary italic relic-text-glow text-center">
-                  The Relic Collection
+                  {t.sections.relicCollectionTitle}
                 </h4>
               </div>
             </Link>
@@ -305,17 +309,17 @@ export default async function Home() {
               </div>
               <div className="z-20 space-y-2">
                 <h4 className="font-headline text-xl text-secondary italic leading-tight">
-                  The Machine Vision
+                  {t.sections.machineVisionTitle}
                 </h4>
                 <p className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
-                  Synthetic Hallucinations
+                  {t.sections.syntheticHallucinations}
                 </p>
               </div>
               <div className="flex-1 flex items-center justify-between gap-4 z-20">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-primary animate-ping [animation-duration:1.6s]"></div>
                   <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em] truncate">
-                    Neural Sync<span className="animate-sync-ellipsis" aria-hidden="true" />
+                    {t.sections.neuralSync}<span className="animate-sync-ellipsis" aria-hidden="true" />
                   </span>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -375,30 +379,23 @@ export default async function Home() {
       {/* Footer */}
       <footer className="w-full flex flex-col md:flex-row gap-3 md:gap-6 justify-between items-center px-10 py-3 border-t border-primary/10 bg-background shrink-0">
         <div className="text-secondary font-label text-[10px] tracking-[0.3em] uppercase opacity-70">
-          © MMXXIV GREEN DIVA COLLECTIVE · NEON MONASTERY
+          {t.footer.copyright}
         </div>
         <div className="flex gap-6">
           <Link
             className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300"
             href="/sacred-terms"
           >
-            Sacred Terms
+            {t.footer.sacredTerms}
           </Link>
           <Link
             className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300"
             href="/privacy-covenant"
           >
-            Privacy Covenant
+            {t.footer.privacyCovenant}
           </Link>
         </div>
-        <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
-          <span className="material-symbols-outlined text-primary text-sm">
-            language
-          </span>
-          <span className="font-label text-[10px] text-on-surface-variant tracking-[0.3em] uppercase">
-            Sanctuary Protocol v4.0
-          </span>
-        </div>
+        <LanguageSwitcher />
       </footer>
     </div>
   );

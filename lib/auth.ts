@@ -5,11 +5,17 @@ import { prisma } from "@/lib/db";
 
 export const SESSION_COOKIE = "gd_session";
 export const ADMIN_LEVEL = 100;
+
+export function formatSerial(serial: number | null | undefined): string {
+  if (serial == null) return "—";
+  return String(serial).padStart(3, "0");
+}
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7d
 const RENEW_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 2; // 2d
 
 export type CurrentUser = {
   id: string;
+  serial: number | null;
   name: string;
   level: number;
   token: string;
@@ -80,6 +86,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const u = session.user;
   return {
     id: u.id,
+    serial: u.serial,
     name: u.name,
     level: u.level,
     token: u.token,

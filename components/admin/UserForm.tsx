@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
+import { format } from "@/lib/i18n/format";
 
 export type UserFormValues = {
   id?: string;
@@ -30,6 +32,7 @@ export function UserForm({
   initial?: Partial<UserFormValues>;
   initialMaskedToken?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [values, setValues] = useState<UserFormValues>({ ...empty, ...initial });
   const [busy, setBusy] = useState(false);
@@ -77,7 +80,7 @@ export function UserForm({
 
   async function onRegenerate() {
     if (!values.id) return;
-    if (!confirm("Rotate this user's token? Their current sessions will be revoked.")) return;
+    if (!confirm(t.adminUserForm.confirmRotate)) return;
     const r = await fetch(`/api/users/${values.id}?regenerate=1`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -85,7 +88,7 @@ export function UserForm({
     });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      alert(`Rotate failed: ${j.error ?? r.statusText}`);
+      alert(format(t.adminUserForm.rotateFailed, { error: j.error ?? r.statusText }));
       return;
     }
     const data = await r.json();
@@ -97,13 +100,13 @@ export function UserForm({
     return (
       <main className="mx-auto w-full max-w-2xl px-8 py-14">
         <span className="font-label text-secondary tracking-[0.4em] text-[10px] uppercase">
-          Sacred Token Issued
+          {t.adminUserForm.sacredTokenIssued}
         </span>
         <h1 className="mt-2 font-headline text-4xl font-light text-primary sacred-glow">
-          Bear it carefully
+          {t.adminUserForm.bearCarefully}
         </h1>
         <p className="mt-4 text-sm text-on-surface-variant font-light">
-          This token will only be revealed once. Copy it now and deliver it to {values.name}.
+          {format(t.adminUserForm.revealOnceNotice, { name: values.name })}
         </p>
         <div className="mt-6 rounded-lg border border-primary/30 bg-surface-container px-4 py-3 font-mono text-sm text-primary break-all">
           {issuedToken}
@@ -114,7 +117,7 @@ export function UserForm({
             onClick={() => navigator.clipboard?.writeText(issuedToken)}
             className="bg-primary/10 border border-primary/30 text-primary px-6 py-2 font-label tracking-widest uppercase text-[10px] hover:bg-primary/20 transition-all rounded-lg"
           >
-            Copy
+            {t.adminUserForm.copy}
           </button>
           <button
             type="button"
@@ -124,7 +127,7 @@ export function UserForm({
             }}
             className="border border-primary/10 px-6 py-2 font-label tracking-widest uppercase text-[10px] text-gray-500 hover:text-primary hover:border-primary/30 transition-all rounded-lg"
           >
-            Done
+            {t.adminUserForm.done}
           </button>
         </div>
       </main>
@@ -135,15 +138,15 @@ export function UserForm({
     <form onSubmit={onSubmit} className="mx-auto w-full max-w-2xl space-y-6 px-8 py-14">
       <div>
         <span className="font-label text-secondary tracking-[0.4em] text-[10px] uppercase">
-          {mode === "create" ? "New Acolyte" : "Amend Acolyte"}
+          {mode === "create" ? t.adminUserForm.newAcolyteLabel : t.adminUserForm.amendAcolyteLabel}
         </span>
         <h1 className="mt-2 font-headline text-4xl font-light text-primary sacred-glow">
-          {mode === "create" ? "Anoint" : "Refine"}
+          {mode === "create" ? t.adminUserForm.newAcolyteTitle : t.adminUserForm.amendAcolyteTitle}
         </h1>
       </div>
 
       <label className="block">
-        <span className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">Name</span>
+        <span className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">{t.adminUserForm.fieldName}</span>
         <input
           className={input}
           value={values.name}
@@ -154,21 +157,21 @@ export function UserForm({
 
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="block">
-          <span className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">Gender</span>
+          <span className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">{t.adminUserForm.fieldGender}</span>
           <select
             className={input}
             value={values.gender}
             onChange={(e) => field("gender", e.target.value as UserFormValues["gender"])}
           >
-            <option value="">—</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-            <option value="other">Other</option>
+            <option value="">{t.adminUserForm.fieldGenderEmpty}</option>
+            <option value="female">{t.gender.female}</option>
+            <option value="male">{t.gender.male}</option>
+            <option value="other">{t.gender.other}</option>
           </select>
         </label>
         <label className="block">
           <span className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">
-            Level (≥100 = Priestess)
+            {t.adminUserForm.fieldLevel}
           </span>
           <input
             className={input}
@@ -184,20 +187,20 @@ export function UserForm({
 
       <label className="block">
         <span className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">
-          Avatar URL (optional, will be system-generated later)
+          {t.adminUserForm.fieldAvatar}
         </span>
         <input
           className={input}
           value={values.avatarUrl}
           onChange={(e) => field("avatarUrl", e.target.value)}
-          placeholder="https://…"
+          placeholder={t.adminUserForm.avatarPlaceholder}
         />
       </label>
 
       {mode === "edit" && maskedToken ? (
         <div className="border border-primary/10 rounded-lg p-4 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">Token</div>
+            <div className="text-[10px] font-label uppercase tracking-[0.3em] text-primary/60">{t.adminUserForm.tokenLabel}</div>
             <div className="mt-2 font-mono text-sm text-on-surface-variant">{maskedToken}</div>
           </div>
           <button
@@ -205,7 +208,7 @@ export function UserForm({
             onClick={onRegenerate}
             className="border border-primary/30 text-primary px-5 py-2 font-label tracking-widest uppercase text-[10px] hover:bg-primary/10 transition-all rounded-lg"
           >
-            Regenerate
+            {t.adminUserForm.regenerate}
           </button>
         </div>
       ) : null}
@@ -218,14 +221,14 @@ export function UserForm({
           disabled={busy}
           className="bg-primary/10 border border-primary/30 text-primary px-8 py-3 font-label tracking-widest uppercase text-[10px] hover:bg-primary/20 transition-all rounded-lg disabled:opacity-40"
         >
-          {busy ? "…" : mode === "create" ? "Anoint" : "Save"}
+          {busy ? t.bio.pending : mode === "create" ? t.adminUserForm.submitAnoint : t.adminUserForm.submitSave}
         </button>
         <button
           type="button"
           onClick={() => router.push("/admin/users")}
           className="border border-primary/10 px-8 py-3 font-label tracking-widest uppercase text-[10px] text-gray-500 hover:text-primary hover:border-primary/30 transition-all rounded-lg"
         >
-          Withdraw
+          {t.adminUserForm.cancel}
         </button>
       </div>
     </form>

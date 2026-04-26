@@ -11,9 +11,10 @@ export async function GET() {
     throw e;
   }
   const users = await prisma.user.findMany({
-    orderBy: [{ level: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ serial: "asc" }],
     select: {
       id: true,
+      serial: true,
       name: true,
       gender: true,
       level: true,
@@ -52,14 +53,19 @@ export async function POST(req: NextRequest) {
   const token = data.token ?? generateToken();
 
   try {
-    const created = await prisma.user.create({
-      data: {
-        name: data.name,
-        gender: data.gender ?? null,
-        level: data.level,
-        avatarUrl: data.avatarUrl ?? null,
-        token,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const max = await tx.user.aggregate({ _max: { serial: true } });
+      const nextSerial = (max._max.serial ?? 0) + 1;
+      return tx.user.create({
+        data: {
+          serial: nextSerial,
+          name: data.name,
+          gender: data.gender ?? null,
+          level: data.level,
+          avatarUrl: data.avatarUrl ?? null,
+          token,
+        },
+      });
     });
     // return full token ONCE
     return NextResponse.json(created, { status: 201 });

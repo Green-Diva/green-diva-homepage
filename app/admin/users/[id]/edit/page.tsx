@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string }> };
 export default async function EditUserPage({ params }: Params) {
   const me = await getCurrentUser();
   if (!me) redirect("/login");
-  if (me.level < ADMIN_LEVEL) redirect("/admin");
+  if (me.level < ADMIN_LEVEL) redirect("/");
 
   const { id } = await params;
   const u = await prisma.user.findUnique({ where: { id } });

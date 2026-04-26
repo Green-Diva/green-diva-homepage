@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Noto_Serif, Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { I18nProvider } from "@/lib/i18n/client";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
 
 const notoSerif = Noto_Serif({
   variable: "--font-noto-serif",
@@ -21,27 +23,50 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["300", "500", "700"],
 });
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME ?? "GREEN DIVA";
+export async function generateMetadata(): Promise<Metadata> {
+  const dict = await getDictionary();
+  return {
+    title: {
+      default: dict.metadata.title,
+      template: dict.metadata.titleTemplate,
+    },
+    description: dict.metadata.description,
+  };
+}
 
-export const metadata: Metadata = {
-  title: {
-    default: `${siteName} | The Neon Monastery`,
-    template: `%s · ${siteName}`,
-  },
-  description:
-    "Green Diva — a digital intermediary within the Neon Monastery. A pilgrimage through the data-streams of aesthetic transcendence.",
-};
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
+  const dict = await getDictionary();
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`dark ${notoSerif.variable} ${manrope.variable} ${spaceGrotesk.variable}`}
     >
-      <body className="font-body selection:bg-primary/30 selection:text-primary min-h-screen flex flex-col">
-        {children}
+      <body className="font-body selection:bg-primary/30 selection:text-primary min-h-screen flex flex-col relative">
+        {/* Global atmospheric backdrop */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+        >
+          {/* faint grid lattice */}
+          <div
+            className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(rgba(144,222,205,1)_1px,transparent_1px),linear-gradient(90deg,rgba(144,222,205,1)_1px,transparent_1px)]"
+            style={{ backgroundSize: "56px 56px" }}
+          />
+          {/* radial vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_0%,rgba(0,0,0,0.55)_70%,rgba(0,0,0,0.85)_100%)]" />
+          {/* drifting nebula */}
+          <div className="absolute -top-40 left-1/4 w-[640px] h-[640px] rounded-full bg-primary/[0.04] blur-[140px]" />
+          <div className="absolute bottom-0 -right-40 w-[520px] h-[520px] rounded-full bg-secondary/[0.035] blur-[120px]" />
+          {/* scanline cap */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+        </div>
+        <I18nProvider locale={locale} dict={dict}>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

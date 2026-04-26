@@ -1,23 +1,29 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { formatSerial, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import BioEditor from "./BioEditor";
 import ActivityList from "./ActivityList";
 import SkillsRadar from "@/components/SkillsRadar";
 import TokenField from "./TokenField";
-
-const GENDER_LABEL: Record<string, string> = {
-  female: "Female",
-  male: "Male",
-  other: "Other",
-};
+import { getDictionary } from "@/lib/i18n/server";
+import { format } from "@/lib/i18n/format";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?from=/profile");
 
-  const tier = user.level >= 100 ? "High Lord" : `Acolyte · L${user.level}`;
+  const t = await getDictionary();
+  const GENDER_LABEL: Record<string, string> = {
+    female: t.gender.female,
+    male: t.gender.male,
+    other: t.gender.other,
+  };
+
+  const tier =
+    user.level >= 100
+      ? t.tier.highLord
+      : format(t.tier.acolyte, { level: user.level });
   const initial = user.name.trim().charAt(0).toUpperCase() || "·";
 
   const activities = await prisma.activity.findMany({
@@ -36,22 +42,43 @@ export default async function ProfilePage() {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const serialLabel = formatSerial(user.serial);
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-8 py-14">
-      <div className="flex items-center justify-between">
+    <main className="relative mx-auto w-full max-w-5xl px-8 py-14">
+      {/* atmospheric backdrop */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute -top-32 -left-24 w-[420px] h-[420px] rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute top-40 -right-32 w-[520px] h-[520px] rounded-full bg-secondary/[0.04] blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      </div>
+
+      <div className="flex items-end justify-between gap-6 flex-wrap">
         <div>
           <span className="font-label text-secondary tracking-[0.4em] text-[10px] uppercase">
-            Vessel · Identity
+            {t.profile.vesselIdentity}
           </span>
-          <h1 className="mt-2 font-headline text-4xl font-light text-primary sacred-glow">
-            Inner Records
+          <h1 className="mt-2 font-headline text-5xl md:text-6xl font-light text-primary sacred-glow leading-[0.95] tracking-[-0.02em]">
+            {t.profile.innerRecord}
+            <span className="ml-3 align-middle font-mono text-2xl md:text-3xl text-secondary tracking-[0.18em]">
+              · {serialLabel}
+            </span>
           </h1>
+          <div className="mt-3 flex items-center gap-3 font-label text-[10px] tracking-[0.3em] uppercase text-primary/50">
+            <span className="block w-10 h-px bg-primary/30" />
+            <span>{user.name}</span>
+            <span className="text-primary/30">/</span>
+            <span>{tier}</span>
+          </div>
         </div>
         <Link
           href="/"
           className="font-label text-[10px] tracking-[0.3em] uppercase text-primary/70 hover:text-primary transition-colors"
         >
-          Sanctuary
+          {t.profile.backToSanctuary}
         </Link>
       </div>
 
@@ -59,7 +86,7 @@ export default async function ProfilePage() {
       <section className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="rounded-xl border border-primary/15 bg-surface-container/40 p-6">
           <span className="font-label text-[10px] tracking-[0.3em] uppercase text-primary/60">
-            Vessel · Basics
+            {t.profile.vesselBasics}
           </span>
           <div className="mt-4">
             <div className="font-headline text-3xl text-primary">{user.name}</div>
@@ -68,12 +95,12 @@ export default async function ProfilePage() {
             </div>
           </div>
           <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-primary/10 pt-5">
-            <Field label="Name" value={user.name} />
+            <Field label={t.profile.fieldName} value={user.name} />
             <Field
-              label="Gender"
-              value={user.gender ? GENDER_LABEL[user.gender] ?? user.gender : "—"}
+              label={t.profile.fieldGender}
+              value={user.gender ? GENDER_LABEL[user.gender] ?? user.gender : t.gender.none}
             />
-            <Field label="Tier" value={`${tier} (Lv ${user.level})`} />
+            <Field label={t.profile.fieldTier} value={`${tier} (Lv ${user.level})`} />
             <TokenField token={user.token} />
           </dl>
         </div>
@@ -81,10 +108,10 @@ export default async function ProfilePage() {
         <div className="relative rounded-xl border border-dashed border-primary/25 bg-gradient-to-br from-surface-container/60 via-background to-surface-container/40 overflow-hidden flex flex-col items-center justify-center p-6 min-h-[320px]">
           <div className="absolute inset-0 pointer-events-none opacity-30 bg-[linear-gradient(rgba(144,222,205,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(144,222,205,0.06)_1px,transparent_1px)] bg-[size:14px_14px]" />
           <div className="absolute top-4 left-5 font-label text-[10px] tracking-[0.3em] uppercase text-secondary/80">
-            Sigil
+            {t.profile.sigil}
           </div>
           <div className="absolute top-4 right-5 font-label text-[9px] tracking-[0.3em] uppercase text-primary/40 border border-primary/15 px-2 py-0.5 rounded-full">
-            3D Mosaic · Awakening
+            {t.profile.mosaicAwakening}
           </div>
           <div className="relative w-40 h-40 rounded-full border border-primary/30 bg-surface-container flex items-center justify-center text-primary font-headline text-6xl select-none">
             {user.avatarUrl ? (
@@ -96,8 +123,7 @@ export default async function ProfilePage() {
             <span className="absolute -inset-2 rounded-full border border-primary/15 animate-pulse" />
           </div>
           <p className="mt-5 text-xs text-on-surface-variant font-light text-center max-w-xs leading-[1.6]">
-            A 3D mosaic-style sigil will animate here once the sanctum&rsquo;s
-            generative ritual awakens.
+            {t.profile.mosaicDescription}
           </p>
         </div>
       </section>
@@ -106,10 +132,10 @@ export default async function ProfilePage() {
       <section className="mt-6 rounded-xl border border-primary/15 bg-surface-container/40 p-6">
         <div className="flex items-center justify-between">
           <span className="font-label text-[10px] tracking-[0.3em] uppercase text-primary/60">
-            Aptitudes · Pentagram
+            {t.profile.aptitudesPentagram}
           </span>
           <span className="font-label text-[9px] tracking-[0.3em] uppercase text-secondary/60">
-            Stewarded by High Lord
+            {t.profile.stewardedByHighLord}
           </span>
         </div>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 items-center">
@@ -124,11 +150,11 @@ export default async function ProfilePage() {
           />
           <div>
             <h3 className="font-headline text-xl text-secondary italic">
-              Special Attributes
+              {t.profile.specialAttributes}
             </h3>
             {specials.length === 0 ? (
               <p className="mt-3 text-sm text-on-surface-variant font-light italic">
-                None inscribed yet.
+                {t.profile.noneInscribed}
               </p>
             ) : (
               <ul className="mt-4 flex flex-wrap gap-2">
@@ -143,8 +169,7 @@ export default async function ProfilePage() {
               </ul>
             )}
             <p className="mt-6 text-xs text-on-surface-variant font-light leading-[1.7]">
-              Aptitudes range 0–100. They are tuned by the priesthood and reflect
-              your standing within the sanctum.
+              {t.profile.aptitudesHelp}
             </p>
           </div>
         </div>
@@ -161,8 +186,7 @@ export default async function ProfilePage() {
       </section>
 
       <p className="mt-12 text-xs text-on-surface-variant font-light">
-        Identity facts, tier, and aptitudes are stewarded by the High Lord. You may
-        inscribe or revise your autobiography and dispatches at any time.
+        {t.profile.footerNote}
       </p>
     </main>
   );

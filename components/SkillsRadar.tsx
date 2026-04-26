@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/lib/i18n/client";
+
 type Stats = {
   attack: number;
   defense: number;
@@ -5,14 +9,6 @@ type Stats = {
   agility: number;
   luck: number;
 };
-
-const AXES: { key: keyof Stats; label: string }[] = [
-  { key: "attack", label: "Attack" },
-  { key: "defense", label: "Defense" },
-  { key: "hp", label: "HP" },
-  { key: "agility", label: "Agility" },
-  { key: "luck", label: "Luck" },
-];
 
 const SIZE = 280;
 const CENTER = SIZE / 2;
@@ -25,6 +21,14 @@ function pointAt(angleDeg: number, radius: number) {
 }
 
 export default function SkillsRadar({ stats }: { stats: Stats }) {
+  const t = useT();
+  const AXES: { key: keyof Stats; label: string }[] = [
+    { key: "attack", label: t.skills.attack },
+    { key: "defense", label: t.skills.defense },
+    { key: "hp", label: t.skills.hp },
+    { key: "agility", label: t.skills.agility },
+    { key: "luck", label: t.skills.luck },
+  ];
   const angleStep = 360 / AXES.length;
 
   const ringPolys = Array.from({ length: RINGS }, (_, i) => {
@@ -47,7 +51,7 @@ export default function SkillsRadar({ stats }: { stats: Stats }) {
         height={SIZE}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="overflow-visible"
-        aria-label="Skills radar"
+        aria-label={t.skills.radarAria}
       >
         {/* rings */}
         {ringPolys.map((pts, i) => (
