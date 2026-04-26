@@ -33,25 +33,25 @@ export default function LoginForm({ from }: { from?: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-3">
-      <div className="flex gap-2">
+    <form onSubmit={onSubmit} className="mt-10 flex w-full flex-col gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="ADMIN_TOKEN"
+          placeholder="XinHan's Token"
           autoFocus
-          className="flex-1 bg-surface-container border border-primary/20 px-3 py-2 text-sm text-on-surface focus:border-primary/50 focus:outline-none rounded-lg"
+          className="h-16 flex-1 rounded-lg border border-primary/20 bg-surface-container px-5 text-base text-on-surface placeholder:text-on-surface-variant/55 focus:border-primary/50 focus:outline-none"
         />
         <button
           type="submit"
           disabled={pending || !token}
-          className="bg-primary/10 border border-primary/30 text-primary px-5 py-2 font-label tracking-widest uppercase text-[10px] hover:bg-primary/20 transition-all rounded-lg disabled:opacity-50"
+          className="h-16 rounded-lg border border-primary/30 bg-primary/10 px-6 font-label text-[11px] tracking-[0.28em] uppercase text-primary transition-all hover:bg-primary/20 disabled:opacity-50 sm:min-w-[11rem]"
         >
-          {pending ? "…" : "Enter"}
+          {pending ? "…" : "Enter Sanctuary"}
         </button>
       </div>
-      {err ? <p className="text-xs text-red-400 font-light">{err}</p> : null}
+      {err ? <p className="text-sm leading-6 text-red-400">{err}</p> : null}
     </form>
   );
 }
