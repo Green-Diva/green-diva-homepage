@@ -51,11 +51,10 @@ export default async function Home() {
         </Link>
         <nav className="group hidden md:flex items-center gap-11">
           {NAV_ITEMS.map((item) => {
-            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 ${
-              item.active
+            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 ${item.active
                 ? "text-primary border-secondary/40 group-has-[a:not([data-active]):hover]:text-on-surface-variant group-has-[a:not([data-active]):hover]:border-transparent"
                 : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40"
-            }`;
+              }`;
             const activeAttr = item.active ? { "data-active": true } : {};
             const ariaCurrent = item.active ? ("page" as const) : undefined;
             if (item.active) {
