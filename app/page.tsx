@@ -169,14 +169,14 @@ export default async function Home() {
               aria-hidden="true"
               className="glitch-bars absolute inset-0 z-30 pointer-events-none bg-[repeating-linear-gradient(0deg,rgba(144,222,205,0.22)_0px,rgba(144,222,205,0.22)_1px,transparent_1px,transparent_3px)] mix-blend-screen opacity-0"
             ></div>
-            <div className="absolute inset-0 flex flex-col justify-center p-6 z-20">
-              <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
+            <div className="absolute inset-0 flex flex-col justify-center p-5 md:p-6 z-20">
+              <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-2 md:mb-4">
                 menu_book
               </span>
-              <h4 className="font-headline text-4xl text-secondary font-light leading-[1.05] mb-3">
+              <h4 className="font-headline text-3xl md:text-4xl text-secondary font-light leading-[1.05] mb-2 md:mb-3">
                 {t.sections.writtenWordTitle}
               </h4>
-              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
+              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-3 md:mb-5 block">
                 {t.sections.writtenWordVolume}
               </span>
               <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
@@ -202,14 +202,14 @@ export default async function Home() {
               className="module-image object-cover brightness-[0.85] group-hover:brightness-[1] transition-[filter] duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-black/40"></div>
-            <div className="absolute inset-0 flex flex-col justify-center p-6 z-20">
-              <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
+            <div className="absolute inset-0 flex flex-col justify-center p-5 md:p-6 z-20">
+              <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-2 md:mb-4">
                 photo_camera
               </span>
-              <h4 className="font-headline text-4xl text-secondary font-light leading-[1.05] mb-3">
+              <h4 className="font-headline text-3xl md:text-4xl text-secondary font-light leading-[1.05] mb-2 md:mb-3">
                 {t.sections.visualWitnessTitle}
               </h4>
-              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-5 block">
+              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-3 md:mb-5 block">
                 {t.sections.visualWitnessGallery}
               </span>
               <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
