@@ -93,7 +93,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row max-w-[1600px] w-full mx-auto">
+      <main className="flex-1 flex flex-col lg:flex-row max-w-[1440px] w-full mx-auto">
         {/* Left Side: Hero Information */}
         <section className="w-full lg:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
           {/* Sacred Divider — gradient line + center diamond glyph */}
@@ -115,7 +115,7 @@ export default async function Home() {
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
                 </span>
-                <h1 className="font-headline text-[44px] sm:text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none tracking-[-0.02em]">
+                <h1 className="font-headline text-[40px] sm:text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none tracking-[-0.02em]">
                   {t.hero.oracleTitle}
                 </h1>
               </div>
@@ -124,7 +124,7 @@ export default async function Home() {
                   <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
                     {t.hero.introductionHeading}
                   </h3>
-                  <p className="font-body text-on-surface-variant text-[15px] font-light leading-[1.7]">
+                  <p className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7]">
                     {t.hero.introductionBody}
                   </p>
                 </div>
@@ -132,7 +132,7 @@ export default async function Home() {
                   <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
                     {t.hero.originHeading}
                   </h3>
-                  <p className="font-body text-on-surface-variant text-[15px] font-light leading-[1.7]">
+                  <p className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7]">
                     {t.hero.originBody}
                   </p>
                 </div>
@@ -152,7 +152,7 @@ export default async function Home() {
           {/* Module 1: The Written Word */}
           <Link
             href="/written-word"
-            className="module-card glitch-host group relative flex-1 min-h-[160px] md:min-h-[175px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card glitch-host group relative flex-1 min-h-[144px] md:min-h-[160px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -191,7 +191,7 @@ export default async function Home() {
           {/* Module 2: The Visual Witness */}
           <Link
             href="/visual-witness"
-            className="module-card group relative flex-1 min-h-[160px] md:min-h-[175px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card group relative flex-1 min-h-[144px] md:min-h-[160px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <Image
               alt={t.sections.visualWitnessTitle}

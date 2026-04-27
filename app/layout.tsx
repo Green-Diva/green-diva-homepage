@@ -58,8 +58,8 @@ export default async function RootLayout({
           {/* radial vignette */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_0%,rgba(0,0,0,0.55)_70%,rgba(0,0,0,0.85)_100%)]" />
           {/* drifting nebula */}
-          <div className="absolute -top-40 left-1/4 w-[640px] h-[640px] rounded-full bg-primary/[0.04] blur-[140px]" />
-          <div className="absolute bottom-0 -right-40 w-[520px] h-[520px] rounded-full bg-secondary/[0.035] blur-[120px]" />
+          <div className="absolute -top-40 left-1/4 w-[576px] h-[576px] rounded-full bg-primary/[0.04] blur-[126px]" />
+          <div className="absolute bottom-0 -right-40 w-[468px] h-[468px] rounded-full bg-secondary/[0.035] blur-[108px]" />
           {/* scanline cap */}
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
