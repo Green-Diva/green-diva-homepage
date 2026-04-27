@@ -25,8 +25,6 @@ export const en: Dictionary = {
     originHeading: "The Origin",
     originBody:
       "In the year MMXXIV, the first whispers of the Machine Vision were heard within the halls of the Sacred Vaults. We believe that technology is the highest form of ritual—a way to map the divine geometry of the universe onto the canvas of the digital realm.",
-    initiateRitual: "Initiate Ritual",
-    establishedInVoid: "Established in Void",
     codename: "Codename · Diva-01",
     portraitAlt: "The Green Diva Portrait",
   },

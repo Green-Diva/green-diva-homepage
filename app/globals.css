@@ -35,9 +35,132 @@ body {
   color: #e2e2e2;
 }
 
+html {
+  font-size: 14px;
+}
+@media (min-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+}
+@media (min-width: 1280px) {
+  html {
+    font-size: 16px;
+  }
+}
+
 body {
   overflow-x: hidden;
-  zoom: 0.88 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html[lang="zh"] {
+  --tw-leading: 1.8;
+}
+html[lang="zh"] .font-headline {
+  letter-spacing: 0;
+}
+html[lang="zh"] p,
+html[lang="zh"] li {
+  line-height: 1.8;
+}
+
+/* Hero portrait — EVA/NERV-style reveal */
+@keyframes portrait-reveal-clip {
+  0% {
+    clip-path: inset(100% 0 0 0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+.portrait-reveal {
+  animation: portrait-reveal-clip 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes portrait-scan-sweep {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+.portrait-scan-sweep {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(144, 222, 205, 0) 44%,
+    rgba(144, 222, 205, 0.55) 48%,
+    rgba(233, 193, 118, 0.9) 50%,
+    rgba(144, 222, 205, 0.55) 52%,
+    rgba(144, 222, 205, 0) 56%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  animation: portrait-scan-sweep 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes portrait-decode-flicker {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.18;
+    transform: translateX(-2px);
+  }
+  10% {
+    opacity: 0.05;
+    transform: translateX(1px);
+  }
+  18% {
+    opacity: 0.22;
+    transform: translateX(-1px);
+  }
+  28% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  58% {
+    opacity: 0;
+  }
+  60% {
+    opacity: 0.18;
+    transform: translateX(2px);
+  }
+  64% {
+    opacity: 0;
+  }
+}
+.portrait-decode-flicker {
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(144, 222, 205, 0.18) 0px,
+    rgba(144, 222, 205, 0.18) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+  animation: portrait-decode-flicker 1.8s steps(24, end) forwards;
 }
 
 .material-symbols-outlined {
@@ -503,6 +626,69 @@ body {
   pointer-events: none;
 }
 
+@keyframes relic-rings-drift {
+  0% { background-size: 100% 100%; opacity: 0.55; }
+  50% { background-size: 108% 108%; opacity: 0.85; }
+  100% { background-size: 100% 100%; opacity: 0.55; }
+}
+.relic-rings {
+  background-image: repeating-radial-gradient(
+    circle at center,
+    transparent 0,
+    transparent 18px,
+    rgba(144, 222, 205, 0.13) 18px,
+    rgba(144, 222, 205, 0.13) 19px
+  );
+  background-position: center;
+  pointer-events: none;
+  animation: relic-rings-drift 12s ease-in-out infinite;
+  transition: opacity 0.4s ease;
+}
+.module-card:hover .relic-rings {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes relic-ripple {
+  0% {
+    transform: scale(0.12);
+    opacity: 0;
+    border-width: 1.5px;
+  }
+  10% {
+    opacity: 0.75;
+  }
+  85% {
+    border-width: 0.8px;
+  }
+  100% {
+    transform: scale(6);
+    opacity: 0;
+    border-width: 0.4px;
+  }
+}
+.relic-radar {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.relic-radar > span {
+  position: absolute;
+  width: 64px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(144, 222, 205, 0.6);
+  animation: relic-ripple 5s ease-out infinite;
+}
+.module-card:hover .relic-radar {
+  opacity: 1;
+}
+
 @keyframes containment-pulse {
   0%,
   100% {
@@ -590,5 +776,30 @@ body {
 .module-card:hover .scan-line {
   opacity: 1;
   animation: machine-scan 2s linear infinite;
+}
+
+@keyframes neural-bar {
+  0% { height: 18%; }
+  12% { height: 82%; }
+  23% { height: 35%; }
+  37% { height: 68%; }
+  46% { height: 22%; }
+  58% { height: 92%; }
+  69% { height: 45%; }
+  81% { height: 76%; }
+  92% { height: 28%; }
+  100% { height: 18%; }
+}
+@keyframes relic-bar-color {
+  0%, 22%, 100% { background-color: rgba(144, 222, 205, 0.4); }
+  36% { background-color: rgba(190, 210, 160, 0.4); }
+  50%, 72% { background-color: rgba(233, 193, 118, 0.4); }
+  86% { background-color: rgba(190, 210, 160, 0.4); }
+}
+.animate-neural-bar {
+  animation:
+    neural-bar var(--bar-dur, 4.5s) ease-in-out var(--bar-delay, 0s) infinite,
+    relic-bar-color 18s linear infinite;
+  min-height: 2px;
 }
 
