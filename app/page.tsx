@@ -1,7 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
 import HeroPortrait from "@/components/HeroPortrait";
 import UserMenu from "@/components/UserMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import MobileNav from "@/components/MobileNav";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n/server";
 
@@ -40,24 +42,31 @@ export default async function Home() {
   return (
     <div className="min-h-screen flex flex-col w-full">
       {/* TopAppBar */}
-      <header className="w-full z-50 flex justify-between items-center px-10 py-[14px] bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0">
-        <a
+      <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[14px] bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
+        <Link
           href="/"
-          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]"
+          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
         >
           Green Diva
-        </a>
+        </Link>
         <nav className="group hidden md:flex items-center gap-11">
           {NAV_ITEMS.map((item) => {
-            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 ${
+            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 ${
               item.active
                 ? "text-primary border-secondary/40 group-has-[a:not([data-active]):hover]:text-on-surface-variant group-has-[a:not([data-active]):hover]:border-transparent"
                 : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40"
             }`;
             const activeAttr = item.active ? { "data-active": true } : {};
+            const ariaCurrent = item.active ? ("page" as const) : undefined;
             if (item.active) {
               return (
-                <a key={item.label} href={item.href} className={className} {...activeAttr}>
+                <a
+                  key={item.label}
+                  href={item.href}
+                  className={className}
+                  aria-current={ariaCurrent}
+                  {...activeAttr}
+                >
                   {item.label}
                 </a>
               );
@@ -69,7 +78,7 @@ export default async function Home() {
             );
           })}
         </nav>
-        <div className="flex items-center gap-7">
+        <div className="flex items-center gap-3 sm:gap-5 md:gap-7">
           {user ? (
             <UserMenu
               user={{
@@ -81,12 +90,13 @@ export default async function Home() {
               isAdmin={user.level >= ADMIN_LEVEL}
             />
           ) : null}
+          <MobileNav items={NAV_ITEMS} />
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row">
+      <main className="flex-1 flex flex-col lg:flex-row max-w-[1600px] w-full mx-auto">
         {/* Left Side: Hero Information */}
-        <section className="w-full lg:w-[58%] px-10 py-8 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
+        <section className="w-full lg:w-[58%] px-5 py-6 md:px-10 md:py-8 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
           {/* Sacred Divider — gradient line + center diamond glyph */}
           <div
             aria-hidden
@@ -106,13 +116,13 @@ export default async function Home() {
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
                 </span>
-                <h1 className="font-headline text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none tracking-[-0.02em]">
+                <h1 className="font-headline text-[44px] sm:text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none tracking-[-0.02em]">
                   {t.hero.oracleTitle}
                 </h1>
               </div>
               <div className="space-y-7">
                 <div className="space-y-3">
-                  <h3 className="font-headline text-xl text-secondary italic">
+                  <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
                     {t.hero.introductionHeading}
                   </h3>
                   <p className="font-body text-on-surface-variant text-[15px] font-light leading-[1.7]">
@@ -120,7 +130,7 @@ export default async function Home() {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  <h3 className="font-headline text-xl text-secondary italic">
+                  <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
                     {t.hero.originHeading}
                   </h3>
                   <p className="font-body text-on-surface-variant text-[15px] font-light leading-[1.7]">
@@ -129,22 +139,8 @@ export default async function Home() {
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-5 min-h-0 flex items-center justify-center">
+            <div className="lg:col-span-5 min-h-0 flex items-center justify-center lg:items-stretch">
               <HeroPortrait src={HERO_PORTRAIT} />
-            </div>
-          </div>
-          <div className="lg:row-span-1 flex items-center gap-6 flex-wrap">
-            <Link
-              href="/initiate-ritual"
-              className="bg-primary/5 border border-primary/20 text-primary px-8 py-3 font-label tracking-[0.2em] uppercase text-[11px] whitespace-nowrap hover:bg-primary/20 transition-all duration-500"
-            >
-              {t.hero.initiateRitual}
-            </Link>
-            <div className="flex gap-4 items-center">
-              <span className="w-12 h-px bg-primary/40"></span>
-              <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
-                {t.hero.establishedInVoid}
-              </span>
             </div>
           </div>
         </section>
@@ -152,12 +148,12 @@ export default async function Home() {
         {/* Right Side: Gallery Modules */}
         <section
           id="chronicle"
-          className="w-full lg:w-[42%] p-8 gap-6 bg-surface-container-lowest flex flex-col"
+          className="w-full lg:w-[42%] p-5 md:p-8 gap-4 md:gap-6 bg-surface-container-lowest flex flex-col"
         >
           {/* Module 1: The Written Word */}
           <Link
             href="/written-word"
-            className="module-card glitch-host group relative flex-1 min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block"
+            className="module-card glitch-host group relative flex-1 min-h-[160px] md:min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -196,13 +192,15 @@ export default async function Home() {
           {/* Module 2: The Visual Witness */}
           <Link
             href="/visual-witness"
-            className="module-card group relative flex-1 min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block"
+            className="module-card group relative flex-1 min-h-[160px] md:min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               alt={t.sections.visualWitnessTitle}
-              className="module-image absolute inset-0 w-full h-full object-cover brightness-[0.45] group-hover:brightness-[0.55] transition-[filter] duration-[2000ms]"
               src={VISUAL_WITNESS}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 42vw"
+              className="module-image object-cover brightness-[0.45] group-hover:brightness-[0.55] transition-[filter] duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/40"></div>
             <div className="scanline-overlay absolute inset-0 z-10"></div>
@@ -227,11 +225,11 @@ export default async function Home() {
           </Link>
 
           {/* Row: Relic & Machine Vision */}
-          <div className="grid grid-cols-2 gap-6 flex-1 min-h-[210px]">
+          <div className="grid grid-cols-2 gap-4 md:gap-6 flex-1 min-h-[160px] md:min-h-[210px]">
             {/* Relic Collection */}
             <Link
               href="/relic-collection"
-              className="module-card group relative bg-background border border-primary/20 rounded-xl overflow-hidden flex flex-col items-center justify-center gap-4 p-5"
+              className="module-card group relative bg-background border border-primary/20 rounded-xl overflow-hidden flex flex-col items-center justify-center gap-4 p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
               <div className="noise-overlay absolute inset-0"></div>
               <div className="containment-field absolute inset-0 opacity-20"></div>
@@ -295,7 +293,7 @@ export default async function Home() {
             {/* Machine Vision */}
             <Link
               href="/machine-vision"
-              className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden"
+              className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
               <div className="absolute inset-0 pointer-events-none opacity-20">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_8px]"></div>
@@ -377,19 +375,19 @@ export default async function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full flex flex-col md:flex-row gap-3 md:gap-6 justify-between items-center px-10 py-3 border-t border-primary/10 bg-background shrink-0">
-        <div className="text-secondary font-label text-[10px] tracking-[0.3em] uppercase opacity-70">
+      <footer className="w-full flex flex-col md:flex-row gap-3 md:gap-6 justify-between items-center px-5 md:px-10 py-3 border-t border-primary/10 bg-background shrink-0">
+        <div className="text-secondary font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-70 text-center">
           {t.footer.copyright}
         </div>
-        <div className="flex gap-6">
+        <div className="flex gap-4 md:gap-6">
           <Link
-            className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300"
+            className="font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             href="/sacred-terms"
           >
             {t.footer.sacredTerms}
           </Link>
           <Link
-            className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300"
+            className="font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             href="/privacy-covenant"
           >
             {t.footer.privacyCovenant}

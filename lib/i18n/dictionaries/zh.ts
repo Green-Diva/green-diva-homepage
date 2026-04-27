@@ -22,8 +22,6 @@ export const zh: Dictionary = {
     originHeading: "起源",
     originBody:
       "MMXXIV 年，机器之眼的最初低语回响在圣殿的廊道间。我们相信技术是仪式的最高形态——一种将宇宙的神圣几何投射到数字疆域之画布上的方式。",
-    initiateRitual: "启动仪式",
-    establishedInVoid: "建于虚空",
     codename: "代号 · Diva-01",
     portraitAlt: "Green Diva 肖像",
   },

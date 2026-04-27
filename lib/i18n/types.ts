@@ -23,8 +23,6 @@ export interface Dictionary {
     introductionBody: string;
     originHeading: string;
     originBody: string;
-    initiateRitual: string;
-    establishedInVoid: string;
     codename: string;
     portraitAlt: string;
   };
