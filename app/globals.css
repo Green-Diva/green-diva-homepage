@@ -626,6 +626,69 @@ html[lang="zh"] li {
   pointer-events: none;
 }
 
+@keyframes relic-rings-drift {
+  0% { background-size: 100% 100%; opacity: 0.55; }
+  50% { background-size: 108% 108%; opacity: 0.85; }
+  100% { background-size: 100% 100%; opacity: 0.55; }
+}
+.relic-rings {
+  background-image: repeating-radial-gradient(
+    circle at center,
+    transparent 0,
+    transparent 18px,
+    rgba(144, 222, 205, 0.13) 18px,
+    rgba(144, 222, 205, 0.13) 19px
+  );
+  background-position: center;
+  pointer-events: none;
+  animation: relic-rings-drift 12s ease-in-out infinite;
+  transition: opacity 0.4s ease;
+}
+.module-card:hover .relic-rings {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes relic-ripple {
+  0% {
+    transform: scale(0.12);
+    opacity: 0;
+    border-width: 1.5px;
+  }
+  10% {
+    opacity: 0.75;
+  }
+  85% {
+    border-width: 0.8px;
+  }
+  100% {
+    transform: scale(6);
+    opacity: 0;
+    border-width: 0.4px;
+  }
+}
+.relic-radar {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.relic-radar > span {
+  position: absolute;
+  width: 64px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(144, 222, 205, 0.6);
+  animation: relic-ripple 5s ease-out infinite;
+}
+.module-card:hover .relic-radar {
+  opacity: 1;
+}
+
 @keyframes containment-pulse {
   0%,
   100% {
@@ -713,5 +776,30 @@ html[lang="zh"] li {
 .module-card:hover .scan-line {
   opacity: 1;
   animation: machine-scan 2s linear infinite;
+}
+
+@keyframes neural-bar {
+  0% { height: 18%; }
+  12% { height: 82%; }
+  23% { height: 35%; }
+  37% { height: 68%; }
+  46% { height: 22%; }
+  58% { height: 92%; }
+  69% { height: 45%; }
+  81% { height: 76%; }
+  92% { height: 28%; }
+  100% { height: 18%; }
+}
+@keyframes relic-bar-color {
+  0%, 22%, 100% { background-color: rgba(144, 222, 205, 0.4); }
+  36% { background-color: rgba(190, 210, 160, 0.4); }
+  50%, 72% { background-color: rgba(233, 193, 118, 0.4); }
+  86% { background-color: rgba(190, 210, 160, 0.4); }
+}
+.animate-neural-bar {
+  animation:
+    neural-bar var(--bar-dur, 4.5s) ease-in-out var(--bar-delay, 0s) infinite,
+    relic-bar-color 18s linear infinite;
+  min-height: 2px;
 }
 

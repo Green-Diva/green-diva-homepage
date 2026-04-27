@@ -229,9 +229,13 @@ export default async function Home() {
               href="/relic-collection"
               className="module-card group relative bg-background border border-primary/20 rounded-xl overflow-hidden flex flex-col items-center justify-center gap-4 p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
-              <div className="noise-overlay absolute inset-0"></div>
+              <div className="relic-rings absolute inset-0"></div>
               <div className="containment-field absolute inset-0 opacity-20"></div>
-              <div className="scanline-overlay absolute inset-0 z-10"></div>
+              <div className="relic-radar" aria-hidden="true">
+                <span style={{ animationDelay: "0s" }}></span>
+                <span style={{ animationDelay: "1.67s" }}></span>
+                <span style={{ animationDelay: "3.33s" }}></span>
+              </div>
               <div
                 aria-hidden="true"
                 className="absolute top-6 right-6 grid grid-cols-2 gap-1.5 z-20"
@@ -242,7 +246,6 @@ export default async function Home() {
                 <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "-2s" }} />
               </div>
               <div className="relative z-20 animate-floating">
-                <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-breathing"></div>
                 <div className="relative w-16 h-16 flex items-center justify-center border rounded-full animate-relic-border-dim">
                   <div className="absolute w-9 h-9 border animate-reverse-spin"></div>
                   <svg
@@ -311,14 +314,28 @@ export default async function Home() {
                   {t.sections.syntheticHallucinations}
                 </p>
               </div>
-              <div className="flex-1 flex items-center justify-between gap-4 z-20">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-primary animate-ping [animation-duration:1.6s]"></div>
-                  <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em] truncate">
-                    {t.sections.neuralSync}<span className="animate-sync-ellipsis" aria-hidden="true" />
+              <div className="flex-1 flex items-center justify-between gap-3 z-20">
+                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                  <div
+                    className="flex items-end gap-[2px] h-12 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
+                    aria-hidden="true"
+                  >
+                    {[6.2, 11.4, 8.4, 13.8, 7.6, 10.6, 14.8, 9.2, 12.2, 7.0, 11.8, 9.6, 12.8, 7.8].map((dur, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-[1px] animate-neural-bar"
+                        style={{
+                          ['--bar-dur' as string]: `${dur}s`,
+                          ['--bar-delay' as string]: `${((i * 0.37) % 4).toFixed(2)}s`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <span className="font-label text-[9px] tracking-[0.25em] uppercase animate-relic-text-70">
+                    Synaptic Drift
                   </span>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2">
                   {/* Left box: vertical Matrix rain (0/1 + half-width katakana) */}
                   <div className="relative w-14 h-14 rounded-xl border overflow-hidden bg-background/80 animate-relic-border-dim">
                     <div
@@ -366,6 +383,12 @@ export default async function Home() {
                     <div className="scanline-overlay absolute inset-0 z-10 pointer-events-none"></div>
                   </div>
                 </div>
+              </div>
+              <div className="flex items-center gap-2 z-20">
+                <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-primary animate-ping [animation-duration:1.6s]"></div>
+                <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em]">
+                  {t.sections.neuralSync}<span className="animate-sync-ellipsis" aria-hidden="true" />
+                </span>
               </div>
             </Link>
           </div>
