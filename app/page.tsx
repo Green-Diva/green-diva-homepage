@@ -42,7 +42,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen flex flex-col w-full">
       {/* TopAppBar */}
-      <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[14px] bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
+      <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[10px] bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
           href="/"
           className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
@@ -95,7 +95,7 @@ export default async function Home() {
 
       <main className="flex-1 flex flex-col lg:flex-row max-w-[1600px] w-full mx-auto">
         {/* Left Side: Hero Information */}
-        <section className="w-full lg:w-[58%] px-5 py-6 md:px-10 md:py-8 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
+        <section className="w-full lg:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
           {/* Sacred Divider — gradient line + center diamond glyph */}
           <div
             aria-hidden
@@ -110,7 +110,7 @@ export default async function Home() {
           </div>
 
           <div className="lg:row-span-2 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch w-full min-h-0">
-            <div className="lg:col-span-7 space-y-8 max-w-[52ch]">
+            <div className="lg:col-span-7 space-y-6 max-w-[52ch]">
               <div className="space-y-3">
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
@@ -119,7 +119,7 @@ export default async function Home() {
                   {t.hero.oracleTitle}
                 </h1>
               </div>
-              <div className="space-y-7">
+              <div className="space-y-5">
                 <div className="space-y-3">
                   <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
                     {t.hero.introductionHeading}
@@ -147,12 +147,12 @@ export default async function Home() {
         {/* Right Side: Gallery Modules */}
         <section
           id="chronicle"
-          className="w-full lg:w-[42%] p-5 md:p-8 gap-4 md:gap-6 bg-surface-container-lowest flex flex-col"
+          className="w-full lg:w-[42%] p-5 md:p-5 gap-4 md:gap-4 bg-surface-container-lowest flex flex-col"
         >
           {/* Module 1: The Written Word */}
           <Link
             href="/written-word"
-            className="module-card glitch-host group relative flex-1 min-h-[160px] md:min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card glitch-host group relative flex-1 min-h-[160px] md:min-h-[175px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -191,7 +191,7 @@ export default async function Home() {
           {/* Module 2: The Visual Witness */}
           <Link
             href="/visual-witness"
-            className="module-card group relative flex-1 min-h-[160px] md:min-h-[210px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card group relative flex-1 min-h-[160px] md:min-h-[175px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <Image
               alt={t.sections.visualWitnessTitle}
@@ -224,7 +224,7 @@ export default async function Home() {
           </Link>
 
           {/* Row: Relic & Machine Vision */}
-          <div className="grid grid-cols-2 gap-4 md:gap-6 flex-1 min-h-[160px] md:min-h-[210px]">
+          <div className="grid grid-cols-2 gap-4 md:gap-4 flex-1 min-h-[160px] md:min-h-[175px]">
             {/* Relic Collection */}
             <Link
               href="/relic-collection"
@@ -374,7 +374,7 @@ export default async function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full flex flex-col md:flex-row gap-3 md:gap-6 justify-between items-center px-5 md:px-10 py-3 border-t border-primary/10 bg-background shrink-0">
+      <footer className="w-full flex flex-col md:flex-row gap-3 md:gap-6 justify-between items-center px-5 md:px-10 py-2 border-t border-primary/10 bg-background shrink-0">
         <div className="text-secondary font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-70 text-center">
           {t.footer.copyright}
         </div>
