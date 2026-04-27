@@ -199,10 +199,9 @@ export default async function Home() {
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 42vw"
-              className="module-image object-cover brightness-[0.45] group-hover:brightness-[0.55] transition-[filter] duration-[2000ms]"
+              className="module-image object-cover brightness-[0.85] group-hover:brightness-[1] transition-[filter] duration-[2000ms]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/40"></div>
-            <div className="scanline-overlay absolute inset-0 z-10"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-black/40"></div>
             <div className="absolute inset-0 flex flex-col justify-center p-6 z-20">
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-4">
                 photo_camera
