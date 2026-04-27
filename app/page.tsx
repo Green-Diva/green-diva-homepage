@@ -183,7 +183,7 @@ export default async function Home() {
                 {t.sections.openArchives}
               </span>
             </div>
-            <div className="absolute top-6 right-6 flex gap-2 z-20">
+            <div className="hidden sm:flex absolute top-6 right-6 gap-2 z-20">
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse"></div>
             </div>
           </Link>
@@ -216,7 +216,7 @@ export default async function Home() {
                 {t.sections.enterFrame}
               </span>
             </div>
-            <div className="absolute top-6 right-6 flex gap-2 z-20">
+            <div className="hidden sm:flex absolute top-6 right-6 gap-2 z-20">
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:0s]"></div>
               <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1s]"></div>
             </div>
@@ -238,7 +238,7 @@ export default async function Home() {
               </div>
               <div
                 aria-hidden="true"
-                className="absolute top-6 right-6 grid grid-cols-2 gap-1.5 z-20"
+                className="hidden sm:grid absolute top-6 right-6 grid-cols-2 gap-1.5 z-20"
               >
                 <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "0s" }} />
                 <span className="w-2 h-2 bg-secondary rounded-full cw-stair" style={{ animationDelay: "-3s" }} />
@@ -285,7 +285,7 @@ export default async function Home() {
                   ></span>
                   <span className="flex-1 h-px bg-gradient-to-r from-secondary/60 to-transparent"></span>
                 </div>
-                <h4 className="font-headline text-xl text-secondary italic relic-text-glow text-center">
+                <h4 className="font-headline text-xl text-secondary relic-text-glow text-center">
                   {t.sections.relicCollectionTitle}
                 </h4>
               </div>
@@ -300,14 +300,14 @@ export default async function Home() {
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_8px]"></div>
               </div>
               <div className="scan-line"></div>
-              <div className="absolute top-6 right-6 grid grid-cols-2 gap-1.5 z-20">
+              <div className="hidden sm:grid absolute top-6 right-6 grid-cols-2 gap-1.5 z-20">
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:0s]"></div>
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:0.5s]"></div>
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1s]"></div>
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse [animation-delay:1.5s]"></div>
               </div>
               <div className="z-20 space-y-2">
-                <h4 className="font-headline text-xl text-secondary italic leading-tight">
+                <h4 className="font-headline text-xl text-secondary leading-tight">
                   {t.sections.machineVisionTitle}
                 </h4>
                 <p className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">

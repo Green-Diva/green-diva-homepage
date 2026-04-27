@@ -35,7 +35,7 @@ export const zh: Dictionary = {
     sacredArtifact: "圣物",
     relicCollectionTitle: "圣物典藏",
     machineVisionTitle: "机器之眼",
-    syntheticHallucinations: "合成幻象",
+    syntheticHallucinations: "Detroit: Become Human",
     neuralSync: "神经同步",
   },
   footer: {

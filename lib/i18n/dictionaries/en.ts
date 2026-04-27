@@ -37,8 +37,8 @@ export const en: Dictionary = {
     enterFrame: "Enter the Frame",
     sacredArtifact: "Sacred Artifact",
     relicCollectionTitle: "The Relic Collection",
-    machineVisionTitle: "The Machine Vision",
-    syntheticHallucinations: "Synthetic Hallucinations",
+    machineVisionTitle: "The AI Vision",
+    syntheticHallucinations: "Detroit: Become Human",
     neuralSync: "Neural Sync",
   },
   footer: {
