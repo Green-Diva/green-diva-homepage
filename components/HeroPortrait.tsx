@@ -18,7 +18,7 @@ export default function HeroPortrait({ src }: Props) {
     <div
       onMouseEnter={trigger}
       onTouchStart={trigger}
-      className="group relative w-full max-w-[420px] aspect-[4/5] lg:max-w-none lg:aspect-auto lg:h-full lg:min-h-[400px] overflow-hidden rounded-xl border border-primary/20 hover:border-primary/40 shadow-[0_0_40px_rgba(144,222,205,0.05)] hover:shadow-[0_0_60px_rgba(144,222,205,0.18)] transition-[border-color,box-shadow] duration-[1000ms] ease-out bg-background"
+      className="group relative w-full max-w-[378px] aspect-[4/5] lg:max-w-none lg:aspect-auto lg:h-full lg:min-h-[360px] overflow-hidden rounded-xl border border-primary/20 hover:border-primary/40 shadow-[0_0_40px_rgba(144,222,205,0.05)] hover:shadow-[0_0_60px_rgba(144,222,205,0.18)] transition-[border-color,box-shadow] duration-[1000ms] ease-out bg-background"
     >
       {/* Base grayscale layer */}
       <Image
