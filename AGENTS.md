@@ -27,7 +27,7 @@ app/
     users/           — GET 列表 / POST 新建（需管理员）
     users/[id]       — GET / PATCH / DELETE（写操作需管理员）
     activities/      — GET 列表 / POST 发布动态
-    activities/[id]  — GET / DELETE
+    activities/[id]  — DELETE
     profile/         — PATCH 更新个人简介
     locale/          — POST 切换语言
 components/
