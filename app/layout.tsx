@@ -3,6 +3,7 @@ import { Noto_Serif, Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
+import SiteFooter from "@/components/SiteFooter";
 
 const notoSerif = Noto_Serif({
   variable: "--font-noto-serif",
@@ -65,7 +66,8 @@ export default async function RootLayout({
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
         </div>
         <I18nProvider locale={locale} dict={dict}>
-          {children}
+          <div className="flex-1 flex flex-col w-full">{children}</div>
+          <SiteFooter />
         </I18nProvider>
       </body>
     </html>

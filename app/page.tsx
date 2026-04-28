@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import HeroPortrait from "@/components/HeroPortrait";
+import SeamlessLoopVideo from "@/components/SeamlessLoopVideo";
 import UserMenu from "@/components/UserMenu";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MobileNav from "@/components/MobileNav";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n/server";
@@ -78,6 +78,7 @@ export default async function Home() {
           })}
         </nav>
         <div className="flex items-center gap-3 sm:gap-5 md:gap-7">
+          <MobileNav items={NAV_ITEMS} />
           {user ? (
             <UserMenu
               user={{
@@ -89,13 +90,12 @@ export default async function Home() {
               isAdmin={user.level >= ADMIN_LEVEL}
             />
           ) : null}
-          <MobileNav items={NAV_ITEMS} />
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row max-w-[1440px] w-full mx-auto">
+      <main className="flex-1 flex flex-col md:flex-row max-w-[1440px] w-full mx-auto">
         {/* Left Side: Hero Information */}
-        <section className="w-full lg:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
+        <section className="w-full md:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
           {/* Sacred Divider — gradient line + center diamond glyph */}
           <div
             aria-hidden
@@ -142,33 +142,67 @@ export default async function Home() {
               <HeroPortrait src={HERO_PORTRAIT} />
             </div>
           </div>
+
+          {/* Oracle loop videos — bottom row of left grid; transparent blend with background */}
+          <div className="lg:row-span-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-end">
+            {[
+              { src: "/videos/oracle-loop.mp4?v=2", label: t.oracleVideos.beginOffering },
+              { src: "/videos/oracle-shrine.mp4", label: t.oracleVideos.enterTemple },
+            ].map((v, i) => (
+              <Link
+                key={i}
+                href="#"
+                aria-label={v.label}
+                className="group relative block w-full aspect-[16/9] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+              >
+                <SeamlessLoopVideo
+                  src={v.src}
+                  fadeWindow={0.7}
+                  style={{
+                    mixBlendMode: "screen",
+                    WebkitMaskImage:
+                      "radial-gradient(ellipse at center, black 55%, transparent 100%)",
+                    maskImage:
+                      "radial-gradient(ellipse at center, black 55%, transparent 100%)",
+                  }}
+                  className="absolute inset-0 w-full h-full object-cover brightness-[0.95] contrast-[1.05] group-hover:brightness-110 touch:brightness-110"
+                />
+                {/* Hover sweep highlight on the video */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 z-[5] pointer-events-none opacity-0 group-hover:opacity-100 touch:opacity-100 transition-opacity duration-500 bg-[linear-gradient(120deg,transparent_30%,rgba(144,222,205,0.18)_50%,transparent_70%)] bg-[length:250%_100%] bg-[position:100%_0] group-hover:[background-position:-50%_0] touch:[background-position:-50%_0] [transition:opacity_0.5s,background-position_1.2s_ease-out]"
+                />
+                {/* Bottom-right Enter CTA */}
+                <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-md border border-primary/40 bg-background/60 backdrop-blur-sm text-primary font-label text-[11px] tracking-[0.25em] uppercase opacity-80 transition-all duration-300 shadow-[0_2px_10px_rgba(0,0,0,0.5)] group-hover:opacity-100 group-hover:border-primary group-hover:bg-background/85 group-hover:text-secondary group-hover:shadow-[0_0_18px_rgba(144,222,205,0.45),0_0_2px_rgba(144,222,205,0.6)_inset] group-hover:-translate-y-0.5 group-hover:tracking-[0.3em] touch:opacity-100 touch:border-primary touch:bg-background/85 touch:text-secondary touch:shadow-[0_0_18px_rgba(144,222,205,0.45),0_0_2px_rgba(144,222,205,0.6)_inset] touch:-translate-y-0.5 touch:tracking-[0.3em]">
+                  {/* Corner brackets */}
+                  <span aria-hidden="true" className="absolute -top-px -left-px w-2 h-2 border-t border-l border-secondary/0 group-hover:border-secondary touch:border-secondary transition-colors duration-300" />
+                  <span aria-hidden="true" className="absolute -top-px -right-px w-2 h-2 border-t border-r border-secondary/0 group-hover:border-secondary touch:border-secondary transition-colors duration-300" />
+                  <span aria-hidden="true" className="absolute -bottom-px -left-px w-2 h-2 border-b border-l border-secondary/0 group-hover:border-secondary touch:border-secondary transition-colors duration-300" />
+                  <span aria-hidden="true" className="absolute -bottom-px -right-px w-2 h-2 border-b border-r border-secondary/0 group-hover:border-secondary touch:border-secondary transition-colors duration-300" />
+                  <span className="relative">{v.label}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1 touch:translate-x-1">
+                    <path d="M5 12h14" />
+                    <path d="M13 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </Link>
+            ))}
+          </div>
         </section>
 
         {/* Right Side: Gallery Modules */}
         <section
           id="chronicle"
-          className="w-full lg:w-[42%] p-5 md:p-5 gap-4 md:gap-4 bg-surface-container-lowest flex flex-col"
+          className="w-full md:w-[42%] p-5 md:p-5 gap-4 md:gap-4 bg-surface-container-lowest flex flex-col"
         >
           {/* Module 1: The Written Word */}
           <Link
             href="/written-word"
-            className="module-card glitch-host group relative flex-1 min-h-[144px] md:min-h-[160px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card group relative flex-1 min-h-[144px] md:min-h-[160px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 transition-all duration-500"></div>
-            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 touch:from-primary/20 transition-all duration-500"></div>
+            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 touch:opacity-100 transition-opacity duration-700"></div>
             <div className="scanline-overlay absolute inset-0 z-10"></div>
-            <div
-              aria-hidden="true"
-              className="green-noise glitch-noise absolute inset-0 z-30 pointer-events-none mix-blend-screen opacity-0"
-            ></div>
-            <div
-              aria-hidden="true"
-              className="yellow-noise glitch-noise absolute inset-0 z-30 pointer-events-none mix-blend-screen opacity-0"
-            ></div>
-            <div
-              aria-hidden="true"
-              className="glitch-bars absolute inset-0 z-30 pointer-events-none bg-[repeating-linear-gradient(0deg,rgba(144,222,205,0.22)_0px,rgba(144,222,205,0.22)_1px,transparent_1px,transparent_3px)] mix-blend-screen opacity-0"
-            ></div>
             <div className="absolute inset-0 flex flex-col justify-center p-5 md:p-6 z-20">
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-2 md:mb-4">
                 menu_book
@@ -179,7 +213,7 @@ export default async function Home() {
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-3 md:mb-5 block">
                 {t.sections.writtenWordVolume}
               </span>
-              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
+              <span className="w-fit min-w-[260px] px-8 py-3 text-center bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 touch:bg-primary/20 transition-all inline-block">
                 {t.sections.openArchives}
               </span>
             </div>
@@ -199,7 +233,7 @@ export default async function Home() {
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 42vw"
-              className="module-image object-cover brightness-[0.85] group-hover:brightness-[1] transition-[filter] duration-[2000ms]"
+              className="module-image object-cover brightness-[0.85] group-hover:brightness-[1] touch:brightness-[1] transition-[filter] duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-black/40"></div>
             <div className="absolute inset-0 flex flex-col justify-center p-5 md:p-6 z-20">
@@ -212,7 +246,7 @@ export default async function Home() {
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-3 md:mb-5 block">
                 {t.sections.visualWitnessGallery}
               </span>
-              <span className="w-fit px-8 py-3 bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 transition-all inline-block">
+              <span className="w-fit min-w-[260px] px-8 py-3 text-center bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 touch:bg-primary/20 transition-all inline-block">
                 {t.sections.enterFrame}
               </span>
             </div>
@@ -252,18 +286,18 @@ export default async function Home() {
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="1.4"
+                    strokeWidth="1.2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     className="w-6 h-6 relative animate-relic-text"
-                    aria-label="Holy Chalice"
+                    aria-label="Vault Sigil"
                   >
-                    <path d="M8 3h8" />
-                    <path d="M8 3v2" />
-                    <path d="M16 3v2" />
-                    <path d="M7 5h10l-1 5a4 4 0 0 1-8 0L7 5z" />
-                    <path d="M12 14v5" />
-                    <path d="M9 19h6" />
+                    <path d="M12 3l3 3-3 3-3-3z" />
+                    <circle cx="12" cy="6" r="0.8" fill="currentColor" stroke="none" />
+                    <path d="M12 9v12" />
+                    <path d="M9 17h3" />
+                    <path d="M12 19h4" />
+                    <path d="M9 21h6" />
                   </svg>
                 </div>
               </div>
@@ -296,7 +330,7 @@ export default async function Home() {
               href="/machine-vision"
               className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
-              <div className="absolute inset-0 pointer-events-none opacity-20">
+              <div className="absolute inset-0 pointer-events-none opacity-20 z-30">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(144,222,205,0.05)_1px,transparent_1px)] bg-[size:100%_8px]"></div>
               </div>
               <div className="scan-line"></div>
@@ -314,16 +348,18 @@ export default async function Home() {
                   {t.sections.syntheticHallucinations}
                 </p>
               </div>
-              <div className="flex-1 flex items-center justify-between gap-3 z-20">
-                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+              <div className="flex-1 flex flex-col gap-3 z-20">
+                {/* Unified machine-vision panel: matrix rain layered over bars + centered all-seeing eye */}
+                <div className="relative flex-1 min-h-[4.5rem] w-full rounded-xl overflow-hidden bg-background/80">
+                  {/* Background layer: bars */}
                   <div
-                    className="flex items-end gap-[2px] h-12 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
+                    className="absolute inset-0 flex items-end gap-[2px] px-2 py-2 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
                     aria-hidden="true"
                   >
                     {[6.2, 11.4, 8.4, 13.8, 7.6, 10.6, 14.8, 9.2, 12.2, 7.0, 11.8, 9.6, 12.8, 7.8].map((dur, i) => (
                       <div
                         key={i}
-                        className="flex-1 rounded-[1px] animate-neural-bar"
+                        className="flex-1 rounded-[1px] animate-neural-bar opacity-60"
                         style={{
                           ['--bar-dur' as string]: `${dur}s`,
                           ['--bar-delay' as string]: `${((i * 0.37) % 4).toFixed(2)}s`,
@@ -331,91 +367,54 @@ export default async function Home() {
                       />
                     ))}
                   </div>
-                  <span className="font-label text-[9px] tracking-[0.25em] uppercase animate-relic-text-70">
-                    Synaptic Drift
+                  {/* Overlay layer: matrix rain across full width */}
+                  <div
+                    aria-hidden="true"
+                    className="hidden sm:grid absolute inset-0 grid-cols-6 gap-x-px font-mono text-[8px] leading-[1.05] animate-relic-text-80 opacity-60 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
+                  >
+                    {[...MATRIX_COLUMNS, ...DIGIT_COLUMNS].map((col, ci) => (
+                      <div
+                        key={ci}
+                        className="flex flex-col items-center animate-matrix-rain"
+                        style={{
+                          animationDelay: `${(ci * 0.45).toFixed(2)}s`,
+                          animationDuration: `${[5, 8, 10, 6, 9, 11, 7, 12, 8, 10, 6, 9][ci]}s`,
+                        }}
+                      >
+                        {col.map((c, i) => (
+                          <span key={i}>{c}</span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="scanline-overlay absolute inset-0 z-10 pointer-events-none"></div>
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-grid text-[40px] leading-none pointer-events-none drop-shadow-[0_0_8px_rgba(144,222,205,0.55)] z-20"
+                  >
+                    <span
+                      className="material-symbols-outlined col-start-1 row-start-1 text-background"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      visibility
+                    </span>
+                    <span className="material-symbols-outlined col-start-1 row-start-1 animate-relic-text-70">
+                      visibility
+                    </span>
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  {/* Left box: vertical Matrix rain (0/1 + half-width katakana) */}
-                  <div className="relative w-14 h-14 rounded-xl border overflow-hidden bg-background/80 animate-relic-border-dim">
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-0 grid grid-cols-3 gap-x-px font-mono text-[8px] leading-[1.05] animate-relic-text-80 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
-                    >
-                      {MATRIX_COLUMNS.map((col, ci) => (
-                        <div
-                          key={ci}
-                          className="flex flex-col items-center animate-matrix-rain"
-                          style={{
-                            animationDelay: `${(ci * 0.7).toFixed(2)}s`,
-                            animationDuration: `${[5, 8, 10][ci]}s`,
-                          }}
-                        >
-                          {col.map((c, i) => (
-                            <span key={i}>{c}</span>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="scanline-overlay absolute inset-0 z-10 pointer-events-none"></div>
-                  </div>
-                  {/* Right box: vertical columns of digits */}
-                  <div className="relative w-14 h-14 rounded-xl border overflow-hidden bg-background/80 animate-relic-border-dim">
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-0 grid grid-cols-3 gap-x-px font-mono text-[8px] leading-[1.05] animate-relic-text-80 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)]"
-                    >
-                      {DIGIT_COLUMNS.map((col, ci) => (
-                        <div
-                          key={ci}
-                          className="flex flex-col items-center animate-matrix-rain"
-                          style={{
-                            animationDelay: `${(0.5 + ci * 0.7).toFixed(2)}s`,
-                            animationDuration: `${[5, 8, 10][ci]}s`,
-                          }}
-                        >
-                          {col.map((c, i) => (
-                            <span key={i}>{c}</span>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="scanline-overlay absolute inset-0 z-10 pointer-events-none"></div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-primary animate-ping [animation-duration:1.6s]"></div>
+                  <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em]">
+                    {t.sections.neuralSync}<span className="animate-sync-ellipsis" aria-hidden="true" />
+                  </span>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 z-20">
-                <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-primary animate-ping [animation-duration:1.6s]"></div>
-                <span className="font-label text-[11px] text-primary/70 uppercase tracking-[0.2em]">
-                  {t.sections.neuralSync}<span className="animate-sync-ellipsis" aria-hidden="true" />
-                </span>
               </div>
             </Link>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full flex flex-col md:flex-row gap-3 md:gap-6 justify-between items-center px-5 md:px-10 py-2 border-t border-primary/10 bg-background shrink-0">
-        <div className="text-secondary font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-70 text-center">
-          {t.footer.copyright}
-        </div>
-        <div className="flex gap-4 md:gap-6">
-          <Link
-            className="font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
-            href="/sacred-terms"
-          >
-            {t.footer.sacredTerms}
-          </Link>
-          <Link
-            className="font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
-            href="/privacy-covenant"
-          >
-            {t.footer.privacyCovenant}
-          </Link>
-        </div>
-        <LanguageSwitcher />
-      </footer>
     </div>
   );
 }

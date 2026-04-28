@@ -26,6 +26,10 @@ export interface Dictionary {
     codename: string;
     portraitAlt: string;
   };
+  oracleVideos: {
+    beginOffering: string;
+    enterTemple: string;
+  };
   sections: {
     writtenWordTitle: string;
     writtenWordVolume: string;

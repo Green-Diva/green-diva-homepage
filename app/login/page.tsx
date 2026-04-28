@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const { from } = await searchParams;
   const t = await getDictionary();
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-8 md:px-10">
+    <main className="mx-auto flex flex-1 w-full max-w-2xl flex-col justify-center px-8 md:px-10">
       <span className="font-label text-secondary tracking-[0.4em] text-[10px] uppercase">
         {t.auth.sanctumEntrance}
       </span>

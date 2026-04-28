@@ -88,7 +88,7 @@ export default async function ProfilePage() {
           <span className="font-label text-[10px] tracking-[0.3em] uppercase text-primary/60">
             {t.profile.vesselBasics}
           </span>
-          <div className="mt-4">
+          <div className="mt-4 text-left">
             <div className="font-headline text-3xl text-primary">{user.name}</div>
             <div className="mt-1 font-label text-[10px] tracking-[0.3em] uppercase text-secondary">
               {tier}
