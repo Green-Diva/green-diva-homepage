@@ -2,6 +2,8 @@
 @import "./fonts.css";
 @plugin "@tailwindcss/typography";
 
+@custom-variant touch (@media (hover: none));
+
 @theme {
   --color-surface-variant: #333535;
   --color-primary-fixed: #a2f1e0;
@@ -299,117 +301,6 @@ html[lang="zh"] li {
     background-color: rgb(190, 210, 160);
   }
 }
-@keyframes written-glitch {
-  0%, 84%, 100% {
-    filter: none;
-    transform: translate3d(0, 0, 0);
-  }
-  85.6% {
-    filter: contrast(1.4) brightness(1.15) hue-rotate(15deg);
-    transform: translate3d(2px, 0, 0) skewX(-1deg);
-  }
-  87.6% {
-    filter: invert(0.06) saturate(1.6) contrast(1.2);
-    transform: translate3d(-3px, 1px, 0);
-  }
-  89.6% {
-    filter: blur(0.6px) brightness(0.6);
-    transform: translate3d(1px, -1px, 0);
-  }
-  91.6% {
-    filter: none;
-    transform: translate3d(0, 0, 0);
-  }
-  93.6% {
-    filter: contrast(1.5) brightness(1.3);
-    transform: translate3d(-2px, 0, 0) skewX(1.5deg);
-  }
-  95.6% {
-    filter: invert(0.04) hue-rotate(-15deg);
-    transform: translate3d(2px, 1px, 0);
-  }
-  97.6% {
-    filter: blur(0.8px);
-    transform: translate3d(0, -1px, 0);
-  }
-}
-
-@keyframes written-glitch-noise {
-  0%, 84%, 100% {
-    opacity: 0;
-  }
-  85.6%, 87.6% {
-    opacity: 0.55;
-  }
-  89.6% {
-    opacity: 0.85;
-  }
-  93.6%, 95.6% {
-    opacity: 0.7;
-  }
-  97.6% {
-    opacity: 0.45;
-  }
-  98.8% {
-    opacity: 0;
-  }
-}
-
-@keyframes written-glitch-bars {
-  0%, 84%, 100% {
-    opacity: 0;
-    clip-path: inset(0 0 0 0);
-  }
-  85.6% {
-    opacity: 0.8;
-    clip-path: inset(20% 0 60% 0);
-  }
-  87.6% {
-    opacity: 0.7;
-    clip-path: inset(55% 0 25% 0);
-  }
-  89.6% {
-    opacity: 0.85;
-    clip-path: inset(8% 0 78% 0);
-  }
-  91.6% {
-    opacity: 0;
-  }
-  93.6% {
-    opacity: 0.75;
-    clip-path: inset(40% 0 35% 0);
-  }
-  95.6% {
-    opacity: 0.6;
-    clip-path: inset(72% 0 8% 0);
-  }
-  97.6% {
-    opacity: 0;
-  }
-}
-
-.glitch-host:hover {
-  animation: written-glitch 5s steps(125, end) infinite;
-}
-.glitch-host:hover .glitch-noise {
-  animation: written-glitch-noise 5s steps(125, end) infinite;
-}
-.glitch-host:hover .glitch-bars {
-  animation: written-glitch-bars 5s steps(125, end) infinite;
-}
-
-.green-noise {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='gn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23gn)'/%3E%3C/svg%3E");
-  background-size: 216px 216px;
-  filter: brightness(1.1) sepia(1) saturate(6) hue-rotate(105deg);
-}
-.yellow-noise {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='yn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23yn)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  background-position: 40px 40px;
-  filter: brightness(1.3) sepia(1) saturate(4) hue-rotate(-8deg);
-}
-
 .animate-relic-border-dim {
   animation: relic-border-dim 18s linear infinite;
 }
@@ -771,7 +662,8 @@ html[lang="zh"] li {
   left: 0;
   right: 0;
   opacity: 0;
-  z-index: 10;
+  z-index: 30;
+  pointer-events: none;
 }
 .module-card:hover .scan-line {
   opacity: 1;
@@ -779,16 +671,16 @@ html[lang="zh"] li {
 }
 
 @keyframes neural-bar {
-  0% { height: 18%; }
-  12% { height: 82%; }
-  23% { height: 35%; }
-  37% { height: 68%; }
-  46% { height: 22%; }
-  58% { height: 92%; }
-  69% { height: 45%; }
-  81% { height: 76%; }
-  92% { height: 28%; }
-  100% { height: 18%; }
+  0% { transform: scaleY(0.18); }
+  12% { transform: scaleY(0.82); }
+  23% { transform: scaleY(0.35); }
+  37% { transform: scaleY(0.68); }
+  46% { transform: scaleY(0.22); }
+  58% { transform: scaleY(0.92); }
+  69% { transform: scaleY(0.45); }
+  81% { transform: scaleY(0.76); }
+  92% { transform: scaleY(0.28); }
+  100% { transform: scaleY(0.18); }
 }
 @keyframes relic-bar-color {
   0%, 22%, 100% { background-color: rgba(144, 222, 205, 0.4); }
@@ -797,9 +689,11 @@ html[lang="zh"] li {
   86% { background-color: rgba(190, 210, 160, 0.4); }
 }
 .animate-neural-bar {
+  height: 100%;
+  transform-origin: bottom;
+  will-change: transform;
   animation:
     neural-bar var(--bar-dur, 4.5s) ease-in-out var(--bar-delay, 0s) infinite,
     relic-bar-color 18s linear infinite;
-  min-height: 2px;
 }
 

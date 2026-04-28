@@ -6,7 +6,7 @@ const PUBLIC_PATHS = new Set<string>([
   "/favicon.ico",
 ]);
 
-const STATIC_PREFIXES = ["/_next", "/fonts", "/images"];
+const STATIC_PREFIXES = ["/_next", "/fonts", "/images", "/videos"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

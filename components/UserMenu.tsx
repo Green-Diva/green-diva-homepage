@@ -60,11 +60,11 @@ export default function UserMenu({ user, isAdmin }: Props) {
         aria-label={t.userMenu.aria}
         className="flex items-center gap-3 group cursor-pointer"
       >
-        <div className="hidden sm:flex flex-col items-end leading-tight">
+        <div className="hidden sm:flex flex-col items-center leading-tight">
           <span className="font-headline text-[13px] text-primary tracking-tight">
             {user.name}
           </span>
-          <span className="font-label text-[9px] text-secondary/80 tracking-[0.3em] uppercase">
+          <span className="font-label text-[9px] text-secondary/80 tracking-[0.3em] uppercase -mr-[0.3em]">
             {tier}
           </span>
         </div>
