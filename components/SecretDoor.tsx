@@ -57,7 +57,7 @@ export default function SecretDoor({ onClose }: Props) {
           SECRET_DOOR_LOCK_KEY,
           String(Date.now() + SECRET_DOOR_LOCK_MS),
         );
-      } catch {}
+      } catch { }
       setTimeout(() => {
         onClose();
       }, 1100);
@@ -96,7 +96,7 @@ export default function SecretDoor({ onClose }: Props) {
           {/* Inner content (revealed when door parts) */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#020807] to-[#04100c] flex flex-col items-center justify-center px-6 py-8">
             <div className="font-label text-[9px] tracking-[0.5em] text-primary/60 uppercase mb-2">
-              VAULT · 7F
+              The Hidden Dungeon
             </div>
             <div className="font-label text-[11px] tracking-[0.4em] text-primary/90 uppercase mb-6">
               Access Code
@@ -104,13 +104,12 @@ export default function SecretDoor({ onClose }: Props) {
 
             <form onSubmit={submit} className="w-full max-w-[240px]">
               <div
-                className={`relative border ${
-                  status === "denied"
+                className={`relative border ${status === "denied"
                     ? "border-red-500/70 secret-door-shake"
                     : status === "granted"
                       ? "border-primary/80"
                       : "border-primary/40"
-                } bg-black/60 px-3 py-2.5 transition-colors`}
+                  } bg-black/60 px-3 py-2.5 transition-colors`}
               >
                 <input
                   ref={inputRef}
@@ -161,17 +160,15 @@ export default function SecretDoor({ onClose }: Props) {
 
           {/* Left half */}
           <div
-            className={`absolute inset-y-0 left-0 w-1/2 secret-door-half secret-door-half-left ${
-              unsealed ? "is-open" : ""
-            }`}
+            className={`absolute inset-y-0 left-0 w-1/2 secret-door-half secret-door-half-left ${unsealed ? "is-open" : ""
+              }`}
           >
             <DoorPanel side="left" />
           </div>
           {/* Right half */}
           <div
-            className={`absolute inset-y-0 right-0 w-1/2 secret-door-half secret-door-half-right ${
-              unsealed ? "is-open" : ""
-            }`}
+            className={`absolute inset-y-0 right-0 w-1/2 secret-door-half secret-door-half-right ${unsealed ? "is-open" : ""
+              }`}
           >
             <DoorPanel side="right" />
           </div>
@@ -195,13 +192,11 @@ export default function SecretDoor({ onClose }: Props) {
 function DoorPanel({ side }: { side: "left" | "right" }) {
   return (
     <div
-      className={`absolute inset-0 ${
-        side === "left"
+      className={`absolute inset-0 ${side === "left"
           ? "bg-gradient-to-r from-[#0d1a16] via-[#0a1612] to-[#06100d]"
           : "bg-gradient-to-l from-[#0d1a16] via-[#0a1612] to-[#06100d]"
-      } border-y border-primary/20 ${
-        side === "left" ? "border-l" : "border-r"
-      } border-primary/20`}
+        } border-y border-primary/20 ${side === "left" ? "border-l" : "border-r"
+        } border-primary/20`}
     >
       {/* Vertical seam shadow */}
       <span
@@ -220,9 +215,8 @@ function DoorPanel({ side }: { side: "left" | "right" }) {
       {/* Center sigil */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div
-          className={`font-label text-[42px] leading-none tracking-[0.1em] text-primary/25 ${
-            side === "left" ? "translate-x-1/3" : "-translate-x-1/3"
-          }`}
+          className={`font-label text-[42px] leading-none tracking-[0.1em] text-primary/25 ${side === "left" ? "translate-x-1/3" : "-translate-x-1/3"
+            }`}
           aria-hidden
         >
           {side === "left" ? "GD" : "07"}
@@ -233,9 +227,8 @@ function DoorPanel({ side }: { side: "left" | "right" }) {
         {[0, 1, 2, 3].map((i) => (
           <span
             key={i}
-            className={`w-1.5 h-1.5 rounded-full bg-primary/40 ${
-              side === "left" ? "self-start" : "self-end"
-            } shadow-[inset_0_0_2px_rgba(0,0,0,0.6)]`}
+            className={`w-1.5 h-1.5 rounded-full bg-primary/40 ${side === "left" ? "self-start" : "self-end"
+              } shadow-[inset_0_0_2px_rgba(0,0,0,0.6)]`}
           />
         ))}
       </div>

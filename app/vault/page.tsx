@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getLocale } from "@/lib/i18n/server";
 
 export const metadata = {
-  title: "VAULT · 7F",
+  title: "The Hidden Dungeon",
   robots: { index: false, follow: false },
 };
 
@@ -10,8 +10,8 @@ export default async function VaultPage() {
   const locale = await getLocale();
   const isZh = locale === "zh";
 
-  const eyebrow = isZh ? "暗室 · 第七层" : "VAULT · 7F";
-  const title = isZh ? "你已抵达暗室" : "You Have Reached the Vault";
+  const eyebrow = isZh ? "隐秘地牢" : "The Hidden Dungeon";
+  const title = isZh ? "你已抵达隐秘地牢" : "You Have Reached the Hidden Dungeon";
   const subtitle = isZh
     ? "这里只有你与神谕对视。说出真名，世界便会松动。"
     : "Only you and the oracle remain. Speak the true name, and the world loosens.";
