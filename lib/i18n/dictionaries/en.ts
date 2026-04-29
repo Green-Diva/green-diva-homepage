@@ -5,8 +5,8 @@ import type { Dictionary } from "../types";
 
 export const en: Dictionary = {
   metadata: {
-    title: "Xinhan Li | The Order of the Green Diva",
-    titleTemplate: "%s | The Order of the Green Diva",
+    title: "Hierarch's Token｜Green Diva",
+    titleTemplate: "%s｜Green Diva",
     description:
       "Green Diva — a digital intermediary within the Order of the Green Diva. A pilgrimage through the data-streams of aesthetic transcendence.",
   },
@@ -64,14 +64,14 @@ export const en: Dictionary = {
     sanctumEntrance: "Sanctum Entrance",
     pageTitle: "The Faithful Sign-in",
     descBefore: "Present the ",
-    descTokenName: "Xin Han's Token",
+    descTokenName: "Hierarch's Token",
     descMiddle: " to ",
     descDiva: "Green Diva",
     descSeparator: ", ",
     descGoddess: "the Goddess",
     descAfter:
       ", that she might unseal the Sanctuary for you. This sacred token shall remain enshrined in your cookies for 7 days only.",
-    tokenPlaceholder: "Xin Han's Token",
+    tokenPlaceholder: "Hierarch's Token",
     enterSanctuary: "Enter Sanctuary",
     pending: "…",
     invalidToken: "The vault rejects your offering.",

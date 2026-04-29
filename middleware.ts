@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/api/auth/login",
+  "/api/locale",
+  "/sacred-terms",
+  "/privacy-covenant",
   "/favicon.ico",
 ]);
 
