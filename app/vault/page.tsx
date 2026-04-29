@@ -17,7 +17,7 @@ export default async function VaultPage() {
     : "Only you and the oracle remain. Speak the true name, and the world loosens.";
   const back = isZh ? "返回神谕" : "Return to the Oracle";
   const stamp = isZh ? "访问已授权" : "ACCESS GRANTED";
-  const sigCH = isZh ? "通道" : "CH";
+  const sigDG = isZh ? "地牢" : "DG";
   const sigSEC = "SEC";
 
   return (
@@ -35,7 +35,7 @@ export default async function VaultPage() {
 
       <header className="relative z-10 flex items-center gap-3 px-5 md:px-10 py-3 border-b border-primary/20">
         <span className="font-label text-[10px] tracking-[0.4em] text-primary/70 uppercase">
-          {sigCH} · 07
+          {sigDG} · 07
         </span>
         <span className="flex-1 h-px bg-primary/15" />
         <span className="font-label text-[10px] tracking-[0.4em] text-primary/40 uppercase">

@@ -105,10 +105,10 @@ export default function SecretDoor({ onClose }: Props) {
             <form onSubmit={submit} className="w-full max-w-[240px]">
               <div
                 className={`relative border ${status === "denied"
-                    ? "border-red-500/70 secret-door-shake"
-                    : status === "granted"
-                      ? "border-primary/80"
-                      : "border-primary/40"
+                  ? "border-red-500/70 secret-door-shake"
+                  : status === "granted"
+                    ? "border-primary/80"
+                    : "border-primary/40"
                   } bg-black/60 px-3 py-2.5 transition-colors`}
               >
                 <input
@@ -177,7 +177,7 @@ export default function SecretDoor({ onClose }: Props) {
         {/* Top status bar */}
         <div className="absolute top-3 left-10 right-10 flex items-center gap-2 pointer-events-none">
           <span className="font-label text-[8px] tracking-[0.4em] uppercase text-primary/60">
-            CH · 07
+            DG · 07
           </span>
           <span className="flex-1 h-px bg-primary/20" />
           <span className="font-label text-[8px] tracking-[0.4em] uppercase text-primary/40">
@@ -193,8 +193,8 @@ function DoorPanel({ side }: { side: "left" | "right" }) {
   return (
     <div
       className={`absolute inset-0 ${side === "left"
-          ? "bg-gradient-to-r from-[#0d1a16] via-[#0a1612] to-[#06100d]"
-          : "bg-gradient-to-l from-[#0d1a16] via-[#0a1612] to-[#06100d]"
+        ? "bg-gradient-to-r from-[#0d1a16] via-[#0a1612] to-[#06100d]"
+        : "bg-gradient-to-l from-[#0d1a16] via-[#0a1612] to-[#06100d]"
         } border-y border-primary/20 ${side === "left" ? "border-l" : "border-r"
         } border-primary/20`}
     >
