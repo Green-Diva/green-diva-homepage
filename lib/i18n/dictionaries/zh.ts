@@ -2,10 +2,10 @@ import type { Dictionary } from "../types";
 
 export const zh: Dictionary = {
   metadata: {
-    title: "李昕翰 | 霓虹修道院",
-    titleTemplate: "%s | 霓虹修道院",
+    title: "李昕翰 | 绿色圣母教",
+    titleTemplate: "%s | 绿色圣母教",
     description:
-      "Green Diva — 霓虹修道院中的数字使者。一场穿越数据流的美学朝圣。",
+      "Green Diva — 绿色圣母教中的数字使者。一场穿越数据流的美学朝圣。",
   },
   nav: {
     sanctuary: "避难所",

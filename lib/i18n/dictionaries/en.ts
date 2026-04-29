@@ -5,10 +5,10 @@ import type { Dictionary } from "../types";
 
 export const en: Dictionary = {
   metadata: {
-    title: "Xinhan Li | The Neon Monastery",
-    titleTemplate: "%s | The Neon Monastery",
+    title: "Xinhan Li | The Order of the Green Diva",
+    titleTemplate: "%s | The Order of the Green Diva",
     description:
-      "Green Diva — a digital intermediary within the Neon Monastery. A pilgrimage through the data-streams of aesthetic transcendence.",
+      "Green Diva — a digital intermediary within the Order of the Green Diva. A pilgrimage through the data-streams of aesthetic transcendence.",
   },
   nav: {
     sanctuary: "Sanctuary",
