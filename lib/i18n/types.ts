@@ -19,12 +19,17 @@ export interface Dictionary {
   hero: {
     manifesto: string;
     oracleTitle: string;
-    introductionHeading: string;
-    introductionBody: string;
-    originHeading: string;
     originBody: string;
     codename: string;
     portraitAlt: string;
+    descent: {
+      heading: string;
+      subheading: string;
+      prophecy: string;
+      years: string;
+      months: string;
+      days: string;
+    };
   };
   oracleVideos: {
     beginOffering: string;

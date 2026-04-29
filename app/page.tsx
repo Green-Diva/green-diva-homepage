@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import DescentCountdown from "@/components/DescentCountdown";
 import HeroPortrait from "@/components/HeroPortrait";
 import SeamlessLoopVideo from "@/components/SeamlessLoopVideo";
 import UserMenu from "@/components/UserMenu";
@@ -115,27 +116,33 @@ export default async function Home() {
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
                 </span>
-                <h1 className="font-headline text-[40px] sm:text-6xl lg:text-7xl font-light text-primary sacred-glow leading-none tracking-[-0.02em]">
+                <h1 className="font-headline text-[36px] sm:text-5xl lg:text-[56px] font-light text-primary sacred-glow leading-[1.05] tracking-[-0.02em]">
                   {t.hero.oracleTitle}
                 </h1>
               </div>
               <div className="space-y-5">
                 <div className="space-y-3">
-                  <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
-                    {t.hero.introductionHeading}
-                  </h3>
-                  <p className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7]">
-                    {t.hero.introductionBody}
-                  </p>
+                  {t.hero.originBody.split("\n\n").map((paragraph, index) => (
+                    <p
+                      key={index}
+                      className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7] text-justify"
+                    >
+                      {paragraph.split(/(\*\*[^*]+\*\*)/g).map((seg, i) =>
+                        seg.startsWith("**") && seg.endsWith("**") ? (
+                          <em
+                            key={i}
+                            className="not-italic text-secondary font-normal"
+                          >
+                            {seg.slice(2, -2)}
+                          </em>
+                        ) : (
+                          <span key={i}>{seg}</span>
+                        ),
+                      )}
+                    </p>
+                  ))}
                 </div>
-                <div className="space-y-3">
-                  <h3 className="font-headline text-2xl md:text-3xl text-secondary italic">
-                    {t.hero.originHeading}
-                  </h3>
-                  <p className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7]">
-                    {t.hero.originBody}
-                  </p>
-                </div>
+                <DescentCountdown labels={t.hero.descent} />
               </div>
             </div>
             <div className="lg:col-span-5 min-h-0 flex items-center justify-center lg:items-stretch">
@@ -144,7 +151,7 @@ export default async function Home() {
           </div>
 
           {/* Oracle loop videos — bottom row of left grid; transparent blend with background */}
-          <div className="lg:row-span-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-end">
+          <div className="lg:row-span-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-stretch">
             {[
               { src: "/videos/oracle-loop.mp4?v=2", label: t.oracleVideos.beginOffering },
               { src: "/videos/oracle-shrine.mp4", label: t.oracleVideos.enterTemple },
@@ -153,7 +160,7 @@ export default async function Home() {
                 key={i}
                 href="#"
                 aria-label={v.label}
-                className="group relative block w-full aspect-[16/9] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+                className="group relative block w-full aspect-[16/9] lg:aspect-auto lg:h-full lg:min-h-[160px] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
               >
                 <SeamlessLoopVideo
                   src={v.src}
