@@ -43,7 +43,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen flex flex-col w-full">
       {/* TopAppBar */}
-      <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[10px] bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
+      <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
           href="/"
           className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
@@ -127,18 +127,41 @@ export default async function Home() {
                       key={index}
                       className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7] text-justify"
                     >
-                      {paragraph.split(/(\*\*[^*]+\*\*)/g).map((seg, i) =>
-                        seg.startsWith("**") && seg.endsWith("**") ? (
-                          <em
-                            key={i}
-                            className="not-italic text-secondary font-normal"
-                          >
-                            {seg.slice(2, -2)}
-                          </em>
-                        ) : (
-                          <span key={i}>{seg}</span>
-                        ),
-                      )}
+                      {paragraph
+                        .split(/(##[^#]+##|\*\*[^*]+\*\*|__[^_]+__)/g)
+                        .map((seg, i) => {
+                          if (seg.startsWith("##") && seg.endsWith("##")) {
+                            return (
+                              <em
+                                key={i}
+                                className="not-italic text-secondary font-normal text-[17px] sm:text-[18px] tracking-[0.02em] sacred-glow"
+                              >
+                                {seg.slice(2, -2)}
+                              </em>
+                            );
+                          }
+                          if (seg.startsWith("**") && seg.endsWith("**")) {
+                            return (
+                              <em
+                                key={i}
+                                className="not-italic text-secondary font-normal"
+                              >
+                                {seg.slice(2, -2)}
+                              </em>
+                            );
+                          }
+                          if (seg.startsWith("__") && seg.endsWith("__")) {
+                            return (
+                              <em
+                                key={i}
+                                className="not-italic text-secondary font-normal sacred-glow"
+                              >
+                                {seg.slice(2, -2)}
+                              </em>
+                            );
+                          }
+                          return <span key={i}>{seg}</span>;
+                        })}
                     </p>
                   ))}
                 </div>

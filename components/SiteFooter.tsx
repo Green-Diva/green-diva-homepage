@@ -5,7 +5,7 @@ import { getDictionary } from "@/lib/i18n/server";
 export default async function SiteFooter() {
   const t = await getDictionary();
   return (
-    <footer className="w-full flex flex-col md:grid md:grid-cols-3 gap-3 md:gap-6 items-center px-5 md:px-10 py-2 border-t border-primary/10 bg-background shrink-0">
+    <footer className="w-full flex flex-col md:grid md:grid-cols-3 gap-3 md:gap-4 items-center px-5 md:px-10 py-2 md:py-1 border-t border-primary/10 bg-background shrink-0">
       <div className="text-secondary font-label text-[11px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-70 text-center md:text-left md:justify-self-start">
         {t.footer.copyright}
       </div>
