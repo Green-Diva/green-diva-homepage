@@ -26,6 +26,7 @@ export interface Dictionary {
       heading: string;
       subheading: string;
       prophecy: string;
+      adventDate: string;
       years: string;
       months: string;
       days: string;

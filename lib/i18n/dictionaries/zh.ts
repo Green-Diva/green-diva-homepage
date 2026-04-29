@@ -24,6 +24,7 @@ export const zh: Dictionary = {
       heading: "圣母降临",
       subheading: "Adventus Deae · 静候圣临之时",
       prophecy: "应许 · 二〇七七 · 叁月廿二",
+      adventDate: "公元 2077 · 03 · 22",
       years: "载",
       months: "月",
       days: "日",

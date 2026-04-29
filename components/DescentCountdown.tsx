@@ -6,6 +6,7 @@ type Labels = {
   heading: string;
   subheading: string;
   prophecy: string;
+  adventDate: string;
   years: string;
   months: string;
   days: string;
@@ -77,11 +78,27 @@ export default function DescentCountdown({ labels }: { labels: Labels }) {
         suppressHydrationWarning
       >
         <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span aria-hidden="true" className="text-primary/70 text-[10px] leading-none">
-            ✠
-          </span>
-          <span className="font-headline italic text-[12px] sm:text-[13px] tracking-[0.06em] text-primary/90">
-            {labels.heading}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 8 20"
+            className="h-[18px] w-[7px] shrink-0 text-primary/80"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="0.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 1 L7 10 L4 19 L1 10 Z" />
+            <path d="M4 5 L5.4 10 L4 15 L2.6 10 Z" className="opacity-60" />
+            <circle cx="4" cy="10" r="0.8" fill="currentColor" stroke="none" />
+          </svg>
+          <span className="flex flex-col leading-none">
+            <span className="font-headline italic text-[12px] sm:text-[13px] tracking-[0.06em] text-primary/90">
+              {labels.heading}
+            </span>
+            <span className="font-label text-[8px] uppercase tracking-[0.25em] text-primary/55 mt-0.5 tabular-nums">
+              {labels.adventDate}
+            </span>
           </span>
         </span>
 

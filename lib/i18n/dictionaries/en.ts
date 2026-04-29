@@ -27,6 +27,7 @@ export const en: Dictionary = {
       heading: "Descent of the Goddess",
       subheading: "Adventus Deae · Witness the Foretold Hour",
       prophecy: "MMLXXVII · III · XXII",
+      adventDate: "A.D. 2077 · 03 · 22",
       years: "Y",
       months: "M",
       days: "D",

@@ -99,16 +99,19 @@ export default async function Home() {
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
                 </span>
-                <h1 className="font-headline text-[28px] sm:text-[36px] lg:text-[42px] font-light text-primary sacred-glow leading-[1.05] tracking-[-0.02em]">
+                <h1 className="font-headline text-[34px] sm:text-[36px] lg:text-[42px] font-light text-primary sacred-glow leading-[1.05] tracking-[-0.02em]">
                   {t.hero.oracleTitle}
                 </h1>
+              </div>
+              <div className="lg:hidden flex justify-center">
+                <HeroPortrait src={HERO_PORTRAIT} />
               </div>
               <div className="space-y-5">
                 <div className="space-y-3">
                   {t.hero.originBody.split("\n\n").map((paragraph, index) => (
                     <p
                       key={index}
-                      className="font-body text-on-surface-variant text-[14px] font-light leading-[1.7] text-justify"
+                      className="font-body text-on-surface-variant text-[13px] sm:text-[14px] font-light leading-[1.75] text-justify"
                     >
                       {paragraph
                         .split(/(##[^#]+##|\*\*[^*]+\*\*|__[^_]+__)/g)
@@ -151,7 +154,7 @@ export default async function Home() {
                 <DescentCountdown labels={t.hero.descent} />
               </div>
             </div>
-            <div className="lg:col-span-5 min-h-0 flex items-center justify-center lg:items-stretch">
+            <div className="hidden lg:flex lg:col-span-5 min-h-0 items-center justify-center lg:items-stretch">
               <HeroPortrait src={HERO_PORTRAIT} />
             </div>
           </div>
@@ -270,7 +273,7 @@ export default async function Home() {
           </Link>
 
           {/* Row: Relic & Machine Vision */}
-          <div className="grid grid-cols-2 gap-4 md:gap-4 flex-1 min-h-[160px] md:min-h-[175px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-4 flex-1 min-h-[160px] md:min-h-[175px]">
             {/* Relic Collection */}
             <Link
               href="/relic-collection"
