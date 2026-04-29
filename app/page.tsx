@@ -52,8 +52,10 @@ export default async function Home() {
         </Link>
         <nav className="group hidden md:flex items-center gap-11">
           {NAV_ITEMS.map((item) => {
-            const className =
-              "font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40";
+            const isSanctuary = item.href === "/sanctuary";
+            const className = isSanctuary
+              ? "font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 text-primary border-secondary/40"
+              : "font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40";
             return (
               <Link key={item.label} href={item.href} className={className}>
                 {item.label}

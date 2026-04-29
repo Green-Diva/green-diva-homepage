@@ -697,3 +697,99 @@ html[lang="zh"] li {
     relic-bar-color 18s linear infinite;
 }
 
+/* 触摸设备：让 Relic Collection 与 Machine Vision 卡片自动播放悬停效果 */
+@media (hover: none) {
+  .module-card .animate-breathing {
+    animation: breathing-glow 4s ease-in-out infinite;
+  }
+  .module-card .relic-rings {
+    animation: none;
+    opacity: 0;
+  }
+  .module-card .relic-radar {
+    opacity: 1;
+  }
+  .module-card {
+    box-shadow: 0 0 20px rgba(144, 222, 205, 0.3);
+    border-color: rgba(144, 222, 205, 0.4);
+  }
+  .module-card .module-image {
+    transform: scale(1.08);
+  }
+  .module-card .scanline-overlay {
+    opacity: 1;
+  }
+  .module-card .animate-floating {
+    animation: floating 3s ease-in-out infinite;
+  }
+  .module-card .scan-line {
+    opacity: 1;
+    animation: machine-scan 2s linear infinite;
+  }
+}
+
+/* Secret door */
+.secret-door-backdrop {
+  background: radial-gradient(
+      circle at center,
+      rgba(0, 0, 0, 0.6) 0%,
+      rgba(0, 0, 0, 0.92) 70%
+    );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: secret-door-fade 0.35s ease-out both;
+}
+@keyframes secret-door-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.secret-door-frame {
+  animation: secret-door-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes secret-door-rise {
+  from {
+    transform: translateY(14px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.secret-door-half {
+  transition: transform 1.2s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+.secret-door-half-left.is-open {
+  transform: translateX(-101%);
+}
+.secret-door-half-right.is-open {
+  transform: translateX(101%);
+}
+.secret-door-shake {
+  animation: secret-door-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes secret-door-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+
