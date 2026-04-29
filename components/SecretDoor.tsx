@@ -177,7 +177,7 @@ export default function SecretDoor({ onClose }: Props) {
         {/* Top status bar */}
         <div className="absolute top-3 left-10 right-10 flex items-center gap-2 pointer-events-none">
           <span className="font-label text-[8px] tracking-[0.4em] uppercase text-primary/60">
-            DG · 07
+            GD · 07
           </span>
           <span className="flex-1 h-px bg-primary/20" />
           <span className="font-label text-[8px] tracking-[0.4em] uppercase text-primary/40">
