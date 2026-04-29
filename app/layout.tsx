@@ -1,28 +1,8 @@
 import type { Metadata } from "next";
-import { Noto_Serif, Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import SiteFooter from "@/components/SiteFooter";
-
-const notoSerif = Noto_Serif({
-  variable: "--font-noto-serif",
-  subsets: ["latin"],
-  weight: ["300", "400", "700"],
-  style: ["normal", "italic"],
-});
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["200", "400", "600"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["300", "500", "700"],
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const dict = await getDictionary();
@@ -41,10 +21,7 @@ export default async function RootLayout({
   const locale = await getLocale();
   const dict = await getDictionary();
   return (
-    <html
-      lang={locale}
-      className={`dark ${notoSerif.variable} ${manrope.variable} ${spaceGrotesk.variable}`}
-    >
+    <html lang={locale} className="dark">
       <body className="font-body selection:bg-primary/30 selection:text-primary min-h-screen flex flex-col relative">
         {/* Global atmospheric backdrop */}
         <div

@@ -36,13 +36,10 @@ function diff(nowMs: number): Parts {
 }
 
 export default function DescentCountdown({ labels }: { labels: Labels }) {
-  const [p, setP] = useState<Parts>({ years: 0, months: 0, days: 0 });
-  const [mounted, setMounted] = useState(false);
+  const [p, setP] = useState<Parts>(() => diff(Date.now()));
 
   useEffect(() => {
-    setMounted(true);
     const tick = () => setP(diff(Date.now()));
-    tick();
     const id = window.setInterval(tick, 60_000);
     return () => window.clearInterval(id);
   }, []);
@@ -106,7 +103,7 @@ export default function DescentCountdown({ labels }: { labels: Labels }) {
                 </span>
               ) : null}
               <span className="text-[16px] sm:text-[18px] font-light sacred-glow tracking-[0.04em]">
-                {String(mounted ? c.value : 0).padStart(2, "0")}
+                {String(c.value).padStart(2, "0")}
               </span>
               <span className="font-label text-[8px] uppercase tracking-[0.25em] text-primary/55">
                 {c.label}
