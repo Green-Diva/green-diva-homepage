@@ -35,7 +35,7 @@ export default async function Home() {
   const user = await getCurrentUser();
   const t = await getDictionary();
   const NAV_ITEMS = [
-    { label: t.nav.sanctuary, href: "/", active: true },
+    { label: t.nav.sanctuary, href: "/sanctuary" },
     { label: t.nav.apocrypha, href: "/apocrypha" },
     { label: t.nav.requiem, href: "/requiem" },
     { label: t.nav.vigils, href: "/vigils" },
@@ -52,27 +52,10 @@ export default async function Home() {
         </Link>
         <nav className="group hidden md:flex items-center gap-11">
           {NAV_ITEMS.map((item) => {
-            const className = `font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 ${item.active
-                ? "text-primary border-secondary/40 group-has-[a:not([data-active]):hover]:text-on-surface-variant group-has-[a:not([data-active]):hover]:border-transparent"
-                : "text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40"
-              }`;
-            const activeAttr = item.active ? { "data-active": true } : {};
-            const ariaCurrent = item.active ? ("page" as const) : undefined;
-            if (item.active) {
-              return (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className={className}
-                  aria-current={ariaCurrent}
-                  {...activeAttr}
-                >
-                  {item.label}
-                </a>
-              );
-            }
+            const className =
+              "font-label text-[12px] tracking-[0.3em] uppercase pb-1 border-b transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 text-on-surface-variant border-transparent hover:text-primary hover:border-secondary/40";
             return (
-              <Link key={item.label} href={item.href} className={className} {...activeAttr}>
+              <Link key={item.label} href={item.href} className={className}>
                 {item.label}
               </Link>
             );
@@ -176,12 +159,12 @@ export default async function Home() {
           {/* Oracle loop videos — bottom row of left grid; transparent blend with background */}
           <div className="lg:row-span-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-stretch">
             {[
-              { src: "/videos/oracle-loop.mp4?v=2", label: t.oracleVideos.beginOffering },
-              { src: "/videos/oracle-shrine.mp4", label: t.oracleVideos.enterTemple },
+              { src: "/videos/oracle-loop.mp4?v=2", label: t.oracleVideos.beginOffering, href: "/sacrifice" },
+              { src: "/videos/oracle-shrine.mp4", label: t.oracleVideos.enterTemple, href: "/sanctuary" },
             ].map((v, i) => (
               <Link
                 key={i}
-                href="#"
+                href={v.href}
                 aria-label={v.label}
                 className="group relative block w-full aspect-[16/9] lg:aspect-auto lg:h-full lg:min-h-[160px] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
               >
