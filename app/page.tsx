@@ -99,7 +99,7 @@ export default async function Home() {
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
                 </span>
-                <h1 className="font-headline text-[36px] sm:text-5xl lg:text-[56px] font-light text-primary sacred-glow leading-[1.05] tracking-[-0.02em]">
+                <h1 className="font-headline text-[28px] sm:text-[36px] lg:text-[42px] font-light text-primary sacred-glow leading-[1.05] tracking-[-0.02em]">
                   {t.hero.oracleTitle}
                 </h1>
               </div>

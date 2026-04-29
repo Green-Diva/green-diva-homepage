@@ -43,7 +43,7 @@ export default function HeroPortrait({ src }: Props) {
           src={src}
           fill
           sizes="(max-width: 1024px) 100vw, 25vw"
-          className="object-cover saturate-[0.78] brightness-95"
+          className="object-cover saturate-[1.05] brightness-[0.98] contrast-[1.05]"
         />
       </div>
       {/* CRT scanlines — fade out once reveal completes */}
