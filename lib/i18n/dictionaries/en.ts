@@ -74,7 +74,7 @@ export const en: Dictionary = {
     tokenPlaceholder: "Hierarch's Token",
     enterSanctuary: "Enter Sanctuary",
     pending: "…",
-    invalidToken: "The vault rejects your offering.",
+    invalidToken: "Invalid token. The Sanctuary rejects your entry.",
   },
   userMenu: {
     aria: "Account menu",
@@ -198,7 +198,7 @@ export const en: Dictionary = {
   },
   errors: {
     invalidRequest: "Invalid request",
-    invalidToken: "Invalid token. The vault rejects your offering.",
+    invalidToken: "Invalid token. The Sanctuary rejects your entry.",
     cannotDemoteOnlyPriestess: "Cannot demote the only remaining priestess.",
     cannotRemoveSelf: "Cannot remove yourself.",
     cannotRemoveOnlyPriestess: "Cannot remove the only remaining priestess.",

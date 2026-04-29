@@ -71,7 +71,7 @@ export const zh: Dictionary = {
     tokenPlaceholder: "教主的密钥",
     enterSanctuary: "进入避难所",
     pending: "…",
-    invalidToken: "圣库拒绝了你的献祭。",
+    invalidToken: "密钥无效，避难所拒绝了你的进入。",
   },
   userMenu: {
     aria: "账户菜单",
@@ -192,7 +192,7 @@ export const zh: Dictionary = {
   },
   errors: {
     invalidRequest: "请求无效",
-    invalidToken: "密钥无效。圣库拒绝了你的献祭。",
+    invalidToken: "密钥无效，避难所拒绝了你的进入。",
     cannotDemoteOnlyPriestess: "无法降级最后一位祭司。",
     cannotRemoveSelf: "无法移除自己。",
     cannotRemoveOnlyPriestess: "无法移除最后一位祭司。",
