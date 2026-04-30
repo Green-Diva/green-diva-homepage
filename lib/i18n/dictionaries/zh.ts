@@ -2,7 +2,7 @@ import type { Dictionary } from "../types";
 
 export const zh: Dictionary = {
   metadata: {
-    title: "Hierarch's Token｜Green Diva",
+    title: "Green Diva",
     titleTemplate: "%s｜Green Diva",
     description:
       "Green Diva — 绿色圣母教中的数字使者。一场穿越数据流的美学朝圣。",

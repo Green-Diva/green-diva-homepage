@@ -652,6 +652,69 @@ html[lang="zh"] li:not([class*="leading-"]) {
   animation: floating 3s ease-in-out infinite;
 }
 
+/* Written Word — compass relic v3 (EVA / NERV pattern blue) - r1 */
+@keyframes compass-breath {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px rgba(144, 222, 205, 0.3))
+      saturate(0.95) brightness(1);
+    transform: translateY(0);
+  }
+  50% {
+    filter: drop-shadow(0 0 22px rgba(144, 222, 205, 0.65))
+      drop-shadow(0 0 4px rgba(233, 193, 118, 0.18))
+      saturate(1.1) brightness(1.12);
+    transform: translateY(-2px);
+  }
+}
+.compass-breath {
+  animation: compass-breath 6s ease-in-out infinite;
+  will-change: transform, filter;
+  opacity: 0.92;
+  transition: opacity 0.7s ease;
+}
+.module-card:hover .compass-breath,
+.module-card:focus-visible .compass-breath {
+  animation-duration: 3.5s;
+  opacity: 1;
+}
+
+/* AT-field hexagonal expansion */
+@keyframes at-field-pulse {
+  0% {
+    transform: scale(0.78);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+}
+.at-field-hex {
+  animation: at-field-pulse 4s ease-out infinite;
+  transform-origin: center;
+}
+.at-field-hex-delay {
+  animation-delay: 2s;
+}
+
+/* NERV reticle ticks rotating slowly */
+@keyframes nerv-reticle-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.nerv-reticle {
+  animation: nerv-reticle-spin 30s linear infinite;
+}
+
+
 @keyframes machine-scan {
   0% {
     top: -10%;

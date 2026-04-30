@@ -5,7 +5,7 @@ import type { Dictionary } from "../types";
 
 export const en: Dictionary = {
   metadata: {
-    title: "Hierarch's Token｜Green Diva",
+    title: "Green Diva",
     titleTemplate: "%s｜Green Diva",
     description:
       "Green Diva — a digital intermediary within the Order of the Green Diva. A pilgrimage through the data-streams of aesthetic transcendence.",

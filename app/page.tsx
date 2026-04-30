@@ -221,6 +221,66 @@ export default async function Home() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 touch:from-primary/20 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 touch:opacity-100 transition-opacity duration-700"></div>
             <div className="scanline-overlay absolute inset-0 z-10"></div>
+            {/* Decorative compass relic — NERV / Pattern Blue HUD */}
+            <div
+              aria-hidden
+              className="hidden sm:block absolute right-8 md:right-12 top-1/2 -translate-y-1/2 z-10 pointer-events-none"
+            >
+              <div className="relative flex items-center justify-center w-[140px] md:w-[180px] aspect-square">
+                {/* AT-field hexagonal pulse rings */}
+                <svg
+                  className="absolute inset-0 w-full h-full overflow-visible"
+                  viewBox="0 0 100 100"
+                  fill="none"
+                  preserveAspectRatio="xMidYMid meet"
+                >
+                  <polygon
+                    className="at-field-hex"
+                    points="50,8 84,28 84,72 50,92 16,72 16,28"
+                    stroke="rgba(144,222,205,0.55)"
+                    strokeWidth="0.6"
+                  />
+                  <polygon
+                    className="at-field-hex at-field-hex-delay"
+                    points="50,8 84,28 84,72 50,92 16,72 16,28"
+                    stroke="rgba(233,193,118,0.4)"
+                    strokeWidth="0.6"
+                  />
+                </svg>
+
+                {/* NERV target reticle (corners + tick marks, slowly rotating) */}
+                <svg
+                  className="absolute w-[88%] aspect-square nerv-reticle"
+                  viewBox="0 0 100 100"
+                  fill="none"
+                >
+                  {/* corner brackets */}
+                  <path
+                    d="M4,14 L4,4 L14,4 M86,4 L96,4 L96,14 M96,86 L96,96 L86,96 M14,96 L4,96 L4,86"
+                    stroke="rgba(233,193,118,0.55)"
+                    strokeWidth="0.7"
+                    strokeLinecap="square"
+                  />
+                  {/* cardinal ticks */}
+                  <path
+                    d="M50,2 L50,8 M50,92 L50,98 M2,50 L8,50 M92,50 L98,50"
+                    stroke="rgba(144,222,205,0.5)"
+                    strokeWidth="0.6"
+                  />
+                </svg>
+
+                {/* Compass icon */}
+                <div className="compass-breath relative">
+                  <Image
+                    src="/images/written-word-icon.png"
+                    alt=""
+                    width={140}
+                    height={140}
+                    className="w-[78px] md:w-[110px] h-auto"
+                  />
+                </div>
+              </div>
+            </div>
             <div className="absolute inset-0 flex flex-col justify-center p-5 md:p-6 z-20">
               <span className="material-symbols-outlined block text-secondary text-2xl opacity-70 mb-2 md:mb-4">
                 menu_book
