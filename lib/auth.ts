@@ -40,8 +40,23 @@ export function sessionCookieOptions() {
   };
 }
 
-export function generateToken(bytes = 24): string {
-  return randomBytes(bytes).toString("base64url");
+// PlayStation-style activation key: XXXX-XXXX-XXXX (12 chars in 3 groups).
+// Alphabet excludes visually ambiguous chars (0/O, 1/I/L) for easier manual
+// entry. Uniqueness is enforced by DB @unique; collision probability across
+// 32^12 ≈ 1.15e18 possibilities is negligible at this app's scale.
+const TOKEN_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+export function generateToken(): string {
+  const groups: string[] = [];
+  for (let g = 0; g < 3; g++) {
+    let chunk = "";
+    const buf = randomBytes(4);
+    for (let i = 0; i < 4; i++) {
+      chunk += TOKEN_ALPHABET[buf[i] % TOKEN_ALPHABET.length];
+    }
+    groups.push(chunk);
+  }
+  return groups.join("-");
 }
 
 export async function createSession(userId: string): Promise<{ id: string; expiresAt: Date }> {

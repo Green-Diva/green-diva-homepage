@@ -4,6 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
 
+// Auto-format short alphanumeric input into XXXX-XXXX-XXXX as the user types.
+// Long or non-conforming input (e.g. legacy base64url tokens with '_' or
+// lowercase) is passed through unchanged so it can't be corrupted.
+function formatTokenInput(raw: string): string {
+  const stripped = raw.replace(/-/g, "").toUpperCase();
+  if (stripped.length <= 12 && /^[A-Z0-9]*$/.test(stripped)) {
+    return stripped.match(/.{1,4}/g)?.join("-") ?? stripped;
+  }
+  return raw;
+}
+
 export default function LoginForm({ from }: { from?: string }) {
   const t = useT();
   const router = useRouter();
@@ -42,9 +53,12 @@ export default function LoginForm({ from }: { from?: string }) {
           <input
             type={show ? "text" : "password"}
             value={token}
-            onChange={(e) => setToken(e.target.value)}
+            onChange={(e) => setToken(formatTokenInput(e.target.value))}
             placeholder={t.auth.tokenPlaceholder}
             autoFocus
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
             className="h-16 w-full rounded-lg border border-primary/20 bg-surface-container pl-5 pr-14 text-base text-on-surface placeholder:text-on-surface-variant/55 focus:border-primary/50 focus:outline-none"
           />
           <button
