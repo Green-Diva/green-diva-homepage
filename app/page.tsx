@@ -275,7 +275,7 @@ export default async function Home() {
           </Link>
 
           {/* Row: Relic & Machine Vision */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-4 flex-1 md:flex-none min-h-[160px] md:min-h-0">
+          <div className="grid grid-cols-2 gap-4 md:gap-4 flex-1 md:flex-none min-h-[160px] md:min-h-0">
             {/* Relic Collection */}
             <Link
               href="/relic-collection"
