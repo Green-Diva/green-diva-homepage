@@ -54,25 +54,49 @@ export default function LoginForm({ from }: { from?: string }) {
             type="text"
             value={token}
             onChange={(e) => setToken(formatTokenInput(e.target.value))}
-            placeholder={t.auth.tokenPlaceholder}
+            aria-label={t.auth.tokenPlaceholder}
             autoFocus
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck={false}
-            className={`h-16 w-full rounded-lg border border-primary/20 bg-surface-container pl-5 pr-14 text-base focus:border-primary/50 focus:outline-none placeholder:text-on-surface-variant/55 ${
-              show
-                ? "text-on-surface"
-                : "text-transparent caret-on-surface selection:bg-primary/20 selection:text-transparent"
-            }`}
+            className="h-16 w-full rounded-lg border border-primary/20 bg-surface-container pl-5 pr-14 text-base text-transparent caret-transparent selection:bg-primary/20 selection:text-transparent focus:border-primary/50 focus:outline-none"
           />
-          {!show && token ? (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 right-14 flex items-center pl-5 font-mono text-base tracking-[0.05em] text-on-surface"
-            >
-              {token.replace(/[^-]/g, "•")}
-            </div>
-          ) : null}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 right-14 flex items-center pl-5 font-mono text-base"
+          >
+            {[0, 1, 2].map((groupIdx) => {
+              const groupChars = (token.split("-")[groupIdx] ?? "").slice(0, 4);
+              return (
+                <div
+                  key={groupIdx}
+                  className={`flex gap-[0.45em] ${groupIdx > 0 ? "ml-[1.1em] border-l border-primary/15 pl-[1.1em]" : ""}`}
+                >
+                  {Array.from({ length: 4 }, (_, i) => {
+                    const ch = groupChars[i];
+                    if (!ch) {
+                      return (
+                        <span
+                          key={i}
+                          className="inline-block w-[0.9ch] text-center text-primary/15"
+                        >
+                          •
+                        </span>
+                      );
+                    }
+                    return (
+                      <span
+                        key={i}
+                        className="inline-block w-[0.9ch] text-center text-on-surface"
+                      >
+                        {show ? ch : "•"}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
           <button
             type="button"
             onClick={() => setShow((v) => !v)}
