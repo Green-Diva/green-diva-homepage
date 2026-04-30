@@ -81,7 +81,7 @@ export default async function Home() {
 
       <main className="flex-1 flex flex-col md:flex-row max-w-[1440px] w-full mx-auto">
         {/* Left Side: Hero Information */}
-        <section className="w-full md:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-6 lg:grid lg:grid-rows-3 relative">
+        <section className="w-full md:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-4 lg:grid lg:grid-rows-3 relative">
           {/* Sacred Divider — gradient line + center diamond glyph */}
           <div
             aria-hidden
@@ -211,12 +211,12 @@ export default async function Home() {
         {/* Right Side: Gallery Modules */}
         <section
           id="chronicle"
-          className="w-full md:w-[42%] p-5 md:p-5 gap-4 md:gap-4 bg-surface-container-lowest flex flex-col"
+          className="w-full md:w-[42%] p-5 md:p-5 gap-4 md:gap-4 bg-surface-container-lowest flex flex-col md:grid md:grid-rows-3"
         >
           {/* Module 1: The Written Word */}
           <Link
             href="/written-word"
-            className="module-card group relative flex-1 min-h-[144px] md:min-h-[160px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card group relative flex-1 md:flex-none min-h-[144px] md:min-h-0 overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:from-primary/20 touch:from-primary/20 transition-all duration-500"></div>
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 touch:opacity-100 transition-opacity duration-700"></div>
@@ -243,7 +243,7 @@ export default async function Home() {
           {/* Module 2: The Visual Witness */}
           <Link
             href="/visual-witness"
-            className="module-card group relative flex-1 min-h-[144px] md:min-h-[160px] overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="module-card group relative flex-1 md:flex-none min-h-[144px] md:min-h-0 overflow-hidden rounded-xl border border-primary/20 bg-background block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
           >
             <Image
               alt={t.sections.visualWitnessTitle}
@@ -275,7 +275,7 @@ export default async function Home() {
           </Link>
 
           {/* Row: Relic & Machine Vision */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-4 flex-1 min-h-[160px] md:min-h-[175px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-4 flex-1 md:flex-none min-h-[160px] md:min-h-0">
             {/* Relic Collection */}
             <Link
               href="/relic-collection"
