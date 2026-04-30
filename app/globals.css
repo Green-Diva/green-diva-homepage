@@ -81,8 +81,8 @@ html[lang="zh"] {
 html[lang="zh"] .font-headline {
   letter-spacing: 0;
 }
-html[lang="zh"] p,
-html[lang="zh"] li {
+html[lang="zh"] p:not([class*="leading-"]),
+html[lang="zh"] li:not([class*="leading-"]) {
   line-height: 1.8;
 }
 
