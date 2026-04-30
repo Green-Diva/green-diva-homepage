@@ -1,18 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 
-// Auto-format short alphanumeric input into XXXX-XXXX-XXXX as the user types.
-// Long or non-conforming input (e.g. legacy base64url tokens with '_' or
-// lowercase) is passed through unchanged so it can't be corrupted.
+const REVEAL_MS = 600;
+const MAX_CHARS = 16;
+const GROUPS = 4;
+
+// Auto-format alphanumeric input into XXXX-XXXX-XXXX-XXXX (max 16 chars).
+// Non-conforming input (e.g. legacy base64url tokens with '_' or lowercase)
+// is passed through, capped at the same total length.
 function formatTokenInput(raw: string): string {
-  const stripped = raw.replace(/-/g, "").toUpperCase();
-  if (stripped.length <= 12 && /^[A-Z0-9]*$/.test(stripped)) {
+  const strippedAll = raw.replace(/-/g, "");
+  const stripped = strippedAll.slice(0, MAX_CHARS).toUpperCase();
+  if (/^[A-Z0-9]*$/.test(stripped)) {
     return stripped.match(/.{1,4}/g)?.join("-") ?? stripped;
   }
-  return raw;
+  return raw.slice(0, MAX_CHARS + (GROUPS - 1));
 }
 
 export default function LoginForm({ from }: { from?: string }) {
@@ -22,6 +27,42 @@ export default function LoginForm({ from }: { from?: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [show, setShow] = useState(false);
+  const [revealIdx, setRevealIdx] = useState<number | null>(null);
+  const [caretIdx, setCaretIdx] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const prevLenRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function syncCaret() {
+    const el = inputRef.current;
+    if (!el) return;
+    const pos = el.selectionStart ?? 0;
+    const before = el.value.slice(0, pos).replace(/-/g, "");
+    setCaretIdx(Math.min(before.length, MAX_CHARS));
+  }
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  function onTokenChange(raw: string) {
+    const next = formatTokenInput(raw);
+    const nextLen = next.replace(/-/g, "").length;
+    if (nextLen > prevLenRef.current) {
+      const idx = nextLen - 1;
+      setRevealIdx(idx);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setRevealIdx(null), REVEAL_MS);
+    } else {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setRevealIdx(null);
+    }
+    prevLenRef.current = nextLen;
+    setToken(next);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,9 +92,22 @@ export default function LoginForm({ from }: { from?: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
         <div className="relative flex-1">
           <input
+            ref={inputRef}
             type="text"
             value={token}
-            onChange={(e) => setToken(formatTokenInput(e.target.value))}
+            onChange={(e) => {
+              onTokenChange(e.target.value);
+              requestAnimationFrame(syncCaret);
+            }}
+            onSelect={syncCaret}
+            onKeyUp={syncCaret}
+            onClick={syncCaret}
+            onFocus={() => {
+              setFocused(true);
+              syncCaret();
+            }}
+            onBlur={() => setFocused(false)}
+            maxLength={MAX_CHARS + (GROUPS - 1)}
             aria-label={t.auth.tokenPlaceholder}
             autoFocus
             autoCapitalize="characters"
@@ -65,7 +119,7 @@ export default function LoginForm({ from }: { from?: string }) {
             aria-hidden
             className="pointer-events-none absolute inset-y-0 left-0 right-14 flex items-center pl-5 font-mono text-base"
           >
-            {[0, 1, 2].map((groupIdx) => {
+            {Array.from({ length: GROUPS }, (_, groupIdx) => {
               const groupChars = (token.split("-")[groupIdx] ?? "").slice(0, 4);
               return (
                 <div
@@ -74,22 +128,41 @@ export default function LoginForm({ from }: { from?: string }) {
                 >
                   {Array.from({ length: 4 }, (_, i) => {
                     const ch = groupChars[i];
-                    if (!ch) {
-                      return (
-                        <span
-                          key={i}
-                          className="inline-block w-[0.9ch] text-center text-primary/15"
-                        >
-                          •
-                        </span>
-                      );
-                    }
+                    const idx = groupIdx * 4 + i;
+                    const reveal = ch && (show || revealIdx === idx);
+                    const showCaretLeft = focused && caretIdx === idx;
+                    const showCaretRight =
+                      focused &&
+                      caretIdx === MAX_CHARS &&
+                      idx === MAX_CHARS - 1;
                     return (
                       <span
                         key={i}
-                        className="inline-block w-[0.9ch] text-center text-on-surface"
+                        className={`relative inline-block w-[0.9ch] text-center ${ch ? "text-on-surface" : "text-primary/15"}`}
                       >
-                        {show ? ch : "•"}
+                        {showCaretLeft ? (
+                          <span
+                            aria-hidden
+                            className="absolute top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 rounded-sm bg-primary shadow-[0_0_8px_var(--color-primary)]"
+                            style={{
+                              left: "-0.225em",
+                              animation:
+                                "login-caret-blink 1.06s steps(2, end) infinite",
+                            }}
+                          />
+                        ) : null}
+                        {showCaretRight ? (
+                          <span
+                            aria-hidden
+                            className="absolute top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 rounded-sm bg-primary shadow-[0_0_8px_var(--color-primary)]"
+                            style={{
+                              right: "-0.225em",
+                              animation:
+                                "login-caret-blink 1.06s steps(2, end) infinite",
+                            }}
+                          />
+                        ) : null}
+                        {ch ? (reveal ? ch : "•") : "•"}
                       </span>
                     );
                   })}
@@ -106,15 +179,15 @@ export default function LoginForm({ from }: { from?: string }) {
           >
             {show ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-5.94" />
                 <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-3.17 4.19" />
                 <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
                 <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
-                <circle cx="12" cy="12" r="3" />
               </svg>
             )}
           </button>
