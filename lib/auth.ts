@@ -68,19 +68,25 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!session) return null;
 
   if (session.expiresAt.getTime() < Date.now()) {
-    await prisma.session.delete({ where: { id: sid } }).catch(() => { });
+    try {
+      await prisma.session.delete({ where: { id: sid } });
+    } catch (err) {
+      console.error("[auth] failed to delete expired session", { sid, err });
+    }
     return null;
   }
 
   // sliding renewal
   const remaining = session.expiresAt.getTime() - Date.now();
   if (remaining < RENEW_THRESHOLD_MS) {
-    await prisma.session
-      .update({
+    try {
+      await prisma.session.update({
         where: { id: sid },
         data: { expiresAt: new Date(Date.now() + SESSION_TTL_MS) },
-      })
-      .catch(() => { });
+      });
+    } catch (err) {
+      console.error("[auth] failed to renew session", { sid, err });
+    }
   }
 
   const u = session.user;

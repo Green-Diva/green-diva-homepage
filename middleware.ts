@@ -48,12 +48,40 @@ async function verifyVaultCookie(token: string | undefined): Promise<boolean> {
   return diff === 0;
 }
 
+const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function csrfBlocked(req: NextRequest): boolean {
+  if (!STATE_CHANGING_METHODS.has(req.method)) return false;
+  if (!req.nextUrl.pathname.startsWith("/api/")) return false;
+  const origin = req.headers.get("origin");
+  const referer = req.headers.get("referer");
+  const host = req.headers.get("host");
+  if (!host) return true;
+  const expectedHost = host.toLowerCase();
+  const ok = (url: string | null) => {
+    if (!url) return false;
+    try {
+      return new URL(url).host.toLowerCase() === expectedHost;
+    } catch {
+      return false;
+    }
+  };
+  if (origin) return !ok(origin);
+  if (referer) return !ok(referer);
+  return true;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (STATIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
+
+  if (csrfBlocked(req)) {
+    return NextResponse.json({ error: "CSRF check failed" }, { status: 403 });
+  }
+
   if (PUBLIC_PATHS.has(pathname)) {
     return NextResponse.next();
   }

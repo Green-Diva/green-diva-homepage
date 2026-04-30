@@ -81,8 +81,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           : "••••",
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "update failed";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    console.error("[api/users PATCH] update failed", e);
+    return NextResponse.json({ error: "update failed" }, { status: 400 });
   }
 }
 

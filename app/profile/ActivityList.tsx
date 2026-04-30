@@ -59,13 +59,27 @@ export default function ActivityList({ initial }: { initial: Activity[] }) {
       </div>
 
       <form onSubmit={onAdd} className="mt-4 flex gap-3">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={280}
-          placeholder={t.activity.placeholder}
-          className="flex-1 rounded-lg border border-primary/20 bg-background/60 px-3 py-2 text-sm text-on-surface focus:border-primary/50 focus:outline-none font-light"
-        />
+        <div className="flex-1 relative">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={280}
+            placeholder={t.activity.placeholder}
+            className="w-full rounded-lg border border-primary/20 bg-background/60 px-3 py-2 pr-14 text-sm text-on-surface focus:border-primary/50 focus:outline-none font-light"
+          />
+          <span
+            className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-label text-[10px] tracking-[0.2em] tabular-nums ${
+              text.length >= 260
+                ? text.length >= 280
+                  ? "text-red-400"
+                  : "text-secondary"
+                : "text-on-surface-variant/60"
+            }`}
+            aria-live="polite"
+          >
+            {text.length}/280
+          </span>
+        </div>
         <button
           type="submit"
           disabled={busy || !text.trim()}

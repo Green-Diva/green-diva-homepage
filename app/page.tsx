@@ -50,7 +50,7 @@ export default async function Home() {
         >
           Green Diva
         </Link>
-        <nav className="group hidden md:flex items-center gap-11">
+        <nav className="group hidden lg:flex items-center gap-11">
           {NAV_ITEMS.map((item) => {
             const isSanctuary = item.href === "/sanctuary";
             const className = isSanctuary
@@ -96,7 +96,7 @@ export default async function Home() {
           </div>
 
           <div className="lg:row-span-2 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch w-full min-h-0">
-            <div className="lg:col-span-7 space-y-6 max-w-[52ch]">
+            <div className="lg:col-span-7 space-y-6 max-w-[52ch] xl:max-w-[60ch]">
               <div className="space-y-3">
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
                   {t.hero.manifesto}
@@ -231,7 +231,7 @@ export default async function Home() {
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-3 md:mb-5 block">
                 {t.sections.writtenWordVolume}
               </span>
-              <span className="w-fit min-w-[260px] px-8 py-3 text-center bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 touch:bg-primary/20 transition-all inline-block">
+              <span className="w-full sm:w-fit sm:min-w-[260px] px-8 py-3 text-center bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 touch:bg-primary/20 transition-all inline-block">
                 {t.sections.openArchives}
               </span>
             </div>
@@ -264,7 +264,7 @@ export default async function Home() {
               <span className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase mb-3 md:mb-5 block">
                 {t.sections.visualWitnessGallery}
               </span>
-              <span className="w-fit min-w-[260px] px-8 py-3 text-center bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 touch:bg-primary/20 transition-all inline-block">
+              <span className="w-full sm:w-fit sm:min-w-[260px] px-8 py-3 text-center bg-primary/5 backdrop-blur-md border border-primary/20 text-[11px] font-label text-primary uppercase tracking-[0.2em] whitespace-nowrap group-hover:bg-primary/20 touch:bg-primary/20 transition-all inline-block">
                 {t.sections.enterFrame}
               </span>
             </div>

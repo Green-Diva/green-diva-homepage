@@ -163,6 +163,10 @@ export interface Dictionary {
     acolyteShort: string; // {{level}}
     confirmRemove: string; // {{name}}
     deleteFailed: string; // {{error}}
+    prevPage: string;
+    nextPage: string;
+    pageInfo: string; // {{page}} {{total}}
+    totalCount: string; // {{count}}
   };
   adminUserForm: {
     newAcolyteLabel: string;

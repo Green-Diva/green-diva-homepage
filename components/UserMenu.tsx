@@ -58,7 +58,7 @@ export default function UserMenu({ user, isAdmin }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t.userMenu.aria}
-        className="flex items-center gap-3 group cursor-pointer"
+        className="flex items-center gap-3 group cursor-pointer touch-manipulation"
       >
         <div className="hidden sm:flex flex-col items-center leading-tight">
           <span className="font-headline text-[13px] text-primary tracking-tight">
@@ -68,12 +68,14 @@ export default function UserMenu({ user, isAdmin }: Props) {
             {tier}
           </span>
         </div>
-        <div className="w-10 h-10 md:w-9 md:h-9 rounded-full border border-primary/30 overflow-hidden hover:border-primary/60 transition-colors flex items-center justify-center bg-surface-container text-primary font-headline text-base">
+        <div className="w-[44px] h-[44px] md:w-9 md:h-9 rounded-full border border-primary/30 overflow-hidden hover:border-primary/60 transition-colors flex items-center justify-center bg-surface-container text-primary font-headline text-base">
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt={user.name}
               src={user.avatarUrl}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-[filter] duration-500"
             />
           ) : (

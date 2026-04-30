@@ -164,6 +164,10 @@ export const zh: Dictionary = {
     acolyteShort: "侍祭（{{level}}）",
     confirmRemove: "移除 {{name}}？",
     deleteFailed: "删除失败：{{error}}",
+    prevPage: "上一页",
+    nextPage: "下一页",
+    pageInfo: "第 {{page}} / {{total}} 页",
+    totalCount: "共 {{count}} 条",
   },
   adminUserForm: {
     newAcolyteLabel: "新增随从",

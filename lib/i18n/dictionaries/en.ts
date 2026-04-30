@@ -168,6 +168,10 @@ export const en: Dictionary = {
     acolyteShort: "Acolyte ({{level}})",
     confirmRemove: "Remove {{name}}?",
     deleteFailed: "Delete failed: {{error}}",
+    prevPage: "Prev",
+    nextPage: "Next",
+    pageInfo: "Page {{page}} / {{total}}",
+    totalCount: "{{count}} total",
   },
   adminUserForm: {
     newAcolyteLabel: "New Acolyte",

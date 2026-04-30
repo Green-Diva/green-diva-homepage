@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
     // return full token ONCE
     return NextResponse.json(created, { status: 201 });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "create failed";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    console.error("[api/users POST] create failed", e);
+    return NextResponse.json({ error: "create failed" }, { status: 400 });
   }
 }
 

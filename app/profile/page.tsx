@@ -116,7 +116,13 @@ export default async function ProfilePage() {
           <div className="relative w-40 h-40 rounded-full border border-primary/30 bg-surface-container flex items-center justify-center text-primary font-headline text-6xl select-none">
             {user.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img alt={user.name} src={user.avatarUrl} className="w-full h-full object-cover rounded-full" />
+              <img
+                alt={user.name}
+                src={user.avatarUrl}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover rounded-full"
+              />
             ) : (
               <span>{initial}</span>
             )}

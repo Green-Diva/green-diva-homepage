@@ -18,7 +18,7 @@
   --color-surface-container: #1e2020;
   --color-surface-container-low: #1a1c1c;
   --color-surface-container-lowest: #0d0f0f;
-  --color-on-surface-variant: #bec9c5;
+  --color-on-surface-variant: #d4dcd9;
   --color-outline-variant: #3f4946;
 
   --font-headline: var(--font-noto-serif), "Noto Serif", serif;
@@ -62,6 +62,16 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .font-label.text-\[8px\],
+  .font-label.text-\[9px\],
+  .font-label.text-\[10px\],
+  .font-label.text-\[11px\] {
+    font-size: 12px !important;
+    letter-spacing: 0.2em !important;
   }
 }
 

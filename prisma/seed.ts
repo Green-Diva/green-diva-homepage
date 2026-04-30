@@ -3,6 +3,11 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && !process.env.ALLOW_PROD_SEED) {
+    throw new Error(
+      "Refusing to seed in production. Set ALLOW_PROD_SEED=1 to override.",
+    );
+  }
   const adminToken = process.env.ADMIN_TOKEN;
   if (adminToken && adminToken !== "change-me-to-a-long-random-string") {
     await prisma.user.upsert({

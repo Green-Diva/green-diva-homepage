@@ -25,6 +25,10 @@ export default async function PlaceholderPage({ title, eyebrow }: Props) {
       </header>
       <main className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="max-w-xl text-center space-y-6">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-secondary/30 bg-secondary/5 font-label text-[10px] tracking-[0.3em] uppercase text-secondary">
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+            {isZh ? "即将开启" : "Coming Soon"}
+          </span>
           {eyebrow ? (
             <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
               {eyebrow}

@@ -3,16 +3,44 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ADMIN_LEVEL, formatSerial, getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n/server";
-import UsersTable from "./UsersTable";
+import { format } from "@/lib/i18n/format";
+import UsersTable, { type SortField, type SortOrder } from "./UsersTable";
 
-export default async function AdminUsersPage() {
+const PAGE_SIZE = 20;
+const ALLOWED_SORT: SortField[] = ["serial", "name", "level", "createdAt"];
+
+function parseSearchParams(sp: { [k: string]: string | string[] | undefined }) {
+  const sortRaw = typeof sp.sort === "string" ? sp.sort : "serial";
+  const sort: SortField = (ALLOWED_SORT as string[]).includes(sortRaw)
+    ? (sortRaw as SortField)
+    : "serial";
+  const orderRaw = typeof sp.order === "string" ? sp.order : "asc";
+  const order: SortOrder = orderRaw === "desc" ? "desc" : "asc";
+  const pageRaw = typeof sp.page === "string" ? Number(sp.page) : 1;
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+  return { sort, order, page };
+}
+
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
+}) {
   const me = await getCurrentUser();
   if (!me) redirect("/login?from=/admin/users");
   if (me.level < ADMIN_LEVEL) redirect("/");
   const t = await getDictionary();
+  const sp = await searchParams;
+  const { sort, order, page } = parseSearchParams(sp);
+
+  const total = await prisma.user.count();
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
 
   const users = await prisma.user.findMany({
-    orderBy: [{ serial: "asc" }],
+    orderBy: [{ [sort]: order }],
+    skip: (safePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     select: {
       id: true,
       serial: true,
@@ -24,6 +52,16 @@ export default async function AdminUsersPage() {
       token: true,
     },
   });
+
+  const buildHref = (overrides: Partial<{ sort: SortField; order: SortOrder; page: number }>) => {
+    const params = new URLSearchParams();
+    const next = { sort, order, page: safePage, ...overrides };
+    if (next.sort !== "serial") params.set("sort", next.sort);
+    if (next.order !== "asc") params.set("order", next.order);
+    if (next.page !== 1) params.set("page", String(next.page));
+    const qs = params.toString();
+    return qs ? `/admin/users?${qs}` : "/admin/users";
+  };
 
   return (
     <main className="mx-auto w-full max-w-5xl px-8 py-12">
@@ -60,7 +98,48 @@ export default async function AdminUsersPage() {
           createdAt: u.createdAt.toISOString(),
         }))}
         meId={me.id}
+        sort={sort}
+        order={order}
+        sortHrefs={{
+          serial: buildHref({ sort: "serial", order: sort === "serial" && order === "asc" ? "desc" : "asc", page: 1 }),
+          name: buildHref({ sort: "name", order: sort === "name" && order === "asc" ? "desc" : "asc", page: 1 }),
+          level: buildHref({ sort: "level", order: sort === "level" && order === "asc" ? "desc" : "asc", page: 1 }),
+          createdAt: buildHref({ sort: "createdAt", order: sort === "createdAt" && order === "asc" ? "desc" : "asc", page: 1 }),
+        }}
       />
+
+      <nav className="mt-6 flex items-center justify-between font-label text-[10px] tracking-[0.3em] uppercase text-primary/70">
+        <span>{format(t.adminUsers.totalCount, { count: total })}</span>
+        <div className="flex items-center gap-4">
+          {safePage > 1 ? (
+            <Link
+              href={buildHref({ page: safePage - 1 })}
+              className="border border-primary/20 px-4 py-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              {t.adminUsers.prevPage}
+            </Link>
+          ) : (
+            <span className="border border-primary/10 px-4 py-2 rounded-lg opacity-30">
+              {t.adminUsers.prevPage}
+            </span>
+          )}
+          <span className="text-secondary tabular-nums">
+            {format(t.adminUsers.pageInfo, { page: safePage, total: totalPages })}
+          </span>
+          {safePage < totalPages ? (
+            <Link
+              href={buildHref({ page: safePage + 1 })}
+              className="border border-primary/20 px-4 py-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              {t.adminUsers.nextPage}
+            </Link>
+          ) : (
+            <span className="border border-primary/10 px-4 py-2 rounded-lg opacity-30">
+              {t.adminUsers.nextPage}
+            </span>
+          )}
+        </div>
+      </nav>
     </main>
   );
 }

@@ -5,6 +5,9 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 
+export type SortField = "serial" | "name" | "level" | "createdAt";
+export type SortOrder = "asc" | "desc";
+
 type Row = {
   id: string;
   serialLabel: string;
@@ -15,9 +18,56 @@ type Row = {
   createdAt: string;
 };
 
-export default function UsersTable({ users: initial, meId }: { users: Row[]; meId: string }) {
+type Props = {
+  users: Row[];
+  meId: string;
+  sort: SortField;
+  order: SortOrder;
+  sortHrefs: Record<SortField, string>;
+};
+
+type SortHeaderProps = {
+  field: SortField;
+  label: string;
+  sort: SortField;
+  order: SortOrder;
+  href: string;
+  className?: string;
+};
+
+function SortHeader({
+  field,
+  label,
+  sort,
+  order,
+  href,
+  className = "px-5 py-4",
+}: SortHeaderProps) {
+  const active = sort === field;
+  const indicator = active ? (order === "asc" ? "↑" : "↓") : "↕";
+  return (
+    <th className={className}>
+      <Link
+        href={href}
+        className={`inline-flex items-center gap-1.5 transition-colors ${active ? "text-primary" : "hover:text-primary/80"
+          }`}
+      >
+        <span>{label}</span>
+        <span
+          aria-hidden="true"
+          className={`text-[9px] ${active ? "text-secondary" : "text-primary/30"}`}
+        >
+          {indicator}
+        </span>
+      </Link>
+    </th>
+  );
+}
+
+export default function UsersTable({ users: initial, meId, sort, order, sortHrefs }: Props) {
   const t = useT();
   const [users, setUsers] = useState(initial);
+
   const genderLabel = (g: string | null) => {
     if (!g) return t.gender.none;
     if (g === "female") return t.gender.female;
@@ -42,12 +92,18 @@ export default function UsersTable({ users: initial, meId }: { users: Row[]; meI
       <table className="w-full text-sm">
         <thead className="text-left text-[10px] font-label uppercase tracking-[0.3em] text-primary/60 bg-surface-container-low">
           <tr>
-            <th className="px-5 py-4">{t.adminUsers.colRecord}</th>
-            <th className="px-5 py-4">{t.adminUsers.colName}</th>
+            <SortHeader field="serial" label={t.adminUsers.colRecord} sort={sort} order={order} href={sortHrefs.serial} />
+            <SortHeader field="name" label={t.adminUsers.colName} sort={sort} order={order} href={sortHrefs.name} />
             <th className="px-5 py-4">{t.adminUsers.colGender}</th>
-            <th className="px-5 py-4">{t.adminUsers.colLevel}</th>
+            <SortHeader field="level" label={t.adminUsers.colLevel} sort={sort} order={order} href={sortHrefs.level} />
             <th className="px-5 py-4">{t.adminUsers.colToken}</th>
-            <th className="px-5 py-4">{t.adminUsers.colJoined}</th>
+            <SortHeader
+              field="createdAt"
+              label={t.adminUsers.colJoined}
+              sort={sort}
+              order={order}
+              href={sortHrefs.createdAt}
+            />
             <th className="px-5 py-4" />
           </tr>
         </thead>

@@ -32,8 +32,23 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const content = parsed.data.content.trim();
+
+  // Idempotency: skip if same content was posted within last 5 seconds
+  const recent = await prisma.activity.findFirst({
+    where: {
+      userId: me.id,
+      content,
+      createdAt: { gte: new Date(Date.now() - 5000) },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recent) {
+    return NextResponse.json(recent, { status: 200 });
+  }
+
   const created = await prisma.activity.create({
-    data: { userId: me.id, content: parsed.data.content.trim() },
+    data: { userId: me.id, content },
   });
   return NextResponse.json(created, { status: 201 });
 }
