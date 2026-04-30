@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 
 const REVEAL_MS = 600;
-const MAX_CHARS = 16;
-const GROUPS = 4;
+const MAX_CHARS = 12;
+const GROUPS = 3;
 
 // Auto-format alphanumeric input into XXXX-XXXX-XXXX-XXXX (max 16 chars).
 // Non-conforming input (e.g. legacy base64url tokens with '_' or lowercase)
@@ -119,56 +119,62 @@ export default function LoginForm({ from }: { from?: string }) {
             aria-hidden
             className="pointer-events-none absolute inset-y-0 left-0 right-14 flex items-center pl-5 font-mono text-base"
           >
-            {Array.from({ length: GROUPS }, (_, groupIdx) => {
-              const groupChars = (token.split("-")[groupIdx] ?? "").slice(0, 4);
-              return (
-                <div
-                  key={groupIdx}
-                  className={`flex gap-[0.45em] ${groupIdx > 0 ? "ml-[1.1em] border-l border-primary/15 pl-[1.1em]" : ""}`}
-                >
-                  {Array.from({ length: 4 }, (_, i) => {
-                    const ch = groupChars[i];
-                    const idx = groupIdx * 4 + i;
-                    const reveal = ch && (show || revealIdx === idx);
-                    const showCaretLeft = focused && caretIdx === idx;
-                    const showCaretRight =
-                      focused &&
-                      caretIdx === MAX_CHARS &&
-                      idx === MAX_CHARS - 1;
-                    return (
-                      <span
-                        key={i}
-                        className={`relative inline-block w-[0.9ch] text-center ${ch ? "text-on-surface" : "text-primary/15"}`}
-                      >
-                        {showCaretLeft ? (
-                          <span
-                            aria-hidden
-                            className="absolute top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 rounded-sm bg-primary shadow-[0_0_8px_var(--color-primary)]"
-                            style={{
-                              left: "-0.225em",
-                              animation:
-                                "login-caret-blink 1.06s steps(2, end) infinite",
-                            }}
-                          />
-                        ) : null}
-                        {showCaretRight ? (
-                          <span
-                            aria-hidden
-                            className="absolute top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 rounded-sm bg-primary shadow-[0_0_8px_var(--color-primary)]"
-                            style={{
-                              right: "-0.225em",
-                              animation:
-                                "login-caret-blink 1.06s steps(2, end) infinite",
-                            }}
-                          />
-                        ) : null}
-                        {ch ? (reveal ? ch : "•") : "•"}
-                      </span>
-                    );
-                  })}
-                </div>
+            {(() => {
+              const filled = token.replace(/-/g, "").length;
+              const groupsToShow = Math.max(
+                1,
+                Math.min(GROUPS, Math.ceil(filled / 4) || 1),
               );
-            })}
+              const lastIdx = groupsToShow * 4 - 1;
+              return Array.from({ length: groupsToShow }, (_, groupIdx) => {
+                const groupChars = (token.split("-")[groupIdx] ?? "").slice(0, 4);
+                return (
+                  <div
+                    key={groupIdx}
+                    className={`flex gap-[0.45em] ${groupIdx > 0 ? "ml-[1.1em] border-l border-primary/15 pl-[1.1em]" : ""}`}
+                  >
+                    {Array.from({ length: 4 }, (_, i) => {
+                      const ch = groupChars[i];
+                      const idx = groupIdx * 4 + i;
+                      const reveal = ch && (show || revealIdx === idx);
+                      const showCaretLeft = focused && caretIdx === idx;
+                      const showCaretRight =
+                        focused && caretIdx === lastIdx + 1 && idx === lastIdx;
+                      return (
+                        <span
+                          key={i}
+                          className={`relative inline-block w-[0.9ch] text-center ${ch ? "text-on-surface" : "text-primary/15"}`}
+                        >
+                          {showCaretLeft ? (
+                            <span
+                              aria-hidden
+                              className="absolute top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 rounded-sm bg-primary shadow-[0_0_8px_var(--color-primary)]"
+                              style={{
+                                left: "-0.225em",
+                                animation:
+                                  "login-caret-blink 1.06s steps(2, end) infinite",
+                              }}
+                            />
+                          ) : null}
+                          {showCaretRight ? (
+                            <span
+                              aria-hidden
+                              className="absolute top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 rounded-sm bg-primary shadow-[0_0_8px_var(--color-primary)]"
+                              style={{
+                                right: "-0.225em",
+                                animation:
+                                  "login-caret-blink 1.06s steps(2, end) infinite",
+                              }}
+                            />
+                          ) : null}
+                          {ch ? (reveal ? ch : "•") : "•"}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              });
+            })()}
           </div>
           <button
             type="button"
