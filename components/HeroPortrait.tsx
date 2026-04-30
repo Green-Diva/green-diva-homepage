@@ -118,7 +118,7 @@ export default function HeroPortrait({ src }: Props) {
         onTouchCancel={cancelLongPress}
         onContextMenu={(e) => e.preventDefault()}
         style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
-        className="group relative w-full max-w-none aspect-[4/5] sm:max-w-[378px] lg:max-w-none lg:aspect-auto lg:h-full lg:min-h-[360px] overflow-hidden rounded-xl border border-primary/20 hover:border-primary/40 shadow-[0_0_40px_rgba(144,222,205,0.05)] hover:shadow-[0_0_60px_rgba(144,222,205,0.18)] transition-[border-color,box-shadow] duration-[1000ms] ease-out bg-background select-none"
+        className="group relative w-full max-w-none aspect-[4/5] sm:max-w-[378px] lg:max-w-none lg:aspect-auto lg:h-full lg:min-h-0 overflow-hidden rounded-xl border border-primary/20 hover:border-primary/40 shadow-[0_0_40px_rgba(144,222,205,0.05)] hover:shadow-[0_0_60px_rgba(144,222,205,0.18)] transition-[border-color,box-shadow] duration-[1000ms] ease-out bg-background select-none"
       >
         {/* Base grayscale layer */}
         <Image

@@ -41,7 +41,7 @@ export default async function Home() {
     { label: t.nav.vigils, href: "/vigils" },
   ];
   return (
-    <div className="min-h-screen flex flex-col w-full">
+    <div className="flex flex-col flex-1 w-full">
       {/* TopAppBar */}
       <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
@@ -79,7 +79,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col md:flex-row max-w-[1440px] w-full mx-auto">
+      <main className="flex-1 flex flex-col md:flex-row max-w-[1440px] w-full mx-auto md:min-h-0 md:overflow-hidden">
         {/* Left Side: Hero Information */}
         <section className="w-full md:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-4 lg:grid lg:grid-rows-3 relative">
           {/* Sacred Divider — gradient line + center diamond glyph */}
@@ -113,7 +113,7 @@ export default async function Home() {
                   {t.hero.originBody.split("\n\n").map((paragraph, index) => (
                     <p
                       key={index}
-                      className="font-body text-on-surface-variant text-[13px] sm:text-[14px] font-light leading-[1.75] text-justify"
+                      className="font-body text-on-surface-variant text-[13px] sm:text-[14px] font-light leading-[1.6] text-justify"
                     >
                       {paragraph
                         .split(/(##[^#]+##|\*\*[^*]+\*\*|__[^_]+__)/g)
@@ -171,7 +171,7 @@ export default async function Home() {
                 key={i}
                 href={v.href}
                 aria-label={v.label}
-                className="group relative block w-full aspect-[16/9] lg:aspect-auto lg:h-full lg:min-h-[160px] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+                className="group relative block w-full aspect-[16/9] lg:aspect-auto lg:h-full lg:min-h-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
               >
                 <SeamlessLoopVideo
                   src={v.src}
