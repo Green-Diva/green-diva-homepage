@@ -51,7 +51,7 @@ export default function LoginForm({ from }: { from?: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
         <div className="relative flex-1">
           <input
-            type={show ? "text" : "password"}
+            type="text"
             value={token}
             onChange={(e) => setToken(formatTokenInput(e.target.value))}
             placeholder={t.auth.tokenPlaceholder}
@@ -59,8 +59,20 @@ export default function LoginForm({ from }: { from?: string }) {
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck={false}
-            className="h-16 w-full rounded-lg border border-primary/20 bg-surface-container pl-5 pr-14 text-base text-on-surface placeholder:text-on-surface-variant/55 focus:border-primary/50 focus:outline-none"
+            className={`h-16 w-full rounded-lg border border-primary/20 bg-surface-container pl-5 pr-14 text-base focus:border-primary/50 focus:outline-none placeholder:text-on-surface-variant/55 ${
+              show
+                ? "text-on-surface"
+                : "text-transparent caret-on-surface selection:bg-primary/20 selection:text-transparent"
+            }`}
           />
+          {!show && token ? (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-0 right-14 flex items-center pl-5 font-mono text-base tracking-[0.05em] text-on-surface"
+            >
+              {token.replace(/[^-]/g, "•")}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => setShow((v) => !v)}
