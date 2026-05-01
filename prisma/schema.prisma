@@ -8,24 +8,26 @@ datasource db {
 }
 
 model User {
-  id                String     @id @default(cuid())
-  serial            Int?       @unique
-  token             String     @unique
+  id                String         @id @default(cuid())
+  serial            Int?           @unique
+  token             String         @unique
   name              String
   gender            String?
   avatarUrl         String?
   bio               String?
-  level             Int        @default(1)
-  attack            Int        @default(50)
-  defense           Int        @default(50)
-  hp                Int        @default(50)
-  agility           Int        @default(50)
-  luck              Int        @default(50)
+  level             Int            @default(1)
+  attack            Int            @default(50)
+  defense           Int            @default(50)
+  hp                Int            @default(50)
+  agility           Int            @default(50)
+  luck              Int            @default(50)
   specialAttributes String?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
   sessions          Session[]
   activities        Activity[]
+  relicShares       RelicShare[]   @relation("RelicShareRecipient")
+  sharedByMe        RelicShare[]   @relation("RelicShareGranter")
 }
 
 model Activity {
@@ -46,4 +48,63 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+enum Rarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+  SPECIAL
+}
+
+model Relic {
+  id           String        @id @default(cuid())
+  slot         Int           @unique
+  slug         String        @unique
+  nameEn       String
+  nameZh       String
+  classifEn    String
+  classifZh    String
+  rarity       Rarity
+  iconKey      String?
+  modelPath    String?
+  photoPaths   String[]
+  loreEn       String?
+  loreZh       String?
+  acquiredAt   DateTime?
+  origin       String?
+  passwordHash String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  unlocks      RelicUnlock[]
+  shares       RelicShare[]
+
+  @@index([rarity])
+}
+
+model RelicShare {
+  id          String   @id @default(cuid())
+  relicId     String
+  userId      String
+  sharedById  String
+  createdAt   DateTime @default(now())
+  relic       Relic    @relation(fields: [relicId], references: [id], onDelete: Cascade)
+  user        User     @relation("RelicShareRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  sharedBy    User     @relation("RelicShareGranter", fields: [sharedById], references: [id], onDelete: Cascade)
+
+  @@unique([relicId, userId])
+  @@index([userId])
+}
+
+model RelicUnlock {
+  id        String   @id @default(cuid())
+  relicId   String
+  cookieKey String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  relic     Relic    @relation(fields: [relicId], references: [id], onDelete: Cascade)
+
+  @@unique([relicId, cookieKey])
+  @@index([expiresAt])
 }

@@ -44,3 +44,6 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/dev.db-journal
 /prisma/migrations
+
+# relic asset storage (.glb / hi-res images served via auth-gated API only)
+/private/relics

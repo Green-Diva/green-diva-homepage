@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:stable": "npm run build && npm run start",
     "build": "next build",
     "start": "prisma db push --skip-generate && next start",
     "lint": "eslint",
@@ -16,8 +17,11 @@
     "seed": "tsx --env-file=.env prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
+    "@google/model-viewer": "^4.2.0",
     "@prisma/client": "^5.22.0",
     "@tailwindcss/typography": "^0.5.19",
+    "bcryptjs": "^3.0.3",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -27,6 +31,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

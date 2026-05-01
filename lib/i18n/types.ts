@@ -200,4 +200,118 @@ export interface Dictionary {
     cannotRemoveSelf: string;
     cannotRemoveOnlyPriestess: string;
   };
+  relicCollection: {
+    pageTitle: string;
+    subtitle: string;
+    capacity: string; // {{filled}} {{total}}
+    statusGuest: string;
+    statusInitiate: string;
+    statusHighLord: string;
+    sidebarTitle: string;
+    filterAll: string;
+    filterCommon: string;
+    filterRare: string;
+    filterEpic: string;
+    filterLegendary: string;
+    filterSpecial: string;
+    cellEmpty: string;
+    cellSlot: string; // {{slot}}
+    backToVault: string;
+    rarityCommon: string;
+    rarityRare: string;
+    rarityEpic: string;
+    rarityLegendary: string;
+    rarityNoBoundary: string;
+    needLevelTitle: string;
+    needLevelBody: string; // {{required}}
+    needPasswordTitle: string;
+    needPasswordBody: string;
+    passwordPlaceholder: string;
+    unlock: string;
+    unlocking: string;
+    unlockFailed: string;
+    rateLimited: string;
+    cancel: string;
+    lore: string;
+    acquired: string;
+    origin: string;
+    rarity: string;
+    slotNo: string;
+    viewerLoading: string;
+    viewerUnsupported: string;
+    noModel: string;
+    noPhotos: string;
+    accessGreen: string;
+    accessRed: string;
+    accessUnlocked: string;
+    shared: string;
+    accessShared: string;
+    adminInscribeHere: string;
+  };
+  adminRelics: {
+    pageTitle: string;
+    pageSubtitle: string;
+    backToSanctuary: string;
+    addNew: string;
+    colSlot: string;
+    colName: string;
+    colRarity: string;
+    colModel: string;
+    colPassword: string;
+    colActions: string;
+    edit: string;
+    remove: string;
+    confirmRemove: string; // {{name}}
+    yes: string;
+    no: string;
+    formNew: string;
+    formEdit: string;
+    fSlot: string;
+    fSlug: string;
+    fNameEn: string;
+    fNameZh: string;
+    fClassifEn: string;
+    fClassifZh: string;
+    fRarity: string;
+    fIcon: string;
+    fOrigin: string;
+    fAcquired: string;
+    fLoreEn: string;
+    fLoreZh: string;
+    fPassword: string;
+    fPasswordKeep: string;
+    fPasswordReset: string;
+    fModel: string;
+    fPhotos: string;
+    uploadModel: string;
+    uploadPhoto: string;
+    uploading: string;
+    uploadFailed: string;
+    save: string;
+    cancel: string;
+    saving: string;
+    saveFailed: string;
+    aiSuggest: string;
+    aiThinking: string;
+    aiFailed: string;
+    aiNotConfigured: string;
+    aiDescriptionPlaceholder: string;
+    aiHint: string;
+    extract: string;
+    extractConfirm: string; // {{name}}
+    move: string;
+    moveTitle: string;
+    moveTo: string;
+    moveSlotInUse: string; // {{slot}}
+    share: string;
+    shareTitle: string;
+    shareSearch: string;
+    shareGrant: string;
+    shareRevoke: string;
+    shareLevel: string; // {{level}}
+    shareEmpty: string;
+    shareCurrent: string;
+    sharedBadge: string;
+    adminToolbar: string;
+  };
 }

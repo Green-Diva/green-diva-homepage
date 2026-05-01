@@ -9,6 +9,8 @@ const PUBLIC_PATHS = new Set<string>([
   "/favicon.ico",
 ]);
 
+const PUBLIC_PREFIXES = ["/relic-collection", "/api/relics"];
+
 const STATIC_PREFIXES = ["/_next", "/fonts", "/images", "/videos"];
 
 const VAULT_COOKIE = "gd_vault";
@@ -83,6 +85,10 @@ export async function middleware(req: NextRequest) {
   }
 
   if (PUBLIC_PATHS.has(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
 

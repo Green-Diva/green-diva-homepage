@@ -368,7 +368,8 @@ export default async function Home() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     className="w-6 h-6 relative animate-relic-text"
-                    aria-label="Vault Sigil"
+                    aria-hidden="true"
+                    focusable="false"
                   >
                     <path d="M12 3l3 3-3 3-3-3z" />
                     <circle cx="12" cy="6" r="0.8" fill="currentColor" stroke="none" />
