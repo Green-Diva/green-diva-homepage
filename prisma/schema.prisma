@@ -97,6 +97,36 @@ model RelicShare {
   @@index([userId])
 }
 
+enum RelicAction {
+  CREATED
+  EDITED
+  MOVED
+  RARITY_CHANGED
+  SHARED
+  SHARE_REVOKED
+  EXTRACTED
+}
+
+model RelicLog {
+  // No FK to Relic — entries persist after EXTRACTED (relic row is deleted).
+  // relicSlug + relicNameSnapshot keep orphans readable.
+  id                 String      @id @default(cuid())
+  relicId            String
+  relicSlug          String
+  relicNameSnapshot  String
+  action             RelicAction
+  actorId            String?
+  actorNameSnapshot  String?
+  targetUserId       String?
+  targetNameSnapshot String?
+  notes              String?
+  details            Json?       // structured diff / before-after for EDITED/MOVED/RARITY_CHANGED
+  createdAt          DateTime    @default(now())
+
+  @@index([relicId, createdAt])
+  @@index([action, createdAt])
+}
+
 model RelicUnlock {
   id        String   @id @default(cuid())
   relicId   String

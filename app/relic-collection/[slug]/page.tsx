@@ -13,6 +13,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import RelicViewer from "./_components/RelicViewer";
 import PhotoCarousel from "./_components/PhotoCarousel";
 import AdminToolbar from "./_components/AdminToolbar";
+import LogPanel from "./_components/LogPanel";
 import UnlockTrigger from "../_components/UnlockTrigger";
 
 export async function generateMetadata({
@@ -244,6 +245,8 @@ export default async function RelicDetailPage({
                   />
                 </div>
               ) : null}
+
+              {isAdmin ? <LogPanel relicId={relic.id} /> : null}
             </div>
           </div>
         )}

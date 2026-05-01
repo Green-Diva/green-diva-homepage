@@ -5,6 +5,7 @@ import { AuthError, requireAdmin } from "@/lib/auth";
 import { relicCreateSchema } from "@/lib/relicValidators";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getCurrentUser } from "@/lib/auth";
+import { recordRelicLog } from "@/lib/relicLog";
 
 export async function GET() {
   const [relics, user, unlockedIds] = await Promise.all([
@@ -32,8 +33,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let me;
   try {
-    await requireAdmin();
+    me = await requireAdmin();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -71,9 +73,15 @@ export async function POST(req: NextRequest) {
         origin: data.origin ?? null,
         passwordHash,
       },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, nameEn: true },
     });
-    return NextResponse.json(created, { status: 201 });
+    await recordRelicLog({
+      action: "CREATED",
+      relic: { id: created.id, slug: created.slug, name: created.nameEn },
+      actor: { id: me.id, name: me.name },
+      details: { slot: data.slot, rarity: data.rarity },
+    });
+    return NextResponse.json({ id: created.id, slug: created.slug }, { status: 201 });
   } catch (e) {
     console.error("[api/relics POST] create failed", e);
     return NextResponse.json({ error: "create failed" }, { status: 400 });

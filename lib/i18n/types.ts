@@ -313,5 +313,23 @@ export interface Dictionary {
     shareCurrent: string;
     sharedBadge: string;
     adminToolbar: string;
+    extractGivenTo: string;
+    extractGivenToHint: string;
+    extractNotes: string;
+    extractNotesHint: string;
+    extractKeepBlank: string;
+    logTitle: string;
+    logEmpty: string;
+    logBy: string; // {{actor}}
+    logTo: string; // {{target}}
+    logActionCREATED: string;
+    logActionEDITED: string;
+    logActionMOVED: string; // {{from}} {{to}}
+    logActionRARITY_CHANGED: string; // {{from}} {{to}}
+    logActionSHARED: string;
+    logActionSHARE_REVOKED: string;
+    logActionEXTRACTED: string;
+    logActionEXTRACTED_TO: string; // {{target}}
+    logFieldsSummary: string; // {{fields}}
   };
 }
