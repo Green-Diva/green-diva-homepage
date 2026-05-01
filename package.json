@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "clean": "rm -rf .next .next-dev",
     "dev": "next dev --webpack",
     "dev:stable": "npm run build && npm run start",
-    "build": "next build",
+    "build": "rm -rf .next && next build",
     "start": "prisma db push --skip-generate && next start",
+    "start:stable": "npm run build && npm run start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "db:push": "prisma db push",
