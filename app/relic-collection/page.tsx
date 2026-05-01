@@ -15,18 +15,21 @@ export const metadata: Metadata = {
 };
 
 const TOTAL_SLOTS = 30;
+const PAGE_SIZE = 12;
 const VALID_FILTERS: RarityFilter[] = ["ALL", "COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"];
 
 export default async function RelicCollectionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ rarity?: string }>;
+  searchParams: Promise<{ rarity?: string; page?: string }>;
 }) {
   const sp = await searchParams;
   const rarityRaw = (sp.rarity ?? "ALL").toUpperCase();
   const filter: RarityFilter = (VALID_FILTERS as string[]).includes(rarityRaw)
     ? (rarityRaw as RarityFilter)
     : "ALL";
+  const pageRaw = parseInt(sp.page ?? "1", 10);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
 
   const [t, locale, user, unlockedIds, allRelics] = await Promise.all([
     getDictionary(),
@@ -63,10 +66,20 @@ export default async function RelicCollectionPage({
     : allRelics.filter((r) => r.rarity === filter)
   ) as CellRelic[];
 
-  const slotMap = new Map<number, CellRelic>();
-  for (const r of filtered) slotMap.set(r.slot, r);
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const filledCount = allRelics.length;
+
+  const buildHref = ({ page: nextPage }: { page: number }): string => {
+    const params = new URLSearchParams();
+    if (filter !== "ALL") params.set("rarity", filter);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    const qs = params.toString();
+    return qs ? `/relic-collection?${qs}` : "/relic-collection";
+  };
 
   return (
     <div className="min-h-screen flex flex-col w-full bg-background text-on-background">
@@ -126,13 +139,12 @@ export default async function RelicCollectionPage({
 
           <div className="flex-1 min-w-0">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-px bg-primary/10 p-px border border-primary/20">
-              {Array.from({ length: TOTAL_SLOTS }, (_, i) => i + 1).map((slot) => {
-                const relic = slotMap.get(slot) ?? null;
-                const access = relic ? canAccessRelic(relic, user, unlockedIds, sharedIds) : null;
+              {pageItems.map((relic) => {
+                const access = canAccessRelic(relic, user, unlockedIds, sharedIds);
                 return (
                   <VaultCell
-                    key={slot}
-                    slot={slot}
+                    key={relic.id}
+                    slot={relic.slot}
                     relic={relic}
                     access={access}
                     locale={locale}
@@ -141,7 +153,47 @@ export default async function RelicCollectionPage({
                   />
                 );
               })}
+              {Array.from({ length: Math.max(0, PAGE_SIZE - pageItems.length) }).map((_, i) => (
+                <div
+                  key={`filler-${i}`}
+                  aria-hidden
+                  className="relative bg-background/40 aspect-square min-h-[88px] border border-primary/5"
+                />
+              ))}
             </div>
+
+            <nav className="mt-6 flex items-center justify-between font-label text-[10px] tracking-[0.3em] uppercase text-primary/70">
+              <span>{format(t.adminUsers.totalCount, { count: total })}</span>
+              <div className="flex items-center gap-4">
+                {safePage > 1 ? (
+                  <Link
+                    href={buildHref({ page: safePage - 1 })}
+                    className="border border-primary/20 px-4 py-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    {t.adminUsers.prevPage}
+                  </Link>
+                ) : (
+                  <span className="border border-primary/10 px-4 py-2 rounded-lg opacity-30">
+                    {t.adminUsers.prevPage}
+                  </span>
+                )}
+                <span className="text-secondary tabular-nums">
+                  {format(t.adminUsers.pageInfo, { page: safePage, total: totalPages })}
+                </span>
+                {safePage < totalPages ? (
+                  <Link
+                    href={buildHref({ page: safePage + 1 })}
+                    className="border border-primary/20 px-4 py-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    {t.adminUsers.nextPage}
+                  </Link>
+                ) : (
+                  <span className="border border-primary/10 px-4 py-2 rounded-lg opacity-30">
+                    {t.adminUsers.nextPage}
+                  </span>
+                )}
+              </div>
+            </nav>
 
             <p className="mt-4 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/60">
               {t.relicCollection.accessGreen} · {t.relicCollection.accessRed} ·{" "}
