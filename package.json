@@ -6,7 +6,7 @@
     "clean": "rm -rf .next .next-dev",
     "dev": "next dev --webpack",
     "dev:stable": "npm run build && npm run start",
-    "build": "rm -rf .next && next build",
+    "build": "next build",
     "start": "prisma db push --skip-generate && next start",
     "start:stable": "npm run build && npm run start",
     "lint": "eslint",
