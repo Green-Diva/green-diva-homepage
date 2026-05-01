@@ -3,32 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
-import { format } from "@/lib/i18n/format";
 import RelicForm, { type RelicEditValue } from "@/app/admin/relics/RelicForm";
 import MoveModal from "./MoveModal";
 import ShareModal from "./ShareModal";
+import ExtractModal from "./ExtractModal";
 
 type Props = {
   relic: RelicEditValue & { slug: string };
+  onChange?: () => void;
 };
 
-export default function AdminToolbar({ relic }: Props) {
+export default function AdminToolbar({ relic, onChange }: Props) {
   const t = useT();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [moving, setMoving] = useState(false);
   const [sharing, setSharing] = useState(false);
-
-  async function onExtract() {
-    if (!confirm(format(t.adminRelics.extractConfirm, { name: relic.nameEn }))) return;
-    const res = await fetch(`/api/relics/${relic.id}`, { method: "DELETE" });
-    if (res.ok) {
-      router.push("/relic-collection");
-      router.refresh();
-    } else {
-      alert(t.adminRelics.saveFailed);
-    }
-  }
+  const [extracting, setExtracting] = useState(false);
 
   return (
     <>
@@ -41,7 +32,7 @@ export default function AdminToolbar({ relic }: Props) {
         <ToolbarBtn label={t.adminRelics.share} onClick={() => setSharing(true)} />
         <ToolbarBtn
           label={t.adminRelics.extract}
-          onClick={onExtract}
+          onClick={() => setExtracting(true)}
           danger
         />
       </div>
@@ -52,6 +43,7 @@ export default function AdminToolbar({ relic }: Props) {
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false);
+            onChange?.();
             router.refresh();
           }}
         />
@@ -63,6 +55,7 @@ export default function AdminToolbar({ relic }: Props) {
           onClose={() => setMoving(false)}
           onMoved={() => {
             setMoving(false);
+            onChange?.();
             router.refresh();
           }}
         />
@@ -71,7 +64,22 @@ export default function AdminToolbar({ relic }: Props) {
         <ShareModal
           relicId={relic.id}
           relicName={relic.nameEn}
-          onClose={() => setSharing(false)}
+          onClose={() => {
+            setSharing(false);
+            onChange?.();
+          }}
+        />
+      ) : null}
+      {extracting ? (
+        <ExtractModal
+          relicId={relic.id}
+          relicName={relic.nameEn}
+          onClose={() => setExtracting(false)}
+          onExtracted={() => {
+            setExtracting(false);
+            router.push("/relic-collection");
+            router.refresh();
+          }}
         />
       ) : null}
     </>

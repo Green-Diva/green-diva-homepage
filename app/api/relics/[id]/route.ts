@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { AuthError, getCurrentUser, requireAdmin } from "@/lib/auth";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { relicUpdateSchema } from "@/lib/relicValidators";
+import { recordRelicLog } from "@/lib/relicLog";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -30,8 +32,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  let me;
   try {
-    await requireAdmin();
+    me = await requireAdmin();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -51,8 +54,58 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if ("acquiredAt" in data) {
     update.acquiredAt = data.acquiredAt ? new Date(data.acquiredAt) : null;
   }
+  // capture before-state for diff log
+  const before = await prisma.relic.findUnique({
+    where: { id },
+    select: { id: true, slug: true, nameEn: true, slot: true, rarity: true },
+  });
+  if (!before) return NextResponse.json({ error: "not found" }, { status: 404 });
   try {
     await prisma.relic.update({ where: { id }, data: update });
+    // Determine which kind of edit this was for the audit log
+    const slotChanged = "slot" in data && data.slot != null && data.slot !== before.slot;
+    const rarityChanged = "rarity" in data && data.rarity && data.rarity !== before.rarity;
+    const passwordChanged = "password" in data;
+    const otherFields = Object.keys(data).filter(
+      (k) => !["slot", "rarity", "password"].includes(k),
+    );
+
+    const logs: Promise<void>[] = [];
+    const relicSnap = { id: before.id, slug: before.slug, name: before.nameEn };
+    if (slotChanged) {
+      logs.push(
+        recordRelicLog({
+          action: "MOVED",
+          relic: relicSnap,
+          actor: { id: me.id, name: me.name },
+          details: { from: before.slot, to: data.slot },
+        }),
+      );
+    }
+    if (rarityChanged) {
+      logs.push(
+        recordRelicLog({
+          action: "RARITY_CHANGED",
+          relic: relicSnap,
+          actor: { id: me.id, name: me.name },
+          details: { from: before.rarity, to: data.rarity },
+        }),
+      );
+    }
+    if (otherFields.length > 0 || passwordChanged) {
+      logs.push(
+        recordRelicLog({
+          action: "EDITED",
+          relic: relicSnap,
+          actor: { id: me.id, name: me.name },
+          details: {
+            fields: otherFields,
+            ...(passwordChanged ? { passwordReset: true } : {}),
+          },
+        }),
+      );
+    }
+    await Promise.all(logs);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/relics PATCH] update failed", e);
@@ -60,16 +113,58 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+const deleteBody = z.object({
+  targetUserId: z.string().min(1).max(64).optional().nullable(),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  let me;
   try {
-    await requireAdmin();
+    me = await requireAdmin();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
   const { id } = await ctx.params;
+  // Accept optional body { targetUserId?, notes? } describing who the
+  // extracted item was given to (may be sent as JSON or absent).
+  let body: { targetUserId?: string | null; notes?: string | null } = {};
+  try {
+    if (req.headers.get("content-type")?.includes("application/json")) {
+      const json = await req.json();
+      const parsed = deleteBody.safeParse(json);
+      if (parsed.success) body = parsed.data;
+    }
+  } catch {
+    // ignore — empty body is fine
+  }
+
+  const before = await prisma.relic.findUnique({
+    where: { id },
+    select: { id: true, slug: true, nameEn: true, slot: true, rarity: true },
+  });
+  if (!before) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  let target: { id: string; name: string } | null = null;
+  if (body.targetUserId) {
+    const u = await prisma.user.findUnique({
+      where: { id: body.targetUserId },
+      select: { id: true, name: true },
+    });
+    if (u) target = u;
+  }
+
   try {
     await prisma.relic.delete({ where: { id } });
+    await recordRelicLog({
+      action: "EXTRACTED",
+      relic: { id: before.id, slug: before.slug, name: before.nameEn },
+      actor: { id: me.id, name: me.name },
+      target,
+      notes: body.notes ?? null,
+      details: { slot: before.slot, rarity: before.rarity },
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/relics DELETE] delete failed", e);
