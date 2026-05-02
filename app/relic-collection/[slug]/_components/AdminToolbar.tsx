@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 import RelicForm, { type RelicEditValue } from "@/app/admin/relics/RelicForm";
+import type { AccessReason } from "@/lib/relicAccess";
 import MoveModal from "./MoveModal";
 import ShareModal from "./ShareModal";
 import GrantModal from "./GrantModal";
@@ -11,12 +12,13 @@ import ExtractModal from "./ExtractModal";
 
 type Props = {
   relic: RelicEditValue & { slug: string };
-  isAdmin: boolean;
+  accessReason: AccessReason;
   isExtracted: boolean;
   onChange?: () => void;
+  rightSlot?: React.ReactNode;
 };
 
-export default function AdminToolbar({ relic, isAdmin, isExtracted, onChange }: Props) {
+export default function AdminToolbar({ relic, accessReason, isExtracted, onChange, rightSlot }: Props) {
   const t = useT();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -30,21 +32,21 @@ export default function AdminToolbar({ relic, isAdmin, isExtracted, onChange }: 
   // page becomes a read-only memorial.
   if (isExtracted) return null;
 
+  const isAdmin = accessReason === "admin";
+  const canExtract = accessReason === "admin" || accessReason === "granted";
+
   return (
     <>
       <div className="border border-secondary/30 bg-secondary/5 p-3 flex flex-wrap items-center gap-2">
         <span className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary mr-2">
           {t.adminRelics.adminToolbar}
         </span>
-        {isAdmin ? (
-          <>
-            <ToolbarBtn label={t.adminRelics.edit} onClick={() => setEditing(true)} />
-            <ToolbarBtn label={t.adminRelics.move} onClick={() => setMoving(true)} />
-            <ToolbarBtn label={t.adminRelics.grant} onClick={() => setGranting(true)} />
-            <ToolbarBtn label={t.adminRelics.share} onClick={() => setSharing(true)} />
-          </>
-        ) : null}
-        <ToolbarBtn label={t.adminRelics.extract} onClick={() => setExtracting(true)} />
+        <ToolbarBtn label={t.adminRelics.edit} onClick={() => setEditing(true)} disabled={!isAdmin} />
+        <ToolbarBtn label={t.adminRelics.move} onClick={() => setMoving(true)} disabled={!isAdmin} />
+        <ToolbarBtn label={t.adminRelics.grant} onClick={() => setGranting(true)} disabled={!isAdmin} />
+        <ToolbarBtn label={t.adminRelics.share} onClick={() => setSharing(true)} disabled={!isAdmin} />
+        <ToolbarBtn label={t.adminRelics.extract} onClick={() => setExtracting(true)} disabled={!canExtract} />
+        {rightSlot ? <div className="ml-auto flex flex-wrap items-center gap-2">{rightSlot}</div> : null}
       </div>
 
       {editing ? (

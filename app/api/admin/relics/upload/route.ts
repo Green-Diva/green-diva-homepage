@@ -4,7 +4,8 @@ import { promises as fs } from "node:fs";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { RELIC_STORAGE_ROOT, ensureStorageRoot } from "@/lib/relicStorage";
 
-const MAX_BYTES = 50 * 1024 * 1024; // 50MB
+const MAX_BYTES = 50 * 1024 * 1024; // 50MB for model/photo
+const MAX_BYTES_ARCHIVE = 200 * 1024 * 1024; // 200MB for archive
 const ALLOWED_MIMES = new Set([
   "model/gltf-binary",
   "model/gltf+json",
@@ -14,6 +15,7 @@ const ALLOWED_MIMES = new Set([
   "image/avif",
 ]);
 const ALLOWED_EXTS = new Set([".glb", ".gltf", ".jpg", ".jpeg", ".png", ".webp", ".avif"]);
+const ARCHIVE_MIMES = new Set(["application/zip", "application/x-zip-compressed", "application/octet-stream"]);
 const SAFE_SLUG = /^[a-z0-9-]{1,64}$/;
 
 export async function POST(req: NextRequest) {
@@ -33,29 +35,47 @@ export async function POST(req: NextRequest) {
   if (!SAFE_SLUG.test(slug)) {
     return NextResponse.json({ error: "invalid slug" }, { status: 400 });
   }
-  if (kind !== "model" && kind !== "photo") {
+  if (kind !== "model" && kind !== "photo" && kind !== "archive" && kind !== "derived") {
     return NextResponse.json({ error: "invalid kind" }, { status: 400 });
   }
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "missing file" }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
+  const isZipKind = kind === "archive" || kind === "derived";
+  const limit = isZipKind ? MAX_BYTES_ARCHIVE : MAX_BYTES;
+  if (file.size > limit) {
     return NextResponse.json({ error: "file too large" }, { status: 413 });
   }
   const ext = path.extname(file.name).toLowerCase();
-  if (!ALLOWED_EXTS.has(ext)) {
-    return NextResponse.json({ error: "unsupported extension" }, { status: 415 });
-  }
-  if (file.type && !ALLOWED_MIMES.has(file.type)) {
-    // mime is best-effort; many browsers send empty for .glb. fall through if blank.
-    return NextResponse.json({ error: "unsupported mime" }, { status: 415 });
+  if (isZipKind) {
+    if (ext !== ".zip") {
+      return NextResponse.json({ error: "unsupported extension" }, { status: 415 });
+    }
+    if (file.type && !ARCHIVE_MIMES.has(file.type)) {
+      return NextResponse.json({ error: "unsupported mime" }, { status: 415 });
+    }
+  } else {
+    if (!ALLOWED_EXTS.has(ext)) {
+      return NextResponse.json({ error: "unsupported extension" }, { status: 415 });
+    }
+    if (file.type && !ALLOWED_MIMES.has(file.type)) {
+      // mime is best-effort; many browsers send empty for .glb. fall through if blank.
+      return NextResponse.json({ error: "unsupported mime" }, { status: 415 });
+    }
   }
 
   await ensureStorageRoot();
   const dir = path.join(RELIC_STORAGE_ROOT, slug);
   await fs.mkdir(dir, { recursive: true });
 
-  const fname = kind === "model" ? `model${ext}` : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+  const fname =
+    kind === "model"
+      ? `model${ext}`
+      : kind === "archive"
+        ? `archive-${Date.now()}.zip`
+        : kind === "derived"
+          ? `derived-${Date.now()}.zip`
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
   const abs = path.join(dir, fname);
   const buf = Buffer.from(await file.arrayBuffer());
 

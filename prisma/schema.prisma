@@ -116,6 +116,8 @@ model Relic {
   iconKey      String?
   modelPath    String?
   photoPaths   String[]
+  archivePath        String?
+  derivedArchivePath String?
   loreEn       String?
   loreZh       String?
   acquiredAt   DateTime?

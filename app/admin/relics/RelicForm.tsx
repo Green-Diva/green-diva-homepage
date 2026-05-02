@@ -32,6 +32,8 @@ type FormState = {
   password: string;
   modelPath: string;
   photoPaths: string[];
+  archivePath: string;
+  derivedArchivePath: string;
 };
 
 const EMPTY: FormState = {
@@ -50,6 +52,8 @@ const EMPTY: FormState = {
   password: "",
   modelPath: "",
   photoPaths: [],
+  archivePath: "",
+  derivedArchivePath: "",
 };
 
 export default function RelicForm({
@@ -82,7 +86,7 @@ export default function RelicForm({
   const [aiError, setAiError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState<"model" | "photo" | null>(null);
+  const [uploading, setUploading] = useState<"model" | "photo" | "archive" | "derived" | null>(null);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -120,6 +124,8 @@ export default function RelicForm({
           password: "",
           modelPath: d.modelPath ?? "",
           photoPaths: Array.isArray(d.photoPaths) ? d.photoPaths : [],
+          archivePath: d.archivePath ?? "",
+          derivedArchivePath: d.derivedArchivePath ?? "",
         });
       });
   }, [initial]);
@@ -130,7 +136,7 @@ export default function RelicForm({
     setState((s) => ({ ...s, [k]: v }));
   }
 
-  async function upload(kind: "model" | "photo", file: File) {
+  async function upload(kind: "model" | "photo" | "archive" | "derived", file: File) {
     if (!state.slug) {
       setError(t.adminRelics.uploadFailed + " · slug required");
       return;
@@ -148,6 +154,10 @@ export default function RelicForm({
         setError(t.adminRelics.uploadFailed);
       } else if (kind === "model") {
         set("modelPath", json.path);
+      } else if (kind === "archive") {
+        set("archivePath", json.path);
+      } else if (kind === "derived") {
+        set("derivedArchivePath", json.path);
       } else {
         set("photoPaths", [...state.photoPaths, json.path]);
       }
@@ -236,8 +246,6 @@ export default function RelicForm({
     setError(null);
     setPending(true);
     const payload: Record<string, unknown> = {
-      slot: Number(state.slot),
-      slug: state.slug.trim(),
       nameEn: state.nameEn.trim(),
       nameZh: state.nameZh.trim(),
       classifEn: state.classifEn.trim(),
@@ -250,7 +258,13 @@ export default function RelicForm({
       loreZh: state.loreZh || null,
       modelPath: state.modelPath || null,
       photoPaths: state.photoPaths,
+      archivePath: state.archivePath || null,
+      derivedArchivePath: state.derivedArchivePath || null,
     };
+    if (!isEdit) {
+      payload.slot = Number(state.slot);
+      payload.slug = state.slug.trim();
+    }
     if (state.password) payload.password = state.password;
 
     try {
@@ -328,9 +342,11 @@ export default function RelicForm({
               min={1}
               max={30}
               required
+              readOnly={isEdit}
+              disabled={isEdit}
               value={state.slot}
               onChange={(e) => set("slot", Number(e.target.value))}
-              className={inputClass}
+              className={inputClass + (isEdit ? " opacity-50 cursor-not-allowed" : "")}
             />
           </Field>
           <Field label={t.adminRelics.fSlug}>
@@ -338,9 +354,11 @@ export default function RelicForm({
               type="text"
               required
               pattern="[a-z0-9-]+"
+              readOnly={isEdit}
+              disabled={isEdit}
               value={state.slug}
               onChange={(e) => set("slug", e.target.value)}
-              className={inputClass}
+              className={inputClass + (isEdit ? " opacity-50 cursor-not-allowed" : "")}
             />
           </Field>
           <Field label={t.adminRelics.fNameEn}>
@@ -419,6 +437,74 @@ export default function RelicForm({
                 }}
               />
             </label>
+          </div>
+        </Field>
+
+        <Field label={t.adminRelics.fArchive}>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              readOnly
+              value={state.archivePath}
+              className={inputClass + " opacity-70"}
+              placeholder="/{slug}/archive-….zip"
+            />
+            <label className="shrink-0 px-3 py-2 border border-primary/40 hover:bg-primary/10 cursor-pointer font-label text-[10px] tracking-[0.2em] uppercase text-primary">
+              {uploading === "archive" ? t.adminRelics.uploading : t.adminRelics.uploadArchive}
+              <input
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) upload("archive", f);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+            {state.archivePath ? (
+              <button
+                type="button"
+                onClick={() => set("archivePath", "")}
+                className="shrink-0 font-label text-[10px] uppercase text-error hover:underline"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+        </Field>
+
+        <Field label={t.adminRelics.fDerived}>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              readOnly
+              value={state.derivedArchivePath}
+              className={inputClass + " opacity-70"}
+              placeholder="/{slug}/derived-….zip"
+            />
+            <label className="shrink-0 px-3 py-2 border border-primary/40 hover:bg-primary/10 cursor-pointer font-label text-[10px] tracking-[0.2em] uppercase text-primary">
+              {uploading === "derived" ? t.adminRelics.uploading : t.adminRelics.uploadDerived}
+              <input
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) upload("derived", f);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+            {state.derivedArchivePath ? (
+              <button
+                type="button"
+                onClick={() => set("derivedArchivePath", "")}
+                className="shrink-0 font-label text-[10px] uppercase text-error hover:underline"
+              >
+                ×
+              </button>
+            ) : null}
           </div>
         </Field>
 

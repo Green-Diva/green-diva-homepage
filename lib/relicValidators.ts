@@ -13,6 +13,18 @@ export const relicCreateSchema = z.object({
   iconKey: z.string().max(64).optional().nullable(),
   modelPath: z.string().max(512).optional().nullable(),
   photoPaths: z.array(z.string().max(512)).max(20).optional().default([]),
+  archivePath: z
+    .string()
+    .max(512)
+    .regex(/^\/[a-z0-9-]+\/archive-\d+\.zip$/)
+    .optional()
+    .nullable(),
+  derivedArchivePath: z
+    .string()
+    .max(512)
+    .regex(/^\/[a-z0-9-]+\/derived-\d+\.zip$/)
+    .optional()
+    .nullable(),
   loreEn: z.string().max(4000).optional().nullable(),
   loreZh: z.string().max(4000).optional().nullable(),
   acquiredAt: z.string().datetime().optional().nullable(),

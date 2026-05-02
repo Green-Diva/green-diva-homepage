@@ -149,24 +149,6 @@ export default async function RelicDetailPage({
           </Link>
         </div>
 
-        {access.level === "GREEN" ? (
-          <div className="mb-3 shrink-0">
-            <AdminToolbar
-              relic={{
-                id: relic.id,
-                slot: relic.slot,
-                slug: relic.slug,
-                nameEn: relic.nameEn,
-                nameZh: relic.nameZh,
-                rarity: relic.rarity,
-                hasPassword: !!relic.passwordHash,
-              }}
-              isAdmin={isAdmin}
-              isExtracted={isExtracted}
-            />
-          </div>
-        ) : null}
-
         {access.level === "RED" ? (
           <div className="max-w-xl mx-auto text-center py-10 space-y-5 border border-error/30 bg-surface-container/30 p-10 shrink-0">
             <span className="material-symbols-outlined text-error text-[48px]">lock</span>
@@ -195,7 +177,7 @@ export default async function RelicDetailPage({
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0">
             {/* Left: 3D viewer */}
-            <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col">
+            <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col relative">
               {relic.modelPath ? (
                 <RelicViewer
                   modelUrl={`/api/relics/${relic.id}/model`}
@@ -218,10 +200,52 @@ export default async function RelicDetailPage({
                   </span>
                 </div>
               )}
+              {!isExtracted ? (
+                <div className="absolute top-3 left-3 right-3 z-10">
+                  <AdminToolbar
+                    relic={{
+                      id: relic.id,
+                      slot: relic.slot,
+                      slug: relic.slug,
+                      nameEn: relic.nameEn,
+                      nameZh: relic.nameZh,
+                      rarity: relic.rarity,
+                      hasPassword: !!relic.passwordHash,
+                    }}
+                    accessReason={access.reason}
+                    isExtracted={isExtracted}
+                    rightSlot={
+                      relic.archivePath || relic.derivedArchivePath ? (
+                        <>
+                          {relic.archivePath ? (
+                            <a
+                              href={`/api/relics/${relic.id}/archive`}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/40 hover:bg-primary/10 font-label text-[11px] tracking-[0.2em] uppercase text-primary"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">archive</span>
+                              {t.relicCollection.archiveDownload}
+                            </a>
+                          ) : null}
+                          {relic.derivedArchivePath ? (
+                            <a
+                              href={`/api/relics/${relic.id}/derived`}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 border border-secondary/40 hover:bg-secondary/10 font-label text-[11px] tracking-[0.2em] uppercase text-secondary"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+                              {t.relicCollection.derivedDownload}
+                            </a>
+                          ) : null}
+                        </>
+                      ) : null
+                    }
+                  />
+                </div>
+              ) : null}
             </div>
 
             {/* Right: metadata */}
-            <div className="lg:col-span-5 flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:-mr-2 scrollbar-thin">
+            <div className="lg:col-span-5 lg:min-h-0 flex flex-col lg:overflow-y-auto lg:pr-2 lg:-mr-2 scrollbar-thin">
+              <section className="border border-primary/15 bg-surface-container/30 p-4 flex flex-col gap-4">
               <div className="flex items-start gap-3 flex-wrap">
                 <span className={"px-3 py-1.5 border font-label text-[10px] tracking-[0.25em] uppercase " + rarityColor(relic.rarity)}>
                   {rarityLabel(t, relic.rarity)}
@@ -291,7 +315,12 @@ export default async function RelicDetailPage({
                 </div>
               ) : null}
 
-              {isAdmin ? <LogPanel relicId={relic.id} /> : null}
+              </section>
+              {isAdmin ? (
+                <div className="mt-4 lg:mt-auto lg:pt-4">
+                  <LogPanel relicId={relic.id} />
+                </div>
+              ) : null}
             </div>
           </div>
         )}

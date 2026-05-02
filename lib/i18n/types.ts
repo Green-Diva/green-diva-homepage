@@ -235,6 +235,8 @@ export interface Dictionary {
     lore: string;
     acquired: string;
     origin: string;
+    archiveDownload: string;
+    derivedDownload: string;
     rarity: string;
     slotNo: string;
     viewerLoading: string;
@@ -288,8 +290,13 @@ export interface Dictionary {
     fPasswordReset: string;
     fModel: string;
     fPhotos: string;
+    fArchive: string;
+    fArchiveDownload: string;
+    fDerived: string;
     uploadModel: string;
     uploadPhoto: string;
+    uploadArchive: string;
+    uploadDerived: string;
     uploading: string;
     uploadFailed: string;
     save: string;

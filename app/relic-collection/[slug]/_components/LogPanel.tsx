@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 
@@ -24,10 +24,6 @@ type LogRow = {
   details: Record<string, unknown> | null;
   createdAt: string;
 };
-
-const MIN = 60_000;
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
 
 function detectLang(): "zh" | "en" {
   if (typeof document !== "undefined") {
@@ -121,19 +117,14 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
     }
   }
 
-  function fmtRelative(iso: string): string {
+  function fmtDateTime(iso: string): string {
     const d = new Date(iso);
-    const diff = Date.now() - d.getTime();
-    if (diff < MIN) return t.adminRelics.logTimeJustNow;
-    if (diff < HOUR) return format(t.adminRelics.logTimeMinutesAgo, { n: Math.floor(diff / MIN) });
-    if (diff < DAY) return format(t.adminRelics.logTimeHoursAgo, { n: Math.floor(diff / HOUR) });
-    if (diff < 7 * DAY) return format(t.adminRelics.logTimeDaysAgo, { n: Math.floor(diff / DAY) });
-    // > 7 days: short local date
-    return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${y}/${m}/${day} ${hh}:${mm}`;
   }
 
   function fmtFullLocal(iso: string): string {
@@ -143,31 +134,9 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
     });
   }
 
-  function dayKey(iso: string): string {
-    const d = new Date(iso);
-    return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  }
-
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const pagedRows = rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-
-  // Group by local day (preserves order — rows arrive newest-first)
-  const grouped = useMemo(() => {
-    const out: { day: string; items: LogRow[] }[] = [];
-    for (const row of pagedRows) {
-      const k = dayKey(row.createdAt);
-      const last = out[out.length - 1];
-      if (last && last.day === k) last.items.push(row);
-      else out.push({ day: k, items: [row] });
-    }
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagedRows, lang]);
 
   function subjectPhrase(row: LogRow): string | null {
     const actor = row.actorNameSnapshot ?? "—";
@@ -241,81 +210,79 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
           {t.adminRelics.logEmpty}
         </p>
       ) : (
-        <div className="space-y-3">
-          {grouped.map((group) => (
-            <div key={group.day} className="space-y-1.5">
-              <div
-                className="font-label text-[9px] tracking-[0.3em] uppercase text-on-surface-variant/45 tabular-nums"
-                suppressHydrationWarning
+        <ol className="space-y-1">
+          {pagedRows.map((row) => {
+            const fields =
+              row.action === "EDITED" &&
+              row.details &&
+              Array.isArray((row.details as { fields?: unknown }).fields)
+                ? ((row.details as { fields: string[] }).fields.join(", "))
+                : null;
+            const moveDetails =
+              row.action === "MOVED" && row.details
+                ? format(t.adminRelics.logMoveDetails, {
+                    from: (row.details as { from?: number }).from ?? "?",
+                    to: (row.details as { to?: number }).to ?? "?",
+                  })
+                : null;
+            const inlineDetails = moveDetails
+              ? `(${moveDetails})`
+              : fields
+                ? `(${format(t.adminRelics.logFieldsSummary, { fields })})`
+                : null;
+            const subject = subjectPhrase(row);
+            return (
+              <li
+                key={row.id}
+                className="border-l border-primary/10 pl-2.5 text-[12px] text-on-surface-variant leading-[1.55]"
               >
-                {group.day}
-              </div>
-              <ol className="space-y-1">
-                {group.items.map((row) => {
-                  const fields =
-                    row.action === "EDITED" &&
-                    row.details &&
-                    Array.isArray((row.details as { fields?: unknown }).fields)
-                      ? ((row.details as { fields: string[] }).fields.join(", "))
-                      : null;
-                  const moveDetails =
-                    row.action === "MOVED" && row.details
-                      ? format(t.adminRelics.logMoveDetails, {
-                          from: (row.details as { from?: number }).from ?? "?",
-                          to: (row.details as { to?: number }).to ?? "?",
-                        })
-                      : null;
-                  const inlineDetails = moveDetails
-                    ? `(${moveDetails})`
-                    : fields
-                      ? `(${format(t.adminRelics.logFieldsSummary, { fields })})`
-                      : null;
-                  const subject = subjectPhrase(row);
-                  return (
-                    <li
-                      key={row.id}
-                      className="border-l border-primary/10 pl-2.5 text-[12px] text-on-surface-variant leading-[1.55]"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className={
-                            "shrink-0 px-2 py-0.5 border font-label text-[9px] tracking-[0.2em] uppercase " +
-                            actionColor(row.action)
-                          }
-                        >
-                          {actionLabel(row)}
-                        </span>
-                        {subject || inlineDetails ? (
-                          <span className={"flex-1 min-w-0 truncate " + subjectColor(row.action)}>
-                            {subject}
-                            {subject && inlineDetails ? " " : null}
-                            {inlineDetails ? (
-                              <span className="text-on-surface-variant/60 tabular-nums">{inlineDetails}</span>
-                            ) : null}
-                          </span>
-                        ) : (
-                          <span className="flex-1" />
-                        )}
-                        <span
-                          className="shrink-0 font-label text-[10px] tracking-[0.15em] text-on-surface-variant/60 tabular-nums"
-                          title={fmtFullLocal(row.createdAt)}
-                          suppressHydrationWarning
-                        >
-                          {fmtRelative(row.createdAt)}
-                        </span>
-                      </div>
-                      {row.notes ? (
-                        <div className="text-[12px] text-on-surface/80 mt-1 italic">
-                          “{row.notes}”
-                        </div>
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={
+                      "shrink-0 px-2 py-0.5 border font-label text-[9px] tracking-[0.2em] uppercase " +
+                      actionColor(row.action)
+                    }
+                  >
+                    {actionLabel(row)}
+                  </span>
+                  {subject || inlineDetails ? (
+                    <span className={"flex-1 min-w-0 truncate " + subjectColor(row.action)}>
+                      {subject}
+                      {subject && inlineDetails ? " " : null}
+                      {inlineDetails ? (
+                        <span className="text-on-surface-variant/60 tabular-nums">{inlineDetails}</span>
                       ) : null}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
+                    </span>
+                  ) : (
+                    <span className="flex-1" />
+                  )}
+                  <span
+                    className="shrink-0 font-label text-[10px] tracking-[0.15em] text-on-surface-variant/60 tabular-nums"
+                    title={fmtFullLocal(row.createdAt)}
+                    suppressHydrationWarning
+                  >
+                    {fmtDateTime(row.createdAt)}
+                  </span>
+                </div>
+                {row.notes ? (
+                  <div className="text-[12px] text-on-surface/80 mt-1 italic">
+                    “{row.notes}”
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+          {Array.from({ length: PAGE_SIZE - pagedRows.length }).map((_, i) => (
+            <li key={`pad-${i}`} aria-hidden className="border-l border-transparent pl-2.5 text-[12px] leading-[1.55] invisible">
+              <div className="flex items-center gap-2.5">
+                <span className="shrink-0 px-2 py-0.5 border font-label text-[9px] tracking-[0.2em] uppercase">
+                  &nbsp;
+                </span>
+                <span className="flex-1" />
+              </div>
+            </li>
           ))}
-        </div>
+        </ol>
       )}
     </section>
   );
