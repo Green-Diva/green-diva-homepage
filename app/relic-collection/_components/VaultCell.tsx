@@ -85,7 +85,7 @@ function CellInner({
           {t.relicCollection.shared}
         </span>
       ) : null}
-      <span className="absolute top-1.5 left-2 font-label text-[9px] tracking-[0.2em] text-on-surface-variant/60">
+      <span className="absolute top-1.5 left-2 font-label text-[10px] tracking-[0.2em] text-on-surface-variant/75">
         {String(relic.slot).padStart(3, "0")}
       </span>
       <div className={"flex flex-col items-center justify-center gap-2 px-2 text-center " + rarityAccent(relic.rarity)}>
@@ -100,10 +100,10 @@ function CellInner({
         ) : (
           <span className="material-symbols-outlined text-[28px]">inventory_2</span>
         )}
-        <span className="block font-label text-[9px] tracking-[0.2em] uppercase line-clamp-2 leading-[1.3]">
+        <span className="block font-label text-[10px] tracking-[0.2em] uppercase line-clamp-2 leading-[1.35]">
           {name}
         </span>
-        <span className="block font-label text-[8px] tracking-[0.2em] uppercase opacity-60 line-clamp-1">
+        <span className="block font-label text-[9px] tracking-[0.2em] uppercase opacity-75 line-clamp-1">
           {classif}
         </span>
       </div>
@@ -113,7 +113,7 @@ function CellInner({
 
 export default function VaultCell({ slot, relic, access, locale, t, isAdmin }: Props) {
   const baseClasses =
-    "relative bg-background/80 aspect-square min-h-[88px] flex items-center justify-center transition-all duration-300 group overflow-hidden";
+    "relative bg-background/80 aspect-square min-h-[88px] lg:aspect-auto lg:min-h-0 flex items-center justify-center transition-all duration-300 group overflow-hidden";
 
   if (!relic) {
     if (isAdmin) {
@@ -128,13 +128,11 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin }: P
           }
         >
           <CellOrnaments />
-          <span className="absolute top-1.5 left-2 font-label text-[9px] tracking-[0.2em] text-on-surface-variant/60">
+          <span className="absolute top-1.5 left-2 font-label text-[10px] tracking-[0.2em] text-on-surface-variant/55">
             {String(slot).padStart(3, "0")}
           </span>
-          <span className="material-symbols-outlined text-secondary/70 text-[24px]">add</span>
-          <span className="absolute bottom-1.5 inset-x-0 font-label text-[8px] tracking-[0.25em] uppercase text-secondary/70 text-center">
-            {t.relicCollection.adminInscribeHere}
-          </span>
+          <span className="material-symbols-outlined text-secondary/55 group-hover:text-secondary touch:text-secondary text-[28px] transition-colors">add</span>
+          <span className="sr-only">{t.relicCollection.adminInscribeHere}</span>
         </EmptyCellAdminTrigger>
       );
     }
@@ -144,10 +142,10 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin }: P
         aria-label={format(t.relicCollection.cellSlot, { slot })}
       >
         <CellOrnaments />
-        <span className="font-label text-[9px] tracking-[0.3em] uppercase text-on-surface-variant/30 leading-tight text-center px-2">
+        <span className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant/45 leading-tight text-center px-2">
           {t.relicCollection.cellEmpty}
           <br />
-          <span className="opacity-50">{format(t.relicCollection.cellSlot, { slot })}</span>
+          <span className="opacity-60">{format(t.relicCollection.cellSlot, { slot })}</span>
         </span>
       </div>
     );

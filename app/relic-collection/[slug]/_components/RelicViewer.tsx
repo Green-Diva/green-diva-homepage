@@ -65,7 +65,7 @@ export default function RelicViewer({ modelUrl, alt, t }: Props) {
 
   if (errored) {
     return (
-      <div className="aspect-square w-full bg-surface-container/40 border border-error/30 flex items-center justify-center">
+      <div className="aspect-square w-full bg-surface-container/40 border border-error/30 flex items-center justify-center lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
         <span className="font-label text-[11px] tracking-[0.2em] uppercase text-error">
           {t.relicCollection.viewerUnsupported}
         </span>
@@ -75,7 +75,7 @@ export default function RelicViewer({ modelUrl, alt, t }: Props) {
 
   if (!ready) {
     return (
-      <div className="relative aspect-square w-full bg-surface-container/40 border border-primary/30 overflow-hidden flex items-center justify-center">
+      <div className="relative aspect-square w-full bg-surface-container/40 border border-primary/30 overflow-hidden flex items-center justify-center lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
         <span className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent animate-[scan_2.4s_linear_infinite]" />
         <span className="font-label text-[11px] tracking-[0.3em] uppercase text-primary z-10">
           {t.relicCollection.viewerLoading}
@@ -85,7 +85,7 @@ export default function RelicViewer({ modelUrl, alt, t }: Props) {
   }
 
   return (
-    <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden">
+    <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
       <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-l border-t border-primary/70 z-10" />
       <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-r border-t border-primary/70 z-10" />
       <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-l border-b border-primary/70 z-10" />

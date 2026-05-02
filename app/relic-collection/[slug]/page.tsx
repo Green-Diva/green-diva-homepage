@@ -86,7 +86,7 @@ export default async function RelicDetailPage({
   const lore = locale === "zh" ? relic.loreZh : relic.loreEn;
 
   return (
-    <div className="min-h-screen flex flex-col w-full bg-background text-on-background">
+    <div className="flex flex-col flex-1 w-full bg-background text-on-background">
       <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-2 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0">
         <Link
           href="/"
@@ -97,8 +97,8 @@ export default async function RelicDetailPage({
         <LanguageSwitcher />
       </header>
 
-      <main className="flex-1 px-4 md:px-10 py-6 md:py-10 w-full max-w-[1440px] mx-auto">
-        <div className="mb-6">
+      <main className="flex-1 px-4 md:px-10 py-4 md:py-6 w-full max-w-[1440px] mx-auto flex flex-col lg:min-h-0 lg:overflow-hidden">
+        <div className="mb-3 shrink-0">
           <Link
             href="/relic-collection"
             className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant hover:text-primary"
@@ -108,7 +108,7 @@ export default async function RelicDetailPage({
         </div>
 
         {access.ok && isAdmin ? (
-          <div className="mb-6">
+          <div className="mb-3 shrink-0">
             <AdminToolbar
               relic={{
                 id: relic.id,
@@ -124,7 +124,7 @@ export default async function RelicDetailPage({
         ) : null}
 
         {!access.ok ? (
-          <div className="max-w-xl mx-auto text-center py-16 space-y-6 border border-error/30 bg-surface-container/30 p-10">
+          <div className="max-w-xl mx-auto text-center py-10 space-y-5 border border-error/30 bg-surface-container/30 p-10 shrink-0">
             <span className="material-symbols-outlined text-error text-[48px]">lock</span>
             <h1 className="font-headline text-2xl tracking-wide uppercase text-on-surface">
               {access.reason === "needs-level"
@@ -149,9 +149,9 @@ export default async function RelicDetailPage({
             ) : null}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0">
             {/* Left: 3D viewer */}
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col">
               {relic.modelPath ? (
                 <RelicViewer
                   modelUrl={`/api/relics/${relic.id}/model`}
@@ -159,7 +159,7 @@ export default async function RelicDetailPage({
                   t={t}
                 />
               ) : relic.photoPaths.length > 0 ? (
-                <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden">
+                <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/api/relics/${relic.id}/photos/0`}
@@ -168,7 +168,7 @@ export default async function RelicDetailPage({
                   />
                 </div>
               ) : (
-                <div className="aspect-square w-full bg-surface-container/40 border border-primary/20 flex items-center justify-center">
+                <div className="aspect-square w-full bg-surface-container/40 border border-primary/20 flex items-center justify-center lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
                   <span className="font-label text-[11px] tracking-[0.2em] uppercase text-on-surface-variant/60">
                     {t.relicCollection.noModel}
                   </span>
@@ -177,7 +177,7 @@ export default async function RelicDetailPage({
             </div>
 
             {/* Right: metadata */}
-            <div className="lg:col-span-5 flex flex-col gap-6">
+            <div className="lg:col-span-5 flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:-mr-2 scrollbar-thin">
               <div className="flex items-start gap-3 flex-wrap">
                 <span className={"px-3 py-1.5 border font-label text-[10px] tracking-[0.25em] uppercase " + rarityColor(relic.rarity)}>
                   {rarityLabel(t, relic.rarity)}

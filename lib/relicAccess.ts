@@ -5,10 +5,10 @@ import { ADMIN_LEVEL, type CurrentUser } from "@/lib/auth";
 import { RELIC_UNLOCK_COOKIE, parseUnlockCookie } from "@/lib/relicCookie";
 
 export const RARITY_GATE: Record<Exclude<Rarity, "SPECIAL">, number> = {
-  COMMON: 0,
+  COMMON: 10,
   RARE: 25,
   EPIC: 50,
-  LEGENDARY: 75,
+  LEGENDARY: 85,
 };
 
 export type AccessResult =

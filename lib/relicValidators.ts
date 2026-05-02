@@ -3,7 +3,7 @@ import { z } from "zod";
 export const RARITIES = ["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"] as const;
 
 export const relicCreateSchema = z.object({
-  slot: z.number().int().min(1).max(30),
+  slot: z.number().int().min(1).max(60),
   slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
   nameEn: z.string().min(1).max(120),
   nameZh: z.string().min(1).max(120),

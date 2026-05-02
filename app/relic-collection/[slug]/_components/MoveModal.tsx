@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 
-const TOTAL_SLOTS = 30;
+const TOTAL_SLOTS = 60;
 
 type Props = {
   relicId: string;
