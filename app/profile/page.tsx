@@ -101,7 +101,7 @@ export default async function ProfilePage() {
               value={user.gender ? GENDER_LABEL[user.gender] ?? user.gender : t.gender.none}
             />
             <Field label={t.profile.fieldTier} value={`${tier} (Lv ${user.level})`} />
-            <TokenField token={user.token} />
+            <TokenField />
           </dl>
         </div>
 

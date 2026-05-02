@@ -18,7 +18,6 @@ export type CurrentUser = {
   serial: number | null;
   name: string;
   level: number;
-  token: string;
   gender: string | null;
   avatarUrl: string | null;
   bio: string | null;
@@ -110,7 +109,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     serial: u.serial,
     name: u.name,
     level: u.level,
-    token: u.token,
     gender: u.gender,
     avatarUrl: u.avatarUrl,
     bio: u.bio,

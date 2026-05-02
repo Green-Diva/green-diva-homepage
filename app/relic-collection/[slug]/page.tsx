@@ -9,7 +9,7 @@ import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { format } from "@/lib/i18n/format";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getSharedRelicIds } from "@/lib/relicShare";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import UserMenu from "@/components/UserMenu";
 import RelicViewer from "./_components/RelicViewer";
 import PhotoCarousel from "./_components/PhotoCarousel";
 import AdminToolbar from "./_components/AdminToolbar";
@@ -87,14 +87,35 @@ export default async function RelicDetailPage({
 
   return (
     <div className="flex flex-col flex-1 w-full bg-background text-on-background">
-      <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-2 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0">
+      <header className="w-full z-50 grid grid-cols-[1fr_auto_1fr] items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
           href="/"
-          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)]"
+          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm justify-self-start"
         >
           Green Diva
         </Link>
-        <LanguageSwitcher />
+        <div className="hidden md:flex items-center gap-3 justify-self-center whitespace-nowrap" aria-label="The Relic Collection">
+          <span aria-hidden className="block w-8 h-px bg-gradient-to-r from-transparent to-primary/50" />
+          <span aria-hidden className="text-secondary/80 text-[10px] leading-none">◆</span>
+          <span className="font-label text-[11px] tracking-[0.45em] uppercase text-primary sacred-glow">
+            The Relic Collection
+          </span>
+          <span aria-hidden className="text-secondary/80 text-[10px] leading-none">◆</span>
+          <span aria-hidden className="block w-8 h-px bg-gradient-to-l from-transparent to-primary/50" />
+        </div>
+        <div className="flex items-center gap-3 sm:gap-5 md:gap-7 justify-self-end">
+          {user ? (
+            <UserMenu
+              user={{
+                name: user.name,
+                level: user.level,
+                avatarUrl: user.avatarUrl,
+                gender: user.gender,
+              }}
+              isAdmin={isAdmin}
+            />
+          ) : null}
+        </div>
       </header>
 
       <main className="flex-1 px-4 md:px-10 py-4 md:py-6 w-full max-w-[1440px] mx-auto flex flex-col lg:min-h-0 lg:overflow-hidden">

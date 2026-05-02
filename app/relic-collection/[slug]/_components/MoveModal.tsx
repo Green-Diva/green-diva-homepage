@@ -6,6 +6,8 @@ import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 
 const TOTAL_SLOTS = 60;
+const PAGE_SIZE = 50;
+const TOTAL_PAGES = Math.max(1, Math.ceil(TOTAL_SLOTS / PAGE_SIZE));
 
 type Props = {
   relicId: string;
@@ -20,6 +22,9 @@ export default function MoveModal({ relicId, currentSlot, onClose, onMoved }: Pr
   const [occupied, setOccupied] = useState<Set<number>>(new Set());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(() => Math.ceil(currentSlot / PAGE_SIZE) || 1);
+  const startSlot = (page - 1) * PAGE_SIZE + 1;
+  const endSlot = Math.min(page * PAGE_SIZE, TOTAL_SLOTS);
 
   useEffect(() => {
     fetch("/api/relics")
@@ -83,15 +88,15 @@ export default function MoveModal({ relicId, currentSlot, onClose, onMoved }: Pr
       }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
     >
-      <div className="w-full max-w-md border border-primary/40 bg-background/95 p-6 space-y-4">
+      <div className="w-full max-w-2xl border border-primary/40 bg-background/95 p-6 space-y-4">
         <h3 className="font-headline text-lg text-primary tracking-wide uppercase">
           {t.adminRelics.moveTitle}
         </h3>
         <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant">
           {t.adminRelics.moveTo}
         </p>
-        <div className="grid grid-cols-6 gap-1.5">
-          {Array.from({ length: TOTAL_SLOTS }, (_, i) => i + 1).map((s) => {
+        <div className="grid grid-cols-10 gap-1.5">
+          {Array.from({ length: endSlot - startSlot + 1 }, (_, i) => startSlot + i).map((s) => {
             const isCur = s === currentSlot;
             const isUsed = occupied.has(s) && !isCur;
             const isTarget = s === target;
@@ -117,6 +122,37 @@ export default function MoveModal({ relicId, currentSlot, onClose, onMoved }: Pr
             );
           })}
         </div>
+        <nav className="flex items-center justify-end gap-2 font-label text-[10px] tracking-[0.3em] uppercase text-primary/70">
+          {page > 1 ? (
+            <button
+              type="button"
+              onClick={() => setPage(page - 1)}
+              className="border border-primary/20 px-2.5 py-1 hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              {t.adminUsers.prevPage}
+            </button>
+          ) : (
+            <span className="border border-primary/10 px-2.5 py-1 opacity-30">
+              {t.adminUsers.prevPage}
+            </span>
+          )}
+          <span className="text-secondary tabular-nums px-1">
+            {format(t.adminUsers.pageInfo, { page, total: TOTAL_PAGES })}
+          </span>
+          {page < TOTAL_PAGES ? (
+            <button
+              type="button"
+              onClick={() => setPage(page + 1)}
+              className="border border-primary/20 px-2.5 py-1 hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              {t.adminUsers.nextPage}
+            </button>
+          ) : (
+            <span className="border border-primary/10 px-2.5 py-1 opacity-30">
+              {t.adminUsers.nextPage}
+            </span>
+          )}
+        </nav>
         {error ? (
           <p role="alert" className="font-label text-[11px] tracking-[0.2em] uppercase text-error">
             {error}

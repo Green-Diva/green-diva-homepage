@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ADMIN_LEVEL, formatSerial, getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n/server";
 import { format } from "@/lib/i18n/format";
+import { MASKED_TOKEN } from "@/lib/userToken";
 import UsersTable, { type SortField, type SortOrder } from "./UsersTable";
 
 const PAGE_SIZE = 20;
@@ -49,7 +50,6 @@ export default async function AdminUsersPage({
       level: true,
       avatarUrl: true,
       createdAt: true,
-      token: true,
     },
   });
 
@@ -94,7 +94,7 @@ export default async function AdminUsersPage({
         users={users.map((u) => ({
           ...u,
           serialLabel: formatSerial(u.serial),
-          token: u.token.length > 8 ? `${u.token.slice(0, 4)}…${u.token.slice(-4)}` : "••••",
+          token: MASKED_TOKEN,
           createdAt: u.createdAt.toISOString(),
         }))}
         meId={me.id}

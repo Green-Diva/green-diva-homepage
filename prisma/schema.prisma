@@ -8,26 +8,69 @@ datasource db {
 }
 
 model User {
-  id                String         @id @default(cuid())
-  serial            Int?           @unique
-  token             String         @unique
+  id                String        @id @default(cuid())
+  serial            Int?          @unique
+  // Tokens are stored as bcrypt hashes (one-way). tokenLookup is an
+  // HMAC-SHA256(token, VAULT_COOKIE_SECRET) for O(1) login lookup.
+  // Plaintext is returned to admins exactly once at issuance.
+  tokenHash         String
+  tokenLookup       String        @unique
   name              String
   gender            String?
   avatarUrl         String?
   bio               String?
-  level             Int            @default(1)
-  attack            Int            @default(50)
-  defense           Int            @default(50)
-  hp                Int            @default(50)
-  agility           Int            @default(50)
-  luck              Int            @default(50)
+  level             Int           @default(1)
+  attack            Int           @default(50)
+  defense           Int           @default(50)
+  hp                Int           @default(50)
+  agility           Int           @default(50)
+  luck              Int           @default(50)
   specialAttributes String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
   sessions          Session[]
   activities        Activity[]
-  relicShares       RelicShare[]   @relation("RelicShareRecipient")
-  sharedByMe        RelicShare[]   @relation("RelicShareGranter")
+  relicShares       RelicShare[]  @relation("RelicShareRecipient")
+  sharedByMe        RelicShare[]  @relation("RelicShareGranter")
+  vaultProfile      VaultProfile?
+  vaultItems        VaultItem[]
+}
+
+// End-to-end encrypted vault — server stores only ciphertext.
+// `salt` + `iterations` are public PBKDF2 parameters; `verifier` is
+// HMAC-SHA256("verify", masterKey) so the client can self-check the entered
+// master password without ever sending it (or anything derivable from it).
+model VaultProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  saltBase64     String
+  verifierBase64 String
+  iterations     Int      @default(600000)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+enum VaultItemKind {
+  PASSWORD
+  NOTE
+}
+
+model VaultItem {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind           VaultItemKind
+  dekCiphertext  String
+  dekIv          String
+  nameCiphertext String
+  nameIv         String
+  bodyCiphertext String
+  bodyIv         String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, updatedAt])
 }
 
 model Activity {
@@ -84,14 +127,14 @@ model Relic {
 }
 
 model RelicShare {
-  id          String   @id @default(cuid())
-  relicId     String
-  userId      String
-  sharedById  String
-  createdAt   DateTime @default(now())
-  relic       Relic    @relation(fields: [relicId], references: [id], onDelete: Cascade)
-  user        User     @relation("RelicShareRecipient", fields: [userId], references: [id], onDelete: Cascade)
-  sharedBy    User     @relation("RelicShareGranter", fields: [sharedById], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  relicId    String
+  userId     String
+  sharedById String
+  createdAt  DateTime @default(now())
+  relic      Relic    @relation(fields: [relicId], references: [id], onDelete: Cascade)
+  user       User     @relation("RelicShareRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  sharedBy   User     @relation("RelicShareGranter", fields: [sharedById], references: [id], onDelete: Cascade)
 
   @@unique([relicId, userId])
   @@index([userId])
@@ -120,7 +163,7 @@ model RelicLog {
   targetUserId       String?
   targetNameSnapshot String?
   notes              String?
-  details            Json?       // structured diff / before-after for EDITED/MOVED/RARITY_CHANGED
+  details            Json?
   createdAt          DateTime    @default(now())
 
   @@index([relicId, createdAt])

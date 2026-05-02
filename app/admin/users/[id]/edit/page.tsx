@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
+import { MASKED_TOKEN } from "@/lib/userToken";
 import { UserForm } from "@/components/admin/UserForm";
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,12 +15,10 @@ export default async function EditUserPage({ params }: Params) {
   const u = await prisma.user.findUnique({ where: { id } });
   if (!u) notFound();
 
-  const masked = u.token.length > 8 ? `${u.token.slice(0, 4)}…${u.token.slice(-4)}` : "••••";
-
   return (
     <UserForm
       mode="edit"
-      initialMaskedToken={masked}
+      initialMaskedToken={MASKED_TOKEN}
       initial={{
         id: u.id,
         name: u.name,

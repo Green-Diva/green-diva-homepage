@@ -1,5 +1,14 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { createHmac } from "node:crypto";
+
+function deriveTokenLookup(token: string): string {
+  const secret = process.env.VAULT_COOKIE_SECRET;
+  if (!secret || secret.length < 16) {
+    throw new Error("VAULT_COOKIE_SECRET missing or too short (>=16 chars) — required for token lookup");
+  }
+  return createHmac("sha256", secret).update(token).digest("base64url");
+}
 
 const prisma = new PrismaClient();
 
@@ -132,11 +141,14 @@ async function main() {
   }
   const adminToken = process.env.ADMIN_TOKEN;
   if (adminToken && adminToken !== "change-me-to-a-long-random-string") {
+    const tokenLookup = deriveTokenLookup(adminToken);
+    const tokenHash = await bcrypt.hash(adminToken, 12);
     await prisma.user.upsert({
-      where: { token: adminToken },
-      update: { level: 100, name: "High Lord" },
+      where: { tokenLookup },
+      update: { level: 100, name: "High Lord", tokenHash },
       create: {
-        token: adminToken,
+        tokenHash,
+        tokenLookup,
         serial: 1,
         name: "High Lord",
         level: 100,

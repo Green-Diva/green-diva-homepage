@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { userCreateSchema } from "@/lib/validators";
-import { ADMIN_LEVEL, AuthError, generateToken, requireAdmin } from "@/lib/auth";
+import { AuthError, generateToken, requireAdmin } from "@/lib/auth";
+import { MASKED_TOKEN, deriveTokenLookup, hashToken } from "@/lib/userToken";
 
 export async function GET() {
   try {
@@ -20,14 +21,13 @@ export async function GET() {
       level: true,
       avatarUrl: true,
       createdAt: true,
-      token: true,
     },
   });
-  // mask token in list
+  // Tokens are bcrypt-hashed; plaintext is unrecoverable. Surface a placeholder.
   return NextResponse.json(
     users.map((u) => ({
       ...u,
-      token: maskToken(u.token),
+      token: MASKED_TOKEN,
     })),
   );
 }
@@ -47,10 +47,9 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  if (data.level >= ADMIN_LEVEL) {
-    // allow creating another priestess; nothing special
-  }
   const token = data.token ?? generateToken();
+  const tokenHash = await hashToken(token);
+  const tokenLookup = deriveTokenLookup(token);
 
   try {
     const created = await prisma.$transaction(async (tx) => {
@@ -63,19 +62,24 @@ export async function POST(req: NextRequest) {
           gender: data.gender ?? null,
           level: data.level,
           avatarUrl: data.avatarUrl ?? null,
-          token,
+          tokenHash,
+          tokenLookup,
+        },
+        select: {
+          id: true,
+          serial: true,
+          name: true,
+          gender: true,
+          level: true,
+          avatarUrl: true,
+          createdAt: true,
         },
       });
     });
-    // return full token ONCE
-    return NextResponse.json(created, { status: 201 });
+    // Plaintext is returned ONCE here. After this response it is unrecoverable.
+    return NextResponse.json({ ...created, token }, { status: 201 });
   } catch (e: unknown) {
     console.error("[api/users POST] create failed", e);
     return NextResponse.json({ error: "create failed" }, { status: 400 });
   }
-}
-
-function maskToken(t: string): string {
-  if (t.length <= 8) return "••••";
-  return `${t.slice(0, 4)}…${t.slice(-4)}`;
 }
