@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// PROJECT POLICY: Every route requires login by default. This whitelist is
+// the entire set of public paths — exact match only. Do NOT add a route
+// here without the user's explicit approval; if you think a new route
+// should be public, ask first. PUBLIC_PREFIXES is intentionally empty for
+// the same reason — never re-introduce wildcards.
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/api/auth/login",
@@ -9,7 +14,7 @@ const PUBLIC_PATHS = new Set<string>([
   "/favicon.ico",
 ]);
 
-const PUBLIC_PREFIXES = ["/relic-collection", "/api/relics"];
+const PUBLIC_PREFIXES: string[] = [];
 
 const STATIC_PREFIXES = ["/_next", "/fonts", "/images", "/videos"];
 
