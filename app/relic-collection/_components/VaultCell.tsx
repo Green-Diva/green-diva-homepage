@@ -42,6 +42,51 @@ function rarityAccent(r: CellRelic["rarity"]): string {
   }
 }
 
+function rarityHoverClass(r: CellRelic["rarity"]): string {
+  switch (r) {
+    case "COMMON":
+      return "hover:border-on-surface-variant/60 touch:border-on-surface-variant/60 hover:shadow-[inset_0_0_14px_rgba(212,220,217,0.18)]";
+    case "RARE":
+      return "hover:border-[#80c8ff] touch:border-[#80c8ff] hover:shadow-[inset_0_0_18px_rgba(128,200,255,0.28),0_0_14px_rgba(128,200,255,0.22)]";
+    case "EPIC":
+      return "hover:border-[#c79bff] touch:border-[#c79bff] hover:shadow-[inset_0_0_22px_rgba(199,155,255,0.32),0_0_18px_rgba(199,155,255,0.28)] hover:animate-cell-epic-pulse";
+    case "LEGENDARY":
+      return "hover:border-secondary touch:border-secondary hover:shadow-[inset_0_0_26px_rgba(255,219,60,0.36),0_0_22px_rgba(255,219,60,0.32)] hover:animate-cell-legendary-breath";
+    case "SPECIAL":
+      return "hover:border-[#ff9bcd] touch:border-[#ff9bcd] hover:shadow-[inset_0_0_30px_rgba(255,155,205,0.40),0_0_28px_rgba(255,155,205,0.45)] hover:animate-cell-special-ritual cell-special";
+  }
+}
+
+function rarityFocusClass(r: CellRelic["rarity"]): string {
+  switch (r) {
+    case "COMMON":
+      return "focus-visible:outline-on-surface-variant";
+    case "RARE":
+      return "focus-visible:outline-[#80c8ff]";
+    case "EPIC":
+      return "focus-visible:outline-[#c79bff]";
+    case "LEGENDARY":
+      return "focus-visible:outline-secondary";
+    case "SPECIAL":
+      return "focus-visible:outline-[#ff9bcd]";
+  }
+}
+
+function raritySweepClass(r: CellRelic["rarity"]): string {
+  switch (r) {
+    case "COMMON":
+      return "via-on-surface-variant";
+    case "RARE":
+      return "via-[#80c8ff]";
+    case "EPIC":
+      return "via-[#c79bff]";
+    case "LEGENDARY":
+      return "via-secondary";
+    case "SPECIAL":
+      return "via-[#ff9bcd]";
+  }
+}
+
 function CellOrnaments() {
   return (
     <>
@@ -171,17 +216,32 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin }: P
     );
   }
 
+  const isSpecial = relic.rarity === "SPECIAL";
   return (
     <Link
       href={`/relic-collection/${relic.slug}`}
       aria-label={t.relicCollection.accessGreen + " · " + (locale === "zh" ? relic.nameZh : relic.nameEn)}
       className={
         baseClasses +
-        " border border-primary/40 hover:border-primary touch:border-primary hover:shadow-[inset_0_0_22px_rgba(82,253,207,0.28)] touch:shadow-[inset_0_0_18px_rgba(82,253,207,0.22)] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-1"
+        " border border-primary/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 " +
+        rarityHoverClass(relic.rarity) +
+        " " +
+        rarityFocusClass(relic.rarity)
       }
     >
       <CellInner relic={relic} locale={locale} access={access} t={t} />
-      <span className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-y-[88px] transition-all duration-700" />
+      <span
+        className={
+          "pointer-events-none absolute left-[18%] right-[18%] top-0 h-px bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:top-[88%] transition-all duration-700 ease-out " +
+          raritySweepClass(relic.rarity)
+        }
+      />
+      {isSpecial ? (
+        <>
+          <span className="cell-ritual-ring" aria-hidden />
+          <span className="cell-ritual-runes" aria-hidden />
+        </>
+      ) : null}
     </Link>
   );
 }

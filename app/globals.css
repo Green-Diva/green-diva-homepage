@@ -550,6 +550,115 @@ html[lang="zh"] li:not([class*="leading-"]) {
   opacity: 0;
 }
 
+/* === Vault cell hover tiers === */
+@keyframes cell-epic-pulse {
+  0%, 100% { box-shadow: inset 0 0 18px rgba(199, 155, 255, 0.28), 0 0 14px rgba(199, 155, 255, 0.22); }
+  50%      { box-shadow: inset 0 0 26px rgba(199, 155, 255, 0.45), 0 0 22px rgba(199, 155, 255, 0.40); }
+}
+.hover\:animate-cell-epic-pulse:hover { animation: cell-epic-pulse 2.4s ease-in-out infinite; }
+
+@keyframes cell-legendary-breath {
+  0%, 100% {
+    box-shadow: inset 0 0 22px rgba(255, 219, 60, 0.30), 0 0 18px rgba(255, 219, 60, 0.26);
+    border-color: rgba(255, 219, 60, 0.7);
+  }
+  50% {
+    box-shadow: inset 0 0 36px rgba(255, 219, 60, 0.55), 0 0 32px rgba(255, 219, 60, 0.50);
+    border-color: rgba(255, 219, 60, 1);
+  }
+}
+.hover\:animate-cell-legendary-breath:hover { animation: cell-legendary-breath 3.2s ease-in-out infinite; }
+
+@keyframes cell-special-ritual {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 28px rgba(255, 155, 205, 0.40),
+      0 0 24px rgba(255, 155, 205, 0.40),
+      0 0 48px rgba(255, 155, 205, 0.20);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 42px rgba(255, 155, 205, 0.65),
+      0 0 36px rgba(255, 155, 205, 0.60),
+      0 0 72px rgba(255, 155, 205, 0.32);
+  }
+}
+.hover\:animate-cell-special-ritual:hover { animation: cell-special-ritual 2.6s ease-in-out infinite; }
+
+@keyframes cell-ritual-ring-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.cell-special .cell-ritual-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 72%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 155, 205, 0.5) 0%,
+    rgba(255, 155, 205, 0.5) 25%,
+    rgba(255, 155, 205, 1) 50%,
+    rgba(255, 155, 205, 0.5) 75%,
+    rgba(255, 155, 205, 0.5) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  padding: 1px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.cell-special:hover .cell-ritual-ring {
+  opacity: 1;
+  animation: cell-ritual-ring-spin 6s linear infinite;
+}
+
+@keyframes cell-rune-flicker {
+  0%, 100% { opacity: 0; }
+  20%      { opacity: 0.9; }
+  60%      { opacity: 0.4; }
+}
+.cell-special .cell-ritual-runes::before,
+.cell-special .cell-ritual-runes::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(255, 155, 205, 0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+.cell-special .cell-ritual-runes::before {
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+}
+.cell-special .cell-ritual-runes::after {
+  top: 88%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.cell-special:hover .cell-ritual-runes::before {
+  animation: cell-rune-flicker 1.6s ease-in-out infinite;
+}
+.cell-special:hover .cell-ritual-runes::after {
+  animation: cell-rune-flicker 1.6s ease-in-out infinite;
+  animation-delay: 0.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover\:animate-cell-epic-pulse:hover,
+  .hover\:animate-cell-legendary-breath:hover,
+  .hover\:animate-cell-special-ritual:hover { animation: none !important; }
+  .cell-special:hover .cell-ritual-ring,
+  .cell-special:hover .cell-ritual-runes::before,
+  .cell-special:hover .cell-ritual-runes::after { animation: none !important; }
+}
+
 @keyframes relic-ripple {
   0% {
     transform: scale(0.12);
