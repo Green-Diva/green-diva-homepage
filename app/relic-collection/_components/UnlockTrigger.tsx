@@ -6,7 +6,7 @@ import type { Dictionary } from "@/lib/i18n/types";
 
 type Props = {
   relicId: string;
-  reason: "needs-level" | "needs-password";
+  reason: "locked-level" | "locked-password";
   required?: number;
   className?: string;
   ariaLabel: string;

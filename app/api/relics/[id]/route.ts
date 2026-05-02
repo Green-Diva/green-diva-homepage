@@ -14,12 +14,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
   const [user, unlockedIds] = await Promise.all([getCurrentUser(), getUnlockedRelicIds()]);
   const access = canAccessRelic(relic, user, unlockedIds);
-  if (!access.ok) {
+  if (access.level === "RED") {
     return NextResponse.json(
       {
         error: "locked",
         reason: access.reason,
-        ...(access.reason === "needs-level" ? { required: access.required } : {}),
+        ...(access.reason === "locked-level" ? { required: access.required } : {}),
         rarity: relic.rarity,
       },
       { status: 403 },

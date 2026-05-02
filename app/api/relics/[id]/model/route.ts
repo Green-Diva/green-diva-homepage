@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!relic.modelPath) return new NextResponse("no model", { status: 404 });
 
   const [user, unlockedIds] = await Promise.all([getCurrentUser(), getUnlockedRelicIds()]);
-  if (!canAccessRelic(relic, user, unlockedIds).ok) {
+  if (canAccessRelic(relic, user, unlockedIds).level === "RED") {
     return new NextResponse("forbidden", { status: 403 });
   }
 

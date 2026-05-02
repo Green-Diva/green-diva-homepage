@@ -6,20 +6,29 @@ import { useT } from "@/lib/i18n/client";
 import RelicForm, { type RelicEditValue } from "@/app/admin/relics/RelicForm";
 import MoveModal from "./MoveModal";
 import ShareModal from "./ShareModal";
+import GrantModal from "./GrantModal";
 import ExtractModal from "./ExtractModal";
 
 type Props = {
   relic: RelicEditValue & { slug: string };
+  isAdmin: boolean;
+  isExtracted: boolean;
   onChange?: () => void;
 };
 
-export default function AdminToolbar({ relic, onChange }: Props) {
+export default function AdminToolbar({ relic, isAdmin, isExtracted, onChange }: Props) {
   const t = useT();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [granting, setGranting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [extracting, setExtracting] = useState(false);
+
+  // Once extracted, the relic is permanently out of circulation. Nobody —
+  // including admin — can edit, move, grant, share, or re-extract. The detail
+  // page becomes a read-only memorial.
+  if (isExtracted) return null;
 
   return (
     <>
@@ -27,14 +36,15 @@ export default function AdminToolbar({ relic, onChange }: Props) {
         <span className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary mr-2">
           {t.adminRelics.adminToolbar}
         </span>
-        <ToolbarBtn label={t.adminRelics.edit} onClick={() => setEditing(true)} />
-        <ToolbarBtn label={t.adminRelics.move} onClick={() => setMoving(true)} />
-        <ToolbarBtn label={t.adminRelics.share} onClick={() => setSharing(true)} />
-        <ToolbarBtn
-          label={t.adminRelics.extract}
-          onClick={() => setExtracting(true)}
-          danger
-        />
+        {isAdmin ? (
+          <>
+            <ToolbarBtn label={t.adminRelics.edit} onClick={() => setEditing(true)} />
+            <ToolbarBtn label={t.adminRelics.move} onClick={() => setMoving(true)} />
+            <ToolbarBtn label={t.adminRelics.grant} onClick={() => setGranting(true)} />
+            <ToolbarBtn label={t.adminRelics.share} onClick={() => setSharing(true)} />
+          </>
+        ) : null}
+        <ToolbarBtn label={t.adminRelics.extract} onClick={() => setExtracting(true)} />
       </div>
 
       {editing ? (
@@ -60,13 +70,27 @@ export default function AdminToolbar({ relic, onChange }: Props) {
           }}
         />
       ) : null}
+      {granting ? (
+        <GrantModal
+          relicId={relic.id}
+          relicName={relic.nameEn}
+          onClose={() => setGranting(false)}
+          onFinish={() => {
+            setGranting(false);
+            onChange?.();
+            router.refresh();
+          }}
+        />
+      ) : null}
       {sharing ? (
         <ShareModal
           relicId={relic.id}
           relicName={relic.nameEn}
-          onClose={() => {
+          onClose={() => setSharing(false)}
+          onFinish={() => {
             setSharing(false);
             onChange?.();
+            router.refresh();
           }}
         />
       ) : null}
@@ -77,7 +101,6 @@ export default function AdminToolbar({ relic, onChange }: Props) {
           onClose={() => setExtracting(false)}
           onExtracted={() => {
             setExtracting(false);
-            router.push("/relic-collection");
             router.refresh();
           }}
         />
@@ -89,21 +112,19 @@ export default function AdminToolbar({ relic, onChange }: Props) {
 function ToolbarBtn({
   label,
   onClick,
-  danger,
+  disabled,
 }: {
   label: string;
   onClick: () => void;
-  danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={
-        "px-3 py-1.5 border font-label text-[11px] tracking-[0.2em] uppercase transition-all " +
-        (danger
-          ? "border-error/40 text-error hover:bg-error/10"
-          : "border-primary/40 text-primary hover:bg-primary/10")
+        "px-3 py-1.5 border font-label text-[11px] tracking-[0.2em] uppercase transition-all border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
       }
     >
       {label}

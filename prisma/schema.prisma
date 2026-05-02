@@ -32,6 +32,9 @@ model User {
   activities        Activity[]
   relicShares       RelicShare[]  @relation("RelicShareRecipient")
   sharedByMe        RelicShare[]  @relation("RelicShareGranter")
+  extractedRelics   Relic[]       @relation("RelicExtractor")
+  relicGrants       RelicGrant[]  @relation("RelicGrantRecipient")
+  grantsIssued      RelicGrant[]  @relation("RelicGrantGranter")
   vaultProfile      VaultProfile?
   vaultItems        VaultItem[]
 }
@@ -118,12 +121,31 @@ model Relic {
   acquiredAt   DateTime?
   origin       String?
   passwordHash String?
+  extractedAt   DateTime?
+  extractedById String?
+  extractedBy   User?         @relation("RelicExtractor", fields: [extractedById], references: [id], onDelete: SetNull)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   unlocks      RelicUnlock[]
   shares       RelicShare[]
+  grants       RelicGrant[]
 
   @@index([rarity])
+  @@index([extractedAt])
+}
+
+model RelicGrant {
+  id          String   @id @default(cuid())
+  relicId     String
+  userId      String
+  grantedById String
+  createdAt   DateTime @default(now())
+  relic       Relic    @relation(fields: [relicId], references: [id], onDelete: Cascade)
+  user        User     @relation("RelicGrantRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy   User     @relation("RelicGrantGranter", fields: [grantedById], references: [id], onDelete: Cascade)
+
+  @@unique([relicId, userId])
+  @@index([userId])
 }
 
 model RelicShare {
@@ -148,6 +170,8 @@ enum RelicAction {
   SHARED
   SHARE_REVOKED
   EXTRACTED
+  GRANTED
+  GRANT_REVOKED
 }
 
 model RelicLog {

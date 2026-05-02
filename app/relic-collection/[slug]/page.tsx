@@ -9,6 +9,7 @@ import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { format } from "@/lib/i18n/format";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getSharedRelicIds } from "@/lib/relicShare";
+import { getGrantedRelicIds } from "@/lib/relicGrant";
 import UserMenu from "@/components/UserMenu";
 import RelicViewer from "./_components/RelicViewer";
 import PhotoCarousel from "./_components/PhotoCarousel";
@@ -67,7 +68,10 @@ export default async function RelicDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const relic = await prisma.relic.findUnique({ where: { slug } });
+  const relic = await prisma.relic.findUnique({
+    where: { slug },
+    include: { extractedBy: { select: { id: true, name: true } } },
+  });
   if (!relic) notFound();
 
   const [t, locale, user, unlockedIds] = await Promise.all([
@@ -76,10 +80,27 @@ export default async function RelicDetailPage({
     getCurrentUser(),
     getUnlockedRelicIds(),
   ]);
-  const sharedIds = await getSharedRelicIds(user?.id);
-  const access = canAccessRelic(relic, user, unlockedIds, sharedIds);
   const isAdmin = (user?.level ?? 0) >= ADMIN_LEVEL;
-  const isShared = access.ok && access.reason === "shared";
+
+  const [sharedIds, grantedIds] = await Promise.all([
+    getSharedRelicIds(user?.id),
+    getGrantedRelicIds(user?.id ?? null),
+  ]);
+
+  // Extracted relics turn read-only. Visible to admin, the extractor, and any
+  // user who held a grant record at extract time. YELLOW-only viewers (shared /
+  // level-view) lose access once the relic is extracted.
+  if (
+    relic.extractedAt &&
+    !isAdmin &&
+    relic.extractedById !== user?.id &&
+    !grantedIds.has(relic.id)
+  ) {
+    notFound();
+  }
+
+  const access = canAccessRelic(relic, user, unlockedIds, sharedIds, grantedIds);
+  const isExtracted = !!relic.extractedAt;
 
   const name = locale === "zh" ? relic.nameZh : relic.nameEn;
   const classif = locale === "zh" ? relic.classifZh : relic.classifEn;
@@ -128,7 +149,7 @@ export default async function RelicDetailPage({
           </Link>
         </div>
 
-        {access.ok && isAdmin ? (
+        {access.level === "GREEN" ? (
           <div className="mb-3 shrink-0">
             <AdminToolbar
               relic={{
@@ -140,27 +161,29 @@ export default async function RelicDetailPage({
                 rarity: relic.rarity,
                 hasPassword: !!relic.passwordHash,
               }}
+              isAdmin={isAdmin}
+              isExtracted={isExtracted}
             />
           </div>
         ) : null}
 
-        {!access.ok ? (
+        {access.level === "RED" ? (
           <div className="max-w-xl mx-auto text-center py-10 space-y-5 border border-error/30 bg-surface-container/30 p-10 shrink-0">
             <span className="material-symbols-outlined text-error text-[48px]">lock</span>
             <h1 className="font-headline text-2xl tracking-wide uppercase text-on-surface">
-              {access.reason === "needs-level"
+              {access.reason === "locked-level"
                 ? t.relicCollection.needLevelTitle
                 : t.relicCollection.needPasswordTitle}
             </h1>
             <p className="font-body text-[14px] text-on-surface-variant leading-[1.7]">
-              {access.reason === "needs-level"
-                ? format(t.relicCollection.needLevelBody, { required: access.required })
+              {access.reason === "locked-level"
+                ? format(t.relicCollection.needLevelBody, { required: access.required ?? 0 })
                 : t.relicCollection.needPasswordBody}
             </p>
-            {access.reason === "needs-password" ? (
+            {access.reason === "locked-password" ? (
               <UnlockTrigger
                 relicId={relic.id}
-                reason="needs-password"
+                reason="locked-password"
                 ariaLabel={t.relicCollection.unlock}
                 t={t}
                 className="inline-block px-6 py-3 border border-primary/60 bg-primary/10 hover:bg-primary/20 font-label text-[11px] tracking-[0.2em] uppercase text-primary"
@@ -206,9 +229,10 @@ export default async function RelicDetailPage({
                 <span className="px-3 py-1.5 border border-primary/30 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant">
                   {t.relicCollection.slotNo} · {String(relic.slot).padStart(3, "0")}
                 </span>
-                {isShared ? (
-                  <span className="px-3 py-1.5 border border-[#ff9bcd]/60 font-label text-[10px] tracking-[0.25em] uppercase text-[#ff9bcd] bg-[#ff9bcd]/5">
-                    {t.relicCollection.shared} · {t.relicCollection.accessShared}
+                {isExtracted ? (
+                  <span className="px-3 py-1.5 border border-on-surface-variant/40 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant bg-on-surface-variant/5">
+                    {t.relicCollection.extractedTag}
+                    {relic.extractedBy ? ` · ${format(t.relicCollection.extractedBy, { name: relic.extractedBy.name })}` : ""}
                   </span>
                 ) : null}
               </div>

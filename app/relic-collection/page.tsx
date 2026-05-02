@@ -6,6 +6,7 @@ import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { format } from "@/lib/i18n/format";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getSharedRelicIds } from "@/lib/relicShare";
+import { getGrantedRelicIds } from "@/lib/relicGrant";
 import VaultCell, { type CellRelic } from "./_components/VaultCell";
 import SidebarFilter, { type RarityFilter } from "./_components/SidebarFilter";
 import UserMenu from "@/components/UserMenu";
@@ -60,11 +61,17 @@ export default async function RelicCollectionPage({
         classifZh: true,
         rarity: true,
         iconKey: true,
+        extractedAt: true,
+        extractedById: true,
+        extractedBy: { select: { name: true } },
       },
     }),
   ]);
 
-  const sharedIds = await getSharedRelicIds(user?.id);
+  const [sharedIds, grantedIds] = await Promise.all([
+    getSharedRelicIds(user?.id),
+    getGrantedRelicIds(user?.id ?? null),
+  ]);
   const isAdmin = (user?.level ?? 0) >= ADMIN_LEVEL;
   const statusLabel = isAdmin
     ? t.relicCollection.statusHighLord
@@ -72,13 +79,14 @@ export default async function RelicCollectionPage({
       ? t.relicCollection.statusInitiate
       : t.relicCollection.statusGuest;
 
-  // Decide which relics pass the filter
-  const filtered: CellRelic[] = (filter === "ALL"
+  // Extracted relics turn into memorial cells visible to everyone, but only
+  // admin / the extractor / grant-holders (whose grant survived extraction)
+  // can click in for detail. Others see a static, non-interactive shell.
+  const filtered = filter === "ALL"
     ? allRelics
-    : allRelics.filter((r) => r.rarity === filter)
-  ) as CellRelic[];
+    : allRelics.filter((r) => r.rarity === filter);
 
-  const slotMap = new Map<number, CellRelic>();
+  const slotMap = new Map<number, (typeof allRelics)[number]>();
   for (const r of filtered) slotMap.set(r.slot, r);
 
   const filledCount = allRelics.length;
@@ -156,16 +164,39 @@ export default async function RelicCollectionPage({
             <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 xl:grid-cols-10 2xl:grid-cols-10 gap-px p-px border border-primary/15 bg-surface-container/30 [background-image:radial-gradient(circle_at_center,rgba(82,253,207,0.06)_1px,transparent_1.5px)] [background-size:14px_14px] lg:flex-1 lg:min-h-0 lg:grid-rows-5">
               {Array.from({ length: endSlot - startSlot + 1 }, (_, i) => startSlot + i).map((slot) => {
                 const relic = slotMap.get(slot) ?? null;
-                const access = relic ? canAccessRelic(relic, user, unlockedIds, sharedIds) : null;
+                const access = relic
+                  ? canAccessRelic(relic, user, unlockedIds, sharedIds, grantedIds)
+                  : null;
+                const cellRelic: CellRelic | null = relic
+                  ? {
+                      id: relic.id,
+                      slot: relic.slot,
+                      slug: relic.slug,
+                      nameEn: relic.nameEn,
+                      nameZh: relic.nameZh,
+                      classifEn: relic.classifEn,
+                      classifZh: relic.classifZh,
+                      rarity: relic.rarity,
+                      iconKey: relic.iconKey,
+                      extractedAt: relic.extractedAt ? relic.extractedAt.toISOString() : null,
+                      extractedByName: relic.extractedBy?.name ?? null,
+                    }
+                  : null;
+                const canViewExtracted = !!relic?.extractedAt && (
+                  isAdmin ||
+                  (!!user && relic.extractedById === user.id) ||
+                  grantedIds.has(relic.id)
+                );
                 return (
                   <VaultCell
                     key={slot}
                     slot={slot}
-                    relic={relic}
+                    relic={cellRelic}
                     access={access}
                     locale={locale}
                     t={t}
                     isAdmin={isAdmin}
+                    canViewExtracted={canViewExtracted}
                   />
                 );
               })}

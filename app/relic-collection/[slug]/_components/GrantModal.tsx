@@ -6,11 +6,11 @@ import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 
 type User = { id: string; name: string; level: number; serial: number | null };
-type Share = {
+type Grant = {
   id: string;
-  userId: string;
   createdAt: string;
-  user: { name: string; level: number; serial: number | null };
+  user: { id: string; name: string; level: number; avatarUrl: string | null };
+  grantedBy: { id: string; name: string };
 };
 
 type Props = {
@@ -20,11 +20,11 @@ type Props = {
   onFinish?: () => void;
 };
 
-export default function ShareModal({ relicId, relicName, onClose, onFinish }: Props) {
+export default function GrantModal({ relicId, relicName, onClose, onFinish }: Props) {
   const t = useT();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<User[]>([]);
-  const [shares, setShares] = useState<Share[]>([]);
+  const [grants, setGrants] = useState<Grant[]>([]);
   const [pendingAdds, setPendingAdds] = useState<Map<string, string>>(new Map());
   const [pendingRemoves, setPendingRemoves] = useState<Map<string, string>>(new Map());
   const [committing, setCommitting] = useState(false);
@@ -34,9 +34,9 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
   >(null);
 
   useEffect(() => {
-    fetch(`/api/admin/relics/${relicId}/share`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setShares)
+    fetch(`/api/admin/relics/${relicId}/grant`)
+      .then((r) => (r.ok ? r.json() : { grants: [] }))
+      .then((j) => setGrants(j.grants ?? []))
       .catch(() => undefined);
     fetch(`/api/admin/users/search`)
       .then((r) => r.json())
@@ -69,12 +69,13 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
 
   if (typeof document === "undefined") return null;
 
-  const initialSharedSet = useMemo(() => new Set(shares.map((s) => s.userId)), [shares]);
+  const initialGrantedSet = useMemo(() => new Set(grants.map((g) => g.user.id)), [grants]);
 
   function queueConfirm() {
     if (!confirmAction) return;
     const { kind, userId, userName } = confirmAction;
     if (kind === "grant") {
+      // Restoring an initial-granted user that was queued for removal: undo the remove
       if (pendingRemoves.has(userId)) {
         const next = new Map(pendingRemoves);
         next.delete(userId);
@@ -85,6 +86,7 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
         setPendingAdds(next);
       }
     } else {
+      // Cancelling a pending add: just remove from adds
       if (pendingAdds.has(userId)) {
         const next = new Map(pendingAdds);
         next.delete(userId);
@@ -109,18 +111,18 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
     try {
       for (const userId of pendingRemoves.keys()) {
         const r = await fetch(
-          `/api/admin/relics/${relicId}/share?userId=${encodeURIComponent(userId)}`,
+          `/api/admin/relics/${relicId}/grant?userId=${encodeURIComponent(userId)}`,
           { method: "DELETE" },
         );
         if (!r.ok) throw new Error("revoke failed");
       }
       for (const userId of pendingAdds.keys()) {
-        const r = await fetch(`/api/admin/relics/${relicId}/share`, {
+        const r = await fetch(`/api/admin/relics/${relicId}/grant`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
         });
-        if (!r.ok) throw new Error("share failed");
+        if (!r.ok) throw new Error("grant failed");
       }
       onFinish?.();
     } catch {
@@ -144,13 +146,13 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
         {confirmAction ? (
           <>
             <h3 className="font-headline text-lg text-primary tracking-wide uppercase">
-              {confirmAction.kind === "grant" ? t.adminRelics.shareGrant : t.adminRelics.shareRevoke}
+              {confirmAction.kind === "grant" ? t.adminRelics.grant : t.adminRelics.grantRevoke}
             </h3>
             <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant leading-relaxed">
               {format(
                 confirmAction.kind === "grant"
-                  ? t.adminRelics.shareGrantConfirm
-                  : t.adminRelics.shareRevokeConfirm,
+                  ? t.adminRelics.grantConfirm
+                  : t.adminRelics.grantRevokeConfirm,
                 { user: confirmAction.userName },
               )}
             </p>
@@ -172,7 +174,7 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
                     : "border-primary/60 bg-primary/10 hover:bg-primary/20 text-primary")
                 }
               >
-                {confirmAction.kind === "grant" ? t.adminRelics.shareGrant : t.adminRelics.shareRevoke}
+                {confirmAction.kind === "grant" ? t.adminRelics.grant : t.adminRelics.grantRevoke}
               </button>
             </div>
           </>
@@ -180,37 +182,40 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
           <>
             <div>
               <h3 className="font-headline text-lg text-primary tracking-wide uppercase">
-                {t.adminRelics.shareTitle}
+                {t.adminRelics.grantTitle}
               </h3>
               <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant mt-1">
                 {relicName}
               </p>
+              <p className="font-label text-[10px] tracking-[0.2em] uppercase text-on-surface-variant/70 mt-2 leading-relaxed">
+                {t.adminRelics.grantHint}
+              </p>
             </div>
 
-            {shares.length > 0 || pendingAdds.size > 0 ? (
+            {grants.length > 0 || pendingAdds.size > 0 ? (
               <div>
                 <h4 className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary mb-2">
                   {t.adminRelics.shareCurrent}
                 </h4>
                 <ul className="space-y-1">
-                  {shares.map((s) => {
-                    const queuedRemove = pendingRemoves.has(s.userId);
+                  {grants.map((g) => {
+                    const queuedRemove = pendingRemoves.has(g.user.id);
                     return (
                       <li
-                        key={s.id}
+                        key={g.id}
                         className={
                           "flex items-center justify-between gap-2 px-3 py-2 border text-[13px] " +
                           (queuedRemove ? "border-error/30 bg-error/5" : "border-primary/15")
                         }
                       >
                         <span className={"text-on-surface " + (queuedRemove ? "line-through opacity-60" : "")}>
-                          {s.user.name}{" "}
+                          {g.user.name}{" "}
                           <span className="font-label text-[10px] tracking-[0.2em] text-on-surface-variant ml-1">
-                            {format(t.adminRelics.shareLevel, { level: s.user.level })}
+                            {format(t.adminRelics.shareLevel, { level: g.user.level })}
                           </span>
                           {queuedRemove ? (
                             <span className="ml-2 px-1.5 py-0.5 border border-error/40 font-label text-[9px] tracking-[0.2em] uppercase text-error no-underline">
-                              {t.adminRelics.pendingShareRevoke}
+                              {t.adminRelics.pendingRevoke}
                             </span>
                           ) : null}
                         </span>
@@ -220,18 +225,18 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
                             queuedRemove
                               ? setPendingRemoves((prev) => {
                                   const n = new Map(prev);
-                                  n.delete(s.userId);
+                                  n.delete(g.user.id);
                                   return n;
                                 })
                               : setConfirmAction({
                                   kind: "revoke",
-                                  userId: s.userId,
-                                  userName: s.user.name,
+                                  userId: g.user.id,
+                                  userName: g.user.name,
                                 })
                           }
                           className="font-label text-[10px] tracking-[0.2em] uppercase text-error hover:underline"
                         >
-                          {queuedRemove ? t.adminRelics.undoQueued : t.adminRelics.shareRevoke}
+                          {queuedRemove ? t.adminRelics.undoQueued : t.adminRelics.grantRevoke}
                         </button>
                       </li>
                     );
@@ -244,7 +249,7 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
                       <span className="text-on-surface">
                         {userName}
                         <span className="ml-2 px-1.5 py-0.5 border border-primary/40 font-label text-[9px] tracking-[0.2em] uppercase text-primary">
-                          {t.adminRelics.pendingShare}
+                          {t.adminRelics.pendingGrant}
                         </span>
                       </span>
                       <button
@@ -282,10 +287,11 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
                   </li>
                 ) : (
                   results.map((u) => {
-                    const isInitiallyShared = initialSharedSet.has(u.id);
+                    const isInitiallyGranted = initialGrantedSet.has(u.id);
                     const isQueuedAdd = pendingAdds.has(u.id);
                     const isQueuedRemove = pendingRemoves.has(u.id);
-                    const effective = (isInitiallyShared && !isQueuedRemove) || isQueuedAdd;
+                    // Effectively granted = (initial AND not queued for remove) OR queued add
+                    const effective = (isInitiallyGranted && !isQueuedRemove) || isQueuedAdd;
                     return (
                       <li
                         key={u.id}
@@ -305,7 +311,7 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
                           }
                           className="px-3 py-1 border border-primary/40 hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed font-label text-[10px] tracking-[0.2em] uppercase text-primary"
                         >
-                          {effective ? "✓" : t.adminRelics.shareGrant}
+                          {effective ? "✓" : t.adminRelics.grant}
                         </button>
                       </li>
                     );

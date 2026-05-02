@@ -247,6 +247,11 @@ export interface Dictionary {
     shared: string;
     accessShared: string;
     adminInscribeHere: string;
+    ownedTag: string;
+    ownedBy: string; // {{name}}
+    alreadyOwned: string;
+    extractedTag: string;
+    extractedBy: string; // {{name}}
   };
   adminRelics: {
     pageTitle: string;
@@ -290,6 +295,7 @@ export interface Dictionary {
     save: string;
     cancel: string;
     saving: string;
+    finish: string;
     saveFailed: string;
     aiSuggest: string;
     aiThinking: string;
@@ -312,6 +318,20 @@ export interface Dictionary {
     shareEmpty: string;
     shareCurrent: string;
     sharedBadge: string;
+    grant: string;
+    grantTitle: string;
+    grantHint: string;
+    grantRevoke: string;
+    grantConfirm: string; // {{user}}
+    grantRevokeConfirm: string; // {{user}}
+    shareGrantConfirm: string; // {{user}}
+    shareRevokeConfirm: string; // {{user}}
+    pendingGrant: string;
+    pendingRevoke: string;
+    pendingShare: string;
+    pendingShareRevoke: string;
+    undoQueued: string;
+    commitFailed: string;
     adminToolbar: string;
     extractGivenTo: string;
     extractGivenToHint: string;
@@ -330,6 +350,26 @@ export interface Dictionary {
     logActionSHARE_REVOKED: string;
     logActionEXTRACTED: string;
     logActionEXTRACTED_TO: string; // {{target}}
+    logActionGRANTED: string;
+    logActionGRANT_REVOKED: string;
+    logTimeJustNow: string;
+    logTimeMinutesAgo: string; // {{n}}
+    logTimeHoursAgo: string; // {{n}}
+    logTimeDaysAgo: string; // {{n}}
+    logExpand: string;
+    logCollapse: string;
     logFieldsSummary: string; // {{fields}}
+    logSubjShared: string; // {{actor}} {{target}}
+    logSubjGranted: string; // {{actor}} {{target}}
+    logSubjShareRevoked: string; // {{actor}} {{target}}
+    logSubjGrantRevoked: string; // {{actor}} {{target}}
+    logSubjExtracted: string; // {{actor}}
+    logSubjCreated: string; // {{actor}}
+    logSubjEdited: string; // {{actor}}
+    logSubjMoved: string; // {{actor}}
+    logMoveDetails: string; // {{from}} {{to}}
+    logPagePrev: string;
+    logPageNext: string;
+    logPageInfo: string; // {{page}} {{total}}
   };
 }

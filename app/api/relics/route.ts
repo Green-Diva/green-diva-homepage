@@ -27,7 +27,7 @@ export async function GET() {
     getUnlockedRelicIds(),
   ]);
   const accessibleIds = relics
-    .filter((r) => canAccessRelic(r, user, unlockedIds).ok)
+    .filter((r) => canAccessRelic(r, user, unlockedIds).level !== "RED")
     .map((r) => r.id);
   return NextResponse.json({ relics, accessibleIds });
 }

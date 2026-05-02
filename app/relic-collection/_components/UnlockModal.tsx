@@ -8,7 +8,7 @@ import type { Dictionary } from "@/lib/i18n/types";
 
 type Props = {
   relicId: string;
-  reason: "needs-level" | "needs-password";
+  reason: "locked-level" | "locked-password";
   required?: number;
   t: Dictionary;
   onClose: () => void;
@@ -65,7 +65,7 @@ export default function UnlockModal({ relicId, reason, required, t, onClose }: P
     }
   }
 
-  const isLevel = reason === "needs-level";
+  const isLevel = reason === "locked-level";
 
   return createPortal(
     <div

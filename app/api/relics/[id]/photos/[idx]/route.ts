@@ -22,7 +22,7 @@ export async function GET(
   if (!photo) return new NextResponse("not found", { status: 404 });
 
   const [user, unlockedIds] = await Promise.all([getCurrentUser(), getUnlockedRelicIds()]);
-  if (!canAccessRelic(relic, user, unlockedIds).ok) {
+  if (canAccessRelic(relic, user, unlockedIds).level === "RED") {
     return new NextResponse("forbidden", { status: 403 });
   }
 

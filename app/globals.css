@@ -20,6 +20,10 @@
   --color-surface-container-lowest: #0d0f0f;
   --color-on-surface-variant: #d4dcd9;
   --color-outline-variant: #3f4946;
+  --color-error: #ff4d4d;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
 
   --font-headline: var(--font-noto-serif), "Noto Serif", serif;
   --font-body: var(--font-manrope), "Manrope", sans-serif;
@@ -633,12 +637,12 @@ html[lang="zh"] li:not([class*="leading-"]) {
   pointer-events: none;
 }
 .cell-special .cell-ritual-runes::before {
-  top: 4px;
+  top: 15%;
   left: 50%;
-  transform: translateX(-50%) rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 .cell-special .cell-ritual-runes::after {
-  top: 88%;
+  top: 85%;
   left: 50%;
   transform: translate(-50%, -50%) rotate(45deg);
 }
