@@ -37,6 +37,8 @@ model User {
   grantsIssued      RelicGrant[]  @relation("RelicGrantGranter")
   vaultProfile      VaultProfile?
   vaultItems        VaultItem[]
+  agentsCreated     Agent[]
+  agentInvocations  AgentInvocation[] @relation("AgentInvocationCaller")
 }
 
 // End-to-end encrypted vault — server stores only ciphertext.
@@ -206,4 +208,76 @@ model RelicUnlock {
 
   @@unique([relicId, cookieKey])
   @@index([expiresAt])
+}
+
+enum AgentStatus {
+  ONLINE
+  STANDBY
+  OFFLINE
+}
+
+enum AgentProvider {
+  ANTHROPIC
+  OPENAI
+  INTERNAL
+  ECHO
+}
+
+model Agent {
+  id               String        @id @default(cuid())
+  serial           Int?          @unique
+  codename         String        @unique
+  nameEn           String
+  nameZh           String
+  classification   String?
+  status           AgentStatus   @default(STANDBY)
+  avatarUrl        String?
+  descriptionEn    String?
+  descriptionZh    String?
+  syncLevel        Float         @default(0)
+  matrixLevel      Int           @default(1)
+  quickness        Int           @default(50)
+  intelligence     Int           @default(50)
+  neuralLink       Int           @default(50)
+  bioSync          Int           @default(50)
+  logic            Int           @default(50)
+  compassion       Int           @default(50)
+  skills           Json?
+  availableAp      Int           @default(0)
+  enabled          Boolean       @default(true)
+  provider         AgentProvider @default(ECHO)
+  model            String?
+  systemPrompt     String?
+  internalHandler  String?
+  inputSchemaJson  String?
+  outputSchemaJson String?
+  maxTokens        Int?          @default(1024)
+  temperature      Float?        @default(0.7)
+  rateLimitPerMin  Int?          @default(20)
+  createdById      String?
+  createdBy        User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  invocations      AgentInvocation[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([enabled, provider])
+}
+
+model AgentInvocation {
+  id           String   @id @default(cuid())
+  agentId      String
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  callerUserId String?
+  caller       User?    @relation("AgentInvocationCaller", fields: [callerUserId], references: [id], onDelete: SetNull)
+  source       String
+  inputJson    String
+  outputJson   String?
+  ok           Boolean  @default(false)
+  errorMessage String?
+  latencyMs    Int?
+  createdAt    DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([callerUserId, createdAt])
 }

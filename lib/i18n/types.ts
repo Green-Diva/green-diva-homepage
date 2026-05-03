@@ -256,6 +256,92 @@ export interface Dictionary {
     extractedTag: string;
     extractedBy: string; // {{name}}
   };
+  machineVision: {
+    pageLabel: string;
+    pageTitle: string;
+    pageSubtitle: string; // {{filled}}/{{total}}
+    backToSanctuary: string;
+    agentCluster: string;
+    unlockAgent: string;
+    statusOnline: string;
+    statusStandby: string;
+    statusOffline: string;
+    classLabel: string;
+    syncLevel: string;
+    matrixLevel: string;
+    baseStats: string;
+    statQuickness: string;
+    statIntelligence: string;
+    statNeuralLink: string;
+    statBioSync: string;
+    statLogic: string;
+    statCompassion: string;
+    skillProgression: string;
+    availableAp: string; // {{n}}
+    selectedSkill: string;
+    passiveSkill: string;
+    activeSkill: string;
+    ultimateSkill: string;
+    cost: string; // {{n}}
+    locked: string;
+    reset: string;
+    clear: string;
+    confirmAllocation: string;
+    skillEmpty: string;
+    edit: string;
+    remove: string;
+    confirmRemove: string; // {{name}}
+    deleteFailed: string;
+    emptyState: string;
+    noAgentSelected: string;
+    editorNewLabel: string;
+    editorNewTitle: string;
+    editorEditLabel: string;
+    editorEditTitle: string;
+    fieldCodename: string;
+    fieldNameEn: string;
+    fieldNameZh: string;
+    fieldClassification: string;
+    fieldStatus: string;
+    fieldAvatar: string;
+    fieldDescriptionEn: string;
+    fieldDescriptionZh: string;
+    fieldSyncLevel: string;
+    fieldMatrixLevel: string;
+    fieldAvailableAp: string;
+    fieldStatsHeading: string;
+    fieldRuntimeHeading: string;
+    fieldEnabled: string;
+    fieldProvider: string;
+    fieldModel: string;
+    fieldSystemPrompt: string;
+    fieldInternalHandler: string;
+    fieldInputSchema: string;
+    fieldOutputSchema: string;
+    fieldMaxTokens: string;
+    fieldTemperature: string;
+    fieldRateLimit: string;
+    fieldSkillsJson: string;
+    fieldSkillsHelp: string;
+    save: string;
+    cancel: string;
+    saving: string;
+    saveFailed: string;
+    invocationConsole: string;
+    invocationConsoleHint: string;
+    invokeInputLabel: string;
+    invokeButton: string;
+    invoking: string;
+    invokeOutputLabel: string;
+    invokeFailed: string;
+    invokeDisabled: string;
+    invokeLatency: string; // {{ms}}
+    invokeRecent: string;
+    invokeNoHistory: string;
+    invokeAdminOnly: string;
+    invokeRateLimited: string;
+    invokeBadJson: string;
+  };
   adminRelics: {
     pageTitle: string;
     pageSubtitle: string;

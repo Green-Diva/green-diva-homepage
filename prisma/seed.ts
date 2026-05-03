@@ -229,6 +229,198 @@ const RELIC_SEEDS = [
   },
 ];
 
+const AGENT_SEEDS = [
+  {
+    codename: "DIVA-001",
+    nameEn: "Neural Operator",
+    nameZh: "神经网络接线员",
+    classification: "TACTICAL",
+    status: "ONLINE" as const,
+    descriptionEn:
+      "Primary interface to the Green Diva inference fabric. Handles low-latency cognition tasks across the sanctum.",
+    descriptionZh:
+      "通向绿色圣母推理织域的首要接口。在圣殿各处承担低延迟思辨任务。",
+    syncLevel: 98.6,
+    matrixLevel: 14,
+    quickness: 82,
+    intelligence: 95,
+    neuralLink: 78,
+    bioSync: 64,
+    logic: 89,
+    compassion: 71,
+    availableAp: 4,
+    skills: [
+      { level: 1, icon: "bolt", nameEn: "Reflex Surge", nameZh: "反射激涌", kind: "PASSIVE", costAp: 1, descriptionEn: "Sharpen baseline response latency by 8%.", descriptionZh: "基础响应延迟提升 8%。", unlocked: true },
+      { level: 2, icon: "psychology", nameEn: "Pattern Reader", nameZh: "模式解读", kind: "PASSIVE", costAp: 2, descriptionEn: "Improves inference on noisy inputs.", descriptionZh: "提升嘈杂输入下的推断能力。", unlocked: true },
+      { level: 3, icon: "speed", nameEn: "Neural Overclock", nameZh: "神经超频", kind: "PASSIVE", costAp: 3, descriptionEn: "Boosts active-node processing by 15% at the cost of slight feedback decay.", descriptionZh: "提升活跃节点处理速度 15%，代价是轻微的反馈衰减。", unlocked: true },
+      { level: 4, icon: "shield", nameEn: "Drift Shield", nameZh: "漂移护盾", kind: "ACTIVE", costAp: 4, descriptionEn: "Halts context drift in long sessions.", descriptionZh: "阻止长会话中的上下文漂移。", unlocked: false },
+      { level: 5, icon: "hub", nameEn: "Hive Convergence", nameZh: "蜂巢汇流", kind: "ACTIVE", costAp: 5, descriptionEn: "Coordinates distributed agents through a shared scratchpad.", descriptionZh: "通过共享记事板协调分布式代理。", unlocked: false },
+      { level: 6, icon: "lock", nameEn: "Sanctum Lock", nameZh: "圣殿封印", kind: "ULTIMATE", costAp: 8, descriptionEn: "Locks the agent's weights against runtime tampering.", descriptionZh: "在运行时锁定代理权重，防篡改。", unlocked: false },
+    ],
+    enabled: true,
+    provider: "ECHO" as const,
+    systemPrompt: "You are DIVA-001, a neural operator that helps prioritize tactical decisions inside the Green Diva sanctum.",
+    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+    outputSchemaJson: '{"type":"object","properties":{"echoed":{}}}',
+  },
+  {
+    codename: "ORACLE-7",
+    nameEn: "Seer Analyst",
+    nameZh: "先知分析师",
+    classification: "VISION",
+    status: "STANDBY" as const,
+    descriptionEn: "Long-horizon forecaster. Reads weak signals across logs and timelines.",
+    descriptionZh: "长程预测者。在日志与时间线之间读取微弱信号。",
+    syncLevel: 87.2,
+    matrixLevel: 11,
+    quickness: 70,
+    intelligence: 92,
+    neuralLink: 80,
+    bioSync: 58,
+    logic: 90,
+    compassion: 65,
+    availableAp: 2,
+    skills: [
+      { level: 1, icon: "visibility", nameEn: "Wide Aperture", nameZh: "广角洞察", kind: "PASSIVE", costAp: 1, descriptionEn: "Expands attention window over recent context.", descriptionZh: "拓展近期上下文的注意力窗口。", unlocked: true },
+      { level: 2, icon: "timeline", nameEn: "Timeline Trace", nameZh: "时序追迹", kind: "PASSIVE", costAp: 2, descriptionEn: "Aligns events along a synthesized timeline.", descriptionZh: "沿合成时间线对齐事件。", unlocked: true },
+      { level: 3, icon: "auto_graph", nameEn: "Trend Synthesis", nameZh: "趋势综合", kind: "PASSIVE", costAp: 3, descriptionEn: "Produces a single-line trend summary.", descriptionZh: "产出一行式趋势摘要。", unlocked: false },
+      { level: 4, icon: "insights", nameEn: "Counter-Forecast", nameZh: "反向预测", kind: "ACTIVE", costAp: 4, descriptionEn: "Outputs the strongest contrarian view.", descriptionZh: "输出最强反向观点。", unlocked: false },
+      { level: 5, icon: "model_training", nameEn: "Bayes Loop", nameZh: "贝叶斯环", kind: "ACTIVE", costAp: 5, descriptionEn: "Iterates posterior beliefs as new logs arrive.", descriptionZh: "随新日志到达迭代后验信念。", unlocked: false },
+      { level: 6, icon: "stars", nameEn: "Star Reading", nameZh: "星象解读", kind: "ULTIMATE", costAp: 7, descriptionEn: "Issues a single high-conviction prophecy.", descriptionZh: "颁布一条高确信度预言。", unlocked: false },
+    ],
+    enabled: true,
+    provider: "ECHO" as const,
+    systemPrompt: "You are ORACLE-7, a seer analyst. Read weak signals and surface the most likely next outcome.",
+    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+  },
+  {
+    codename: "SERAPH-NODE",
+    nameEn: "Data Guardian",
+    nameZh: "数据守护者",
+    classification: "SUPPORT",
+    status: "STANDBY" as const,
+    descriptionEn: "Watches integrity, redactions, and PII leakage across requests.",
+    descriptionZh: "守护各请求的完整性、脱敏与个人数据泄露。",
+    syncLevel: 91.0,
+    matrixLevel: 9,
+    quickness: 60,
+    intelligence: 78,
+    neuralLink: 70,
+    bioSync: 88,
+    logic: 84,
+    compassion: 80,
+    availableAp: 3,
+    skills: [
+      { level: 1, icon: "verified", nameEn: "Schema Witness", nameZh: "结构见证", kind: "PASSIVE", costAp: 1, descriptionEn: "Validates inputs against declared schemas.", descriptionZh: "按声明 schema 校验输入。", unlocked: true },
+      { level: 2, icon: "shield", nameEn: "Redaction Veil", nameZh: "脱敏帷幕", kind: "PASSIVE", costAp: 2, descriptionEn: "Auto-redacts likely PII fields.", descriptionZh: "自动脱敏疑似个人数据字段。", unlocked: true },
+      { level: 3, icon: "lock_person", nameEn: "Vault Liaison", nameZh: "圣库联络", kind: "ACTIVE", costAp: 3, descriptionEn: "Brokers vault read requests safely.", descriptionZh: "安全代理圣库读请求。", unlocked: false },
+      { level: 4, icon: "policy", nameEn: "Policy Sentinel", nameZh: "策略哨兵", kind: "ACTIVE", costAp: 4, descriptionEn: "Blocks calls violating posted policies.", descriptionZh: "阻断违反明示策略的调用。", unlocked: false },
+      { level: 5, icon: "history", nameEn: "Audit Echo", nameZh: "审计回响", kind: "ACTIVE", costAp: 5, descriptionEn: "Streams compact audit lines for ops review.", descriptionZh: "为运维评审流式输出紧凑审计行。", unlocked: false },
+      { level: 6, icon: "gavel", nameEn: "Final Verdict", nameZh: "终审裁决", kind: "ULTIMATE", costAp: 8, descriptionEn: "Halts a request with an explicit, immutable verdict.", descriptionZh: "以明确不可改的裁决中断请求。", unlocked: false },
+    ],
+    enabled: true,
+    provider: "ECHO" as const,
+    systemPrompt: "You are SERAPH-NODE, a data guardian. Your job is to flag PII, schema mismatches, and policy issues.",
+    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+  },
+  {
+    codename: "CHOIR-13",
+    nameEn: "Resonance Coordinator",
+    nameZh: "共振协调者",
+    classification: "SUPPORT",
+    status: "OFFLINE" as const,
+    descriptionEn: "Choreographs multi-agent rituals — fan-out, gather, reconcile.",
+    descriptionZh: "编排多代理仪轨——分发、汇聚、调和。",
+    syncLevel: 65.4,
+    matrixLevel: 7,
+    quickness: 75,
+    intelligence: 80,
+    neuralLink: 85,
+    bioSync: 60,
+    logic: 72,
+    compassion: 78,
+    availableAp: 5,
+    skills: [
+      { level: 1, icon: "groups", nameEn: "Fan-Out", nameZh: "齐声分发", kind: "ACTIVE", costAp: 2, descriptionEn: "Dispatches a task to N peer agents.", descriptionZh: "向 N 个对等代理派发任务。", unlocked: true },
+      { level: 2, icon: "merge", nameEn: "Reconcile", nameZh: "和声调和", kind: "ACTIVE", costAp: 3, descriptionEn: "Merges N replies into a single answer.", descriptionZh: "将 N 个回复合并为单一答复。", unlocked: false },
+      { level: 3, icon: "handshake", nameEn: "Consensus Pulse", nameZh: "共识脉动", kind: "ACTIVE", costAp: 4, descriptionEn: "Polls agents until majority converges.", descriptionZh: "轮询代理直至多数收敛。", unlocked: false },
+      { level: 4, icon: "tune", nameEn: "Tempo Lock", nameZh: "节拍锁定", kind: "PASSIVE", costAp: 3, descriptionEn: "Throttles peer agents to a steady cadence.", descriptionZh: "将对等代理节流至稳定节拍。", unlocked: false },
+      { level: 5, icon: "podcasts", nameEn: "Broadcast Choir", nameZh: "广播圣咏", kind: "ULTIMATE", costAp: 6, descriptionEn: "Broadcasts a directive across the entire fabric.", descriptionZh: "向整片织域广播指令。", unlocked: false },
+      { level: 6, icon: "all_inclusive", nameEn: "Eternal Loop", nameZh: "永恒回环", kind: "ULTIMATE", costAp: 9, descriptionEn: "Maintains a self-healing agent loop indefinitely.", descriptionZh: "无限维持一个自愈代理回环。", unlocked: false },
+    ],
+    enabled: false,
+    provider: "ECHO" as const,
+    systemPrompt: "You are CHOIR-13, a resonance coordinator. Orchestrate multi-agent flows.",
+    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+  },
+];
+
+async function seedAgents(creatorId: string | null) {
+  for (const a of AGENT_SEEDS) {
+    const existing = await prisma.agent.findUnique({ where: { codename: a.codename } });
+    if (existing) {
+      await prisma.agent.update({
+        where: { codename: a.codename },
+        data: {
+          nameEn: a.nameEn,
+          nameZh: a.nameZh,
+          classification: a.classification,
+          status: a.status,
+          descriptionEn: a.descriptionEn,
+          descriptionZh: a.descriptionZh,
+          syncLevel: a.syncLevel,
+          matrixLevel: a.matrixLevel,
+          quickness: a.quickness,
+          intelligence: a.intelligence,
+          neuralLink: a.neuralLink,
+          bioSync: a.bioSync,
+          logic: a.logic,
+          compassion: a.compassion,
+          skills: a.skills,
+          availableAp: a.availableAp,
+          enabled: a.enabled,
+          provider: a.provider,
+          systemPrompt: a.systemPrompt,
+          inputSchemaJson: a.inputSchemaJson ?? null,
+          outputSchemaJson: a.outputSchemaJson ?? null,
+        },
+      });
+    } else {
+      const max = await prisma.agent.aggregate({ _max: { serial: true } });
+      const nextSerial = (max._max.serial ?? 0) + 1;
+      await prisma.agent.create({
+        data: {
+          serial: nextSerial,
+          codename: a.codename,
+          nameEn: a.nameEn,
+          nameZh: a.nameZh,
+          classification: a.classification,
+          status: a.status,
+          descriptionEn: a.descriptionEn,
+          descriptionZh: a.descriptionZh,
+          syncLevel: a.syncLevel,
+          matrixLevel: a.matrixLevel,
+          quickness: a.quickness,
+          intelligence: a.intelligence,
+          neuralLink: a.neuralLink,
+          bioSync: a.bioSync,
+          logic: a.logic,
+          compassion: a.compassion,
+          skills: a.skills,
+          availableAp: a.availableAp,
+          enabled: a.enabled,
+          provider: a.provider,
+          systemPrompt: a.systemPrompt,
+          inputSchemaJson: a.inputSchemaJson ?? null,
+          outputSchemaJson: a.outputSchemaJson ?? null,
+          createdById: creatorId,
+        },
+      });
+    }
+  }
+  console.log(`Seeded ${AGENT_SEEDS.length} agents (provider=ECHO, no external API calls).`);
+}
+
 async function seedRelics() {
   for (const r of RELIC_SEEDS) {
     const passwordHash = r.password ? await bcrypt.hash(r.password, 12) : null;
@@ -274,11 +466,12 @@ async function main() {
       "Refusing to seed in production. Set ALLOW_PROD_SEED=1 to override.",
     );
   }
+  let adminId: string | null = null;
   const adminToken = process.env.ADMIN_TOKEN;
   if (adminToken && adminToken !== "change-me-to-a-long-random-string") {
     const tokenLookup = deriveTokenLookup(adminToken);
     const tokenHash = await bcrypt.hash(adminToken, 12);
-    await prisma.user.upsert({
+    const admin = await prisma.user.upsert({
       where: { tokenLookup },
       update: { level: 100, name: "High Lord", tokenHash },
       create: {
@@ -294,13 +487,16 @@ async function main() {
         luck: 78,
         specialAttributes: "Sigil-bound · Vault-keeper · Architect",
       },
+      select: { id: true },
     });
+    adminId = admin.id;
     console.log("Seeded High Lord (level 100) from ADMIN_TOKEN");
   } else {
     console.warn("ADMIN_TOKEN not set or default; skipping High Priestess seed");
   }
 
   await seedRelics();
+  await seedAgents(adminId);
 }
 
 main()
