@@ -16,6 +16,7 @@ export interface CellRelic {
   classifZh: string;
   rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY" | "SPECIAL";
   iconKey: string | null;
+  status?: "DRAFT" | "PROCESSING" | "READY" | "PARTIAL" | "FAILED" | null;
   extractedAt?: string | null;
   extractedByName?: string | null;
 }
@@ -144,6 +145,16 @@ function CellInner({
       <span className="absolute top-1.5 left-2 font-label text-[10px] tracking-[0.2em] text-on-surface-variant/75">
         {String(relic.slot).padStart(3, "0")}
       </span>
+      {relic.status === "PROCESSING" || relic.status === "DRAFT" ? (
+        <span
+          className="absolute bottom-1.5 right-1.5 z-20 material-symbols-outlined text-secondary text-[14px] animate-spin"
+          style={{ fontVariationSettings: "'FILL' 0, 'wght' 300", animationDuration: "2s" }}
+          aria-label={t.relicCollection.cellProcessing}
+          title={t.relicCollection.cellProcessing}
+        >
+          progress_activity
+        </span>
+      ) : null}
       {/* Four fixed-percentage tiers (icon / name / classif / badge) keep
           live + extracted cells perfectly aligned, and the hover sweep
           (also at 85%) lands on the same baseline as the EXTRACTED badge. */}
@@ -182,7 +193,6 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
         <EmptyCellAdminTrigger
           slot={slot}
           ariaLabel={t.relicCollection.adminInscribeHere}
-          t={t}
           className={
             baseClasses +
             " border border-secondary/30 hover:border-secondary/70 touch:border-secondary/70 hover:shadow-[inset_0_0_18px_rgba(255,219,60,0.16)] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"

@@ -61,6 +61,7 @@ export default async function RelicCollectionPage({
         classifZh: true,
         rarity: true,
         iconKey: true,
+        status: true,
         extractedAt: true,
         extractedById: true,
         extractedBy: { select: { name: true } },
@@ -178,6 +179,7 @@ export default async function RelicCollectionPage({
                       classifZh: relic.classifZh,
                       rarity: relic.rarity,
                       iconKey: relic.iconKey,
+                      status: relic.status,
                       extractedAt: relic.extractedAt ? relic.extractedAt.toISOString() : null,
                       extractedByName: relic.extractedBy?.name ?? null,
                     }

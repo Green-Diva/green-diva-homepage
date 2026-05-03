@@ -255,6 +255,38 @@ export interface Dictionary {
     alreadyOwned: string;
     extractedTag: string;
     extractedBy: string; // {{name}}
+    jobStatusPending: string;
+    jobStatusRunning: string;
+    jobStatusSucceeded: string;
+    jobStatusFailed: string;
+    jobStatusCancelled: string;
+    jobStepEnqueued: string;
+    jobStepExtractZip: string;
+    jobStepRemoveBg: string;
+    jobStepStructuredFields: string;
+    jobStepGen3d: string;
+    jobStepWebResearch: string;
+    jobStepWriteLore: string;
+    jobStepPackDerived: string;
+    jobStepFinalize: string;
+    draftPanelTitle: string;
+    draftPanelSubtitle: string;
+    draftPanelArchiveLabel: string;
+    draftPanelArchiveHint: string;
+    draftPanelDescriptionLabel: string;
+    draftPanelDescriptionPlaceholder: string;
+    draftPanelSubmit: string;
+    draftPanelSubmitting: string;
+    draftPanelCancel: string;
+    draftPanelMissingFile: string;
+    draftPanelSubmitFailed: string;
+    processingBannerWorking: string; // {{progress}} {{step}}
+    processingBannerFailed: string; // {{step}}
+    processingBannerCompleted: string;
+    processingBannerRetry: string;
+    processingBannerRetrying: string;
+    cellProcessing: string;
+    viewerForging: string;
   };
   machineVision: {
     pageLabel: string;
@@ -278,16 +310,31 @@ export interface Dictionary {
     statCompassion: string;
     skillProgression: string;
     availableAp: string; // {{n}}
-    selectedSkill: string;
-    passiveSkill: string;
-    activeSkill: string;
-    ultimateSkill: string;
-    cost: string; // {{n}}
-    locked: string;
-    reset: string;
-    clear: string;
-    confirmAllocation: string;
     skillEmpty: string;
+    activeCapabilities: string;
+    activeCapabilitiesSummary: string; // {{enabled}} {{total}}
+    capabilityEmpty: string;
+    capabilityRequiresEnv: string; // {{vars}}
+    capabilityReady: string;
+    capabilityNoCalls: string;
+    capabilityRecentSummary: string; // {{count}} {{successRate}}
+    capabilityAvgLatency: string; // {{ms}}
+    capabilityLastSucceeded: string;
+    capabilityLastFailed: string;
+    secretConfigure: string;
+    secretReconfigure: string;
+    secretClear: string;
+    secretDialogTitle: string; // {{name}}
+    secretDialogHint: string;
+    secretDialogPlaceholder: string;
+    secretDialogSave: string;
+    secretDialogSaving: string;
+    secretDialogCancel: string;
+    secretDialogClearConfirm: string; // {{name}}
+    secretSourceDb: string;
+    secretSourceEnv: string;
+    secretEmptyValue: string;
+    secretSaveFailed: string;
     edit: string;
     remove: string;
     confirmRemove: string; // {{name}}
@@ -446,6 +493,10 @@ export interface Dictionary {
     logActionEXTRACTED_TO: string; // {{target}}
     logActionGRANTED: string;
     logActionGRANT_REVOKED: string;
+    logActionPROCESSING_STARTED: string;
+    logActionPROCESSING_STEP: string; // {{step}}
+    logActionPROCESSING_SUCCEEDED: string;
+    logActionPROCESSING_FAILED: string; // {{step}}
     logTimeJustNow: string;
     logTimeMinutesAgo: string; // {{n}}
     logTimeHoursAgo: string; // {{n}}

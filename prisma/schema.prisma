@@ -8,37 +8,38 @@ datasource db {
 }
 
 model User {
-  id                String        @id @default(cuid())
-  serial            Int?          @unique
+  id                String            @id @default(cuid())
+  serial            Int?              @unique
   // Tokens are stored as bcrypt hashes (one-way). tokenLookup is an
   // HMAC-SHA256(token, VAULT_COOKIE_SECRET) for O(1) login lookup.
   // Plaintext is returned to admins exactly once at issuance.
   tokenHash         String
-  tokenLookup       String        @unique
+  tokenLookup       String            @unique
   name              String
   gender            String?
   avatarUrl         String?
   bio               String?
-  level             Int           @default(1)
-  attack            Int           @default(50)
-  defense           Int           @default(50)
-  hp                Int           @default(50)
-  agility           Int           @default(50)
-  luck              Int           @default(50)
+  level             Int               @default(1)
+  attack            Int               @default(50)
+  defense           Int               @default(50)
+  hp                Int               @default(50)
+  agility           Int               @default(50)
+  luck              Int               @default(50)
   specialAttributes String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   sessions          Session[]
   activities        Activity[]
-  relicShares       RelicShare[]  @relation("RelicShareRecipient")
-  sharedByMe        RelicShare[]  @relation("RelicShareGranter")
-  extractedRelics   Relic[]       @relation("RelicExtractor")
-  relicGrants       RelicGrant[]  @relation("RelicGrantRecipient")
-  grantsIssued      RelicGrant[]  @relation("RelicGrantGranter")
+  relicShares       RelicShare[]      @relation("RelicShareRecipient")
+  sharedByMe        RelicShare[]      @relation("RelicShareGranter")
+  extractedRelics   Relic[]           @relation("RelicExtractor")
+  relicGrants       RelicGrant[]      @relation("RelicGrantRecipient")
+  grantsIssued      RelicGrant[]      @relation("RelicGrantGranter")
   vaultProfile      VaultProfile?
   vaultItems        VaultItem[]
   agentsCreated     Agent[]
   agentInvocations  AgentInvocation[] @relation("AgentInvocationCaller")
+  agentSecrets      AgentSecret[]
 }
 
 // End-to-end encrypted vault — server stores only ciphertext.
@@ -106,36 +107,48 @@ enum Rarity {
   SPECIAL
 }
 
+enum RelicStatus {
+  DRAFT
+  PROCESSING
+  READY
+  PARTIAL
+  FAILED
+}
+
 model Relic {
-  id           String        @id @default(cuid())
-  slot         Int           @unique
-  slug         String        @unique
-  nameEn       String
-  nameZh       String
-  classifEn    String
-  classifZh    String
-  rarity       Rarity
-  iconKey      String?
-  modelPath    String?
-  photoPaths   String[]
+  id                 String               @id @default(cuid())
+  slot               Int                  @unique
+  slug               String               @unique
+  nameEn             String
+  nameZh             String
+  classifEn          String
+  classifZh          String
+  rarity             Rarity
+  iconKey            String?
+  modelPath          String?
+  photoPaths         String[]
   archivePath        String?
   derivedArchivePath String?
-  loreEn       String?
-  loreZh       String?
-  acquiredAt   DateTime?
-  origin       String?
-  passwordHash String?
-  extractedAt   DateTime?
-  extractedById String?
-  extractedBy   User?         @relation("RelicExtractor", fields: [extractedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  unlocks      RelicUnlock[]
-  shares       RelicShare[]
-  grants       RelicGrant[]
+  loreEn             String?
+  loreZh             String?
+  acquiredAt         DateTime?
+  origin             String?
+  passwordHash       String?
+  extractedAt        DateTime?
+  extractedById      String?
+  extractedBy        User?                @relation("RelicExtractor", fields: [extractedById], references: [id], onDelete: SetNull)
+  status             RelicStatus          @default(READY)
+  draftNote          String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  unlocks            RelicUnlock[]
+  shares             RelicShare[]
+  grants             RelicGrant[]
+  jobs               RelicProcessingJob[]
 
   @@index([rarity])
   @@index([extractedAt])
+  @@index([status])
 }
 
 model RelicGrant {
@@ -176,6 +189,53 @@ enum RelicAction {
   EXTRACTED
   GRANTED
   GRANT_REVOKED
+  PROCESSING_STARTED
+  PROCESSING_STEP
+  PROCESSING_SUCCEEDED
+  PROCESSING_FAILED
+}
+
+enum RelicJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum RelicJobStep {
+  ENQUEUED
+  EXTRACT_ZIP
+  REMOVE_BG
+  STRUCTURED_FIELDS
+  GEN_3D
+  WEB_RESEARCH
+  WRITE_LORE
+  PACK_DERIVED
+  FINALIZE
+}
+
+model RelicProcessingJob {
+  id           String         @id @default(cuid())
+  relicId      String
+  relic        Relic          @relation(fields: [relicId], references: [id], onDelete: Cascade)
+  agentId      String?
+  agent        Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  status       RelicJobStatus @default(PENDING)
+  step         RelicJobStep   @default(ENQUEUED)
+  progress     Int            @default(0)
+  attempt      Int            @default(0)
+  maxAttempts  Int            @default(3)
+  meshyTaskId  String?
+  errorMessage String?
+  stepResults  Json?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([relicId])
 }
 
 model RelicLog {
@@ -224,44 +284,58 @@ enum AgentProvider {
 }
 
 model Agent {
-  id               String        @id @default(cuid())
-  serial           Int?          @unique
-  codename         String        @unique
+  id               String               @id @default(cuid())
+  serial           Int?                 @unique
+  codename         String               @unique
   nameEn           String
   nameZh           String
   classification   String?
-  status           AgentStatus   @default(STANDBY)
+  status           AgentStatus          @default(STANDBY)
   avatarUrl        String?
   descriptionEn    String?
   descriptionZh    String?
-  syncLevel        Float         @default(0)
-  matrixLevel      Int           @default(1)
-  quickness        Int           @default(50)
-  intelligence     Int           @default(50)
-  neuralLink       Int           @default(50)
-  bioSync          Int           @default(50)
-  logic            Int           @default(50)
-  compassion       Int           @default(50)
+  syncLevel        Float                @default(0)
+  matrixLevel      Int                  @default(1)
+  quickness        Int                  @default(50)
+  intelligence     Int                  @default(50)
+  neuralLink       Int                  @default(50)
+  bioSync          Int                  @default(50)
+  logic            Int                  @default(50)
+  compassion       Int                  @default(50)
   skills           Json?
-  availableAp      Int           @default(0)
-  enabled          Boolean       @default(true)
-  provider         AgentProvider @default(ECHO)
+  availableAp      Int                  @default(0)
+  enabled          Boolean              @default(true)
+  provider         AgentProvider        @default(ECHO)
   model            String?
   systemPrompt     String?
   internalHandler  String?
   inputSchemaJson  String?
   outputSchemaJson String?
-  maxTokens        Int?          @default(1024)
-  temperature      Float?        @default(0.7)
-  rateLimitPerMin  Int?          @default(20)
+  maxTokens        Int?                 @default(1024)
+  temperature      Float?               @default(0.7)
+  rateLimitPerMin  Int?                 @default(20)
   createdById      String?
-  createdBy        User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy        User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   invocations      AgentInvocation[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  processingJobs   RelicProcessingJob[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   @@index([status, createdAt])
   @@index([enabled, provider])
+}
+
+model AgentSecret {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  ciphertext  String
+  iv          String
+  authTag     String
+  hint        String?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model AgentInvocation {

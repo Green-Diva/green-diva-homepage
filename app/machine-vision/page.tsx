@@ -7,6 +7,7 @@ import UserMenu from "@/components/UserMenu";
 import AgentClient from "./AgentClient";
 import type { AgentRow } from "./types";
 import type { AgentSkill } from "@/lib/agentTypes";
+import { getCapabilitySummariesByAgent } from "@/lib/agents/summary";
 
 export default async function MachineVisionPage() {
   const me = await getCurrentUser();
@@ -56,6 +57,10 @@ export default async function MachineVisionPage() {
 
   const isAdmin = me.level >= ADMIN_LEVEL;
 
+  const capabilitiesByCodename = await getCapabilitySummariesByAgent(
+    rows.map((r) => ({ id: r.id, codename: r.codename })),
+  );
+
   return (
     <div className="flex flex-col flex-1 w-full">
       <header className="w-full z-30 flex justify-between items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
@@ -87,7 +92,7 @@ export default async function MachineVisionPage() {
         </div>
       </header>
 
-      <AgentClient agents={rows} isAdmin={isAdmin} />
+      <AgentClient agents={rows} isAdmin={isAdmin} capabilitiesByCodename={capabilitiesByCodename} />
     </div>
   );
 }

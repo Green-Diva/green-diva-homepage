@@ -15,6 +15,7 @@ import RelicViewer from "./_components/RelicViewer";
 import PhotoCarousel from "./_components/PhotoCarousel";
 import AdminToolbar from "./_components/AdminToolbar";
 import LogPanel from "./_components/LogPanel";
+import RelicProcessingBanner from "./_components/RelicProcessingBanner";
 import UnlockTrigger from "../_components/UnlockTrigger";
 
 export async function generateMetadata({
@@ -148,6 +149,14 @@ export default async function RelicDetailPage({
             ← {t.relicCollection.pageTitle}
           </Link>
         </div>
+
+        {relic.status !== "READY" && access.level !== "RED" ? (
+          <RelicProcessingBanner
+            relicId={relic.id}
+            initialStatus={relic.status}
+            isAdmin={isAdmin}
+          />
+        ) : null}
 
         {access.level === "RED" ? (
           <div className="max-w-xl mx-auto text-center py-10 space-y-5 border border-error/30 bg-surface-container/30 p-10 shrink-0">

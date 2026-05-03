@@ -3,9 +3,9 @@ import bcrypt from "bcryptjs";
 import { createHmac } from "node:crypto";
 
 function deriveTokenLookup(token: string): string {
-  const secret = process.env.VAULT_COOKIE_SECRET;
+  const secret = process.env.SAFETY_SECRET;
   if (!secret || secret.length < 16) {
-    throw new Error("VAULT_COOKIE_SECRET missing or too short (>=16 chars) — required for token lookup");
+    throw new Error("SAFETY_SECRET missing or too short (>=16 chars) — required for token lookup");
   }
   return createHmac("sha256", secret).update(token).digest("base64url");
 }

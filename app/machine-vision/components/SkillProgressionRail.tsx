@@ -1,25 +1,27 @@
 "use client";
 
-import type { AgentSkill } from "@/lib/agentTypes";
-import type { SkillLevel } from "../types";
+import type { CapabilitySummary } from "@/lib/agents/capabilityTypes";
 
 type Props = {
-  skills: AgentSkill[];
-  activeLevel: SkillLevel;
-  onSelect: (level: SkillLevel) => void;
+  summaries: CapabilitySummary[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
 };
 
-const LEVELS: SkillLevel[] = [1, 2, 3, 4, 5, 6];
+const TOTAL_SLOTS = 6;
 
-export default function SkillProgressionRail({ skills, activeLevel, onSelect }: Props) {
-  const byLevel = new Map<SkillLevel, AgentSkill>();
-  for (const s of skills) byLevel.set(s.level, s);
+export default function SkillProgressionRail({ summaries, activeId, onSelect }: Props) {
+  const slots: Array<
+    { kind: "cap"; cap: CapabilitySummary; index: number } | { kind: "lock"; index: number }
+  > = [];
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    if (i < summaries.length) slots.push({ kind: "cap", cap: summaries[i], index: i });
+    else slots.push({ kind: "lock", index: i });
+  }
 
-  const unlockedSet = new Set<SkillLevel>();
-  for (const s of skills) if (s.unlocked) unlockedSet.add(s.level);
-
-  const lastUnlocked = Math.max(0, ...Array.from(unlockedSet));
-  const progress = Math.max(0, Math.min(1, (lastUnlocked - 1) / (LEVELS.length - 1)));
+  // Progress bar reflects how many capabilities are actually ready (env configured).
+  const readyCount = summaries.filter((c) => c.envOk).length;
+  const progress = Math.max(0, Math.min(1, readyCount / TOTAL_SLOTS));
 
   return (
     <div className="relative px-2 py-3">
@@ -34,46 +36,73 @@ export default function SkillProgressionRail({ skills, activeLevel, onSelect }: 
         }}
       />
       <div className="relative grid grid-cols-6 gap-2 sm:gap-3 items-end">
-        {LEVELS.map((lv) => {
-          const skill = byLevel.get(lv);
-          const unlocked = !!skill?.unlocked;
-          const active = lv === activeLevel;
-          const dim = !skill || (!unlocked && !active);
+        {slots.map((slot) => {
+          if (slot.kind === "lock") {
+            return (
+              <div
+                key={`lock-${slot.index}`}
+                className="flex flex-col items-center gap-2 min-h-[44px] opacity-50"
+                aria-hidden
+              >
+                <span className="font-label text-[10px] tracking-[0.3em] text-outline">
+                  LV.{slot.index + 1}
+                </span>
+                <span className="relative flex items-center justify-center rounded-md border w-11 h-11 border-outline-variant/50 bg-surface-container">
+                  <span className="material-symbols-outlined text-xl text-outline" aria-hidden>
+                    lock
+                  </span>
+                </span>
+              </div>
+            );
+          }
+          const cap = slot.cap;
+          const active = cap.id === activeId;
+          const ready = cap.envOk;
+          const lvLabel = `LV.${slot.index + 1}`;
           return (
             <button
-              key={lv}
+              key={cap.id}
               type="button"
-              onClick={() => onSelect(lv)}
+              onClick={() => onSelect(cap.id)}
               aria-pressed={active}
-              className="flex flex-col items-center gap-2 min-h-[44px] focus:outline-none"
+              aria-label={cap.metadata.nameEn}
+              title={`${cap.metadata.nameEn} / ${cap.metadata.nameZh}`}
+              className="flex flex-col items-center gap-2 min-h-[44px] focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               <span
                 className={`font-label text-[10px] tracking-[0.3em] ${
-                  active ? "text-primary" : unlocked ? "text-secondary" : "text-outline"
+                  active ? "text-primary" : ready ? "text-secondary" : "text-outline"
                 }`}
               >
-                LV.{lv}
+                {lvLabel}
               </span>
               <span
                 className={[
-                  "relative flex items-center justify-center rounded-md border w-11 h-11",
+                  "relative flex items-center justify-center rounded-md border w-11 h-11 transition-all",
                   active
                     ? "border-primary bg-primary/[0.18] mv-skill-active"
-                    : unlocked
+                    : ready
                       ? "border-secondary/60 bg-secondary/[0.06]"
-                      : "border-outline-variant/50 bg-surface-container",
-                  dim ? "opacity-50" : "opacity-100",
-                  "transition-all",
+                      : "border-outline-variant/50 bg-surface-container opacity-70",
                 ].join(" ")}
               >
                 <span
                   className={`material-symbols-outlined text-xl ${
-                    active ? "text-primary" : unlocked ? "text-secondary" : "text-outline"
+                    active ? "text-primary" : ready ? "text-secondary" : "text-outline"
                   }`}
                   aria-hidden
                 >
-                  {skill?.icon ?? "lock"}
+                  {cap.metadata.iconKey}
                 </span>
+                <span
+                  aria-hidden
+                  className={[
+                    "absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full",
+                    ready
+                      ? "bg-primary shadow-[0_0_4px_currentColor] text-primary"
+                      : "bg-on-surface-variant/50",
+                  ].join(" ")}
+                />
               </span>
             </button>
           );

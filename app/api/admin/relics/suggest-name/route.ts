@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AuthError, requireAdmin } from "@/lib/auth";
-import { suggestRelicNaming } from "@/lib/aiNaming";
+import { prisma } from "@/lib/db";
+import { getSecretOrEnv } from "@/lib/agentSecrets";
+import {
+  parseImageDataUrl,
+  structuredNamingCapability,
+  type StructuredNamingImage,
+} from "@/lib/agents/diva-001/structured-naming";
 
 // Per-IP rate limit (in-memory; single-instance only — see CLAUDE.md note).
 const FAIL_DELAY_MS = 600;
@@ -59,14 +65,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "need description or image" }, { status: 400 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!(await getSecretOrEnv("ANTHROPIC_API_KEY"))) {
     return NextResponse.json({ error: "ai-not-configured" }, { status: 503 });
   }
 
+  const diva = await prisma.agent.findUnique({
+    where: { codename: structuredNamingCapability.agentCodename },
+  });
+  if (!diva || !diva.enabled || diva.status === "OFFLINE") {
+    return NextResponse.json({ error: "agent-unavailable" }, { status: 503 });
+  }
+
+  const images: StructuredNamingImage[] = [];
+  if (parsed.data.imageDataUrl) {
+    const img = parseImageDataUrl(parsed.data.imageDataUrl);
+    if (img) images.push(img);
+  }
+
   try {
-    const out = await suggestRelicNaming({
+    const out = await structuredNamingCapability.run(diva, {
       description: parsed.data.description,
-      imageDataUrl: parsed.data.imageDataUrl ?? null,
+      images,
     });
     return NextResponse.json(out);
   } catch (e) {

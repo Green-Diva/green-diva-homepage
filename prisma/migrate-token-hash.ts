@@ -2,7 +2,7 @@
 // User.tokenHash + HMAC User.tokenLookup. Safe to re-run; bails out
 // once the old "token" column no longer exists.
 //
-// Required env: DATABASE_URL, VAULT_COOKIE_SECRET (>=16 chars).
+// Required env: DATABASE_URL, SAFETY_SECRET (>=16 chars).
 // Runs before `prisma db push` in start command — once it succeeds,
 // the schema matches and db push becomes a no-op.
 
@@ -17,9 +17,9 @@ function deriveLookup(token: string, secret: string): string {
 }
 
 async function main() {
-  const secret = process.env.VAULT_COOKIE_SECRET;
+  const secret = process.env.SAFETY_SECRET;
   if (!secret || secret.length < 16) {
-    throw new Error("VAULT_COOKIE_SECRET missing or <16 chars — required for token lookup");
+    throw new Error("SAFETY_SECRET missing or <16 chars — required for token lookup");
   }
 
   const prisma = new PrismaClient();

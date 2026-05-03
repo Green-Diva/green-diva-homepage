@@ -28,7 +28,7 @@ async function verifyVaultCookie(token: string | undefined): Promise<boolean> {
   const sig = token.slice(idx + 1);
   const expMs = Number(exp);
   if (!Number.isFinite(expMs) || expMs < Date.now()) return false;
-  const secret = process.env.VAULT_COOKIE_SECRET;
+  const secret = process.env.SAFETY_SECRET;
   if (!secret || secret.length < 16) return false;
   const key = await crypto.subtle.importKey(
     "raw",

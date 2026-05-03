@@ -5,9 +5,9 @@ import bcrypt from "bcryptjs";
 const BCRYPT_COST = 12;
 
 function getSecret(): string {
-  const s = process.env.VAULT_COOKIE_SECRET;
+  const s = process.env.SAFETY_SECRET;
   if (!s || s.length < 16) {
-    throw new Error("VAULT_COOKIE_SECRET missing or too short (>=16 chars) — required for token lookup");
+    throw new Error("SAFETY_SECRET missing or too short (>=16 chars) — required for token lookup");
   }
   return s;
 }
