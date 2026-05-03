@@ -18,7 +18,7 @@ function labelFor(t: Dictionary, k: RarityFilter): string {
     case "LEGENDARY":
       return t.relicCollection.filterLegendary;
     case "SPECIAL":
-      return t.relicCollection.filterSpecial;
+      return t.relicCollection.filterSpecialItem;
   }
 }
 

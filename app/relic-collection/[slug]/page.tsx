@@ -41,7 +41,7 @@ function rarityLabel(t: Awaited<ReturnType<typeof getDictionary>>, r: string): s
     case "LEGENDARY":
       return t.relicCollection.rarityLegendary;
     case "SPECIAL":
-      return t.relicCollection.rarityNoBoundary;
+      return t.relicCollection.raritySpecialItem;
     default:
       return r;
   }
@@ -215,28 +215,44 @@ export default async function RelicDetailPage({
                     accessReason={access.reason}
                     isExtracted={isExtracted}
                     rightSlot={
-                      relic.archivePath || relic.derivedArchivePath ? (
-                        <>
-                          {relic.archivePath ? (
-                            <a
-                              href={`/api/relics/${relic.id}/archive`}
-                              className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/40 hover:bg-primary/10 font-label text-[11px] tracking-[0.2em] uppercase text-primary"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">archive</span>
-                              {t.relicCollection.archiveDownload}
-                            </a>
-                          ) : null}
-                          {relic.derivedArchivePath ? (
-                            <a
-                              href={`/api/relics/${relic.id}/derived`}
-                              className="inline-flex items-center gap-2 px-3 py-1.5 border border-secondary/40 hover:bg-secondary/10 font-label text-[11px] tracking-[0.2em] uppercase text-secondary"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">inventory_2</span>
-                              {t.relicCollection.derivedDownload}
-                            </a>
-                          ) : null}
-                        </>
-                      ) : null
+                      <>
+                        {relic.archivePath ? (
+                          <a
+                            href={`/api/relics/${relic.id}/archive`}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/40 hover:bg-primary/10 font-label text-[11px] tracking-[0.2em] uppercase text-primary"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">archive</span>
+                            {t.relicCollection.archiveDownload}
+                          </a>
+                        ) : (
+                          <span
+                            aria-disabled="true"
+                            title={t.relicCollection.downloadUnavailable}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 border border-on-surface-variant/20 font-label text-[11px] tracking-[0.2em] uppercase text-on-surface-variant/40 cursor-not-allowed select-none"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">archive</span>
+                            {t.relicCollection.archiveDownload}
+                          </span>
+                        )}
+                        {relic.derivedArchivePath ? (
+                          <a
+                            href={`/api/relics/${relic.id}/derived`}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 border border-secondary/40 hover:bg-secondary/10 font-label text-[11px] tracking-[0.2em] uppercase text-secondary"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+                            {t.relicCollection.derivedDownload}
+                          </a>
+                        ) : (
+                          <span
+                            aria-disabled="true"
+                            title={t.relicCollection.downloadUnavailable}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 border border-on-surface-variant/20 font-label text-[11px] tracking-[0.2em] uppercase text-on-surface-variant/40 cursor-not-allowed select-none"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+                            {t.relicCollection.derivedDownload}
+                          </span>
+                        )}
+                      </>
                     }
                   />
                 </div>
@@ -245,7 +261,7 @@ export default async function RelicDetailPage({
 
             {/* Right: metadata */}
             <div className="lg:col-span-5 lg:min-h-0 flex flex-col lg:overflow-y-auto lg:pr-2 lg:-mr-2 scrollbar-thin">
-              <section className="border border-primary/15 bg-surface-container/30 p-4 flex flex-col gap-4">
+              <section className="border border-primary/15 bg-surface-container/30 p-4 flex flex-col gap-4 lg:flex-1">
               <div className="flex items-start gap-3 flex-wrap">
                 <span className={"px-3 py-1.5 border font-label text-[10px] tracking-[0.25em] uppercase " + rarityColor(relic.rarity)}>
                   {rarityLabel(t, relic.rarity)}

@@ -90,11 +90,15 @@ export default function RelicViewer({ modelUrl, alt, t }: Props) {
       <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-r border-t border-primary/70 z-10" />
       <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-l border-b border-primary/70 z-10" />
       <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-r border-b border-primary/70 z-10" />
-      <ModelViewerElement
-        modelUrl={modelUrl}
-        alt={alt}
-        autoRotate={!reduceMotion}
-      />
+      <div className="absolute inset-0 flex items-center justify-center px-4 lg:px-6 pt-20 lg:pt-24 pb-4 lg:pb-6">
+        <div className="w-full max-w-[520px] aspect-square">
+          <ModelViewerElement
+            modelUrl={modelUrl}
+            alt={alt}
+            autoRotate={!reduceMotion}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -203,12 +203,22 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
           </div>
         ) : null}
       </div>
-      {!loaded ? (
-        <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/50">…</p>
-      ) : rows.length === 0 ? (
-        <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/50">
-          {t.adminRelics.logEmpty}
-        </p>
+      {!loaded || rows.length === 0 ? (
+        <ol className="space-y-1 relative">
+          <p className="absolute inset-0 flex items-center justify-center font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/50 pointer-events-none">
+            {!loaded ? "…" : t.adminRelics.logEmpty}
+          </p>
+          {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+            <li key={`empty-pad-${i}`} aria-hidden className="border-l border-transparent pl-2.5 text-[12px] leading-[1.55] invisible">
+              <div className="flex items-center gap-2.5">
+                <span className="shrink-0 px-2 py-0.5 border font-label text-[9px] tracking-[0.2em] uppercase">
+                  &nbsp;
+                </span>
+                <span className="flex-1" />
+              </div>
+            </li>
+          ))}
+        </ol>
       ) : (
         <ol className="space-y-1">
           {pagedRows.map((row) => {

@@ -213,7 +213,7 @@ export interface Dictionary {
     filterRare: string;
     filterEpic: string;
     filterLegendary: string;
-    filterSpecial: string;
+    filterSpecialItem: string;
     cellEmpty: string;
     cellSlot: string; // {{slot}}
     backToVault: string;
@@ -221,7 +221,7 @@ export interface Dictionary {
     rarityRare: string;
     rarityEpic: string;
     rarityLegendary: string;
-    rarityNoBoundary: string;
+    raritySpecialItem: string;
     needLevelTitle: string;
     needLevelBody: string; // {{required}}
     needPasswordTitle: string;
@@ -237,6 +237,7 @@ export interface Dictionary {
     origin: string;
     archiveDownload: string;
     derivedDownload: string;
+    downloadUnavailable: string;
     rarity: string;
     slotNo: string;
     viewerLoading: string;
