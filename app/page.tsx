@@ -334,7 +334,7 @@ export default async function Home() {
             </div>
           </Link>
 
-          {/* Row: Relic & Machine Vision */}
+          {/* Row: Relic & AI Clergy */}
           <div className="grid grid-cols-2 gap-4 md:gap-4 flex-1 md:flex-none min-h-[160px] md:min-h-0">
             {/* Relic Collection */}
             <Link
@@ -404,9 +404,9 @@ export default async function Home() {
               </div>
             </Link>
 
-            {/* Machine Vision */}
+            {/* AI Clergy */}
             <Link
-              href="/machine-vision"
+              href="/ai-clergy"
               className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
               <div className="absolute inset-0 pointer-events-none opacity-20 z-30">
@@ -421,14 +421,14 @@ export default async function Home() {
               </div>
               <div className="z-20 space-y-2">
                 <h4 className="font-headline text-xl text-secondary leading-tight">
-                  {t.sections.machineVisionTitle}
+                  {t.sections.aiClergyTitle}
                 </h4>
                 <p className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
                   {t.sections.syntheticHallucinations}
                 </p>
               </div>
               <div className="flex-1 flex flex-col gap-3 z-20">
-                {/* Unified machine-vision panel: matrix rain layered over bars + centered all-seeing eye */}
+                {/* Unified ai-clergy panel: matrix rain layered over bars + centered all-seeing eye */}
                 <div className="relative flex-1 min-h-[4.5rem] w-full rounded-xl overflow-hidden bg-background/80">
                   {/* Background layer: bars */}
                   <div

@@ -1,7 +1,7 @@
 import "server-only";
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import type { Agent, Relic, RelicProcessingJob } from "@prisma/client";
+import type { Cleric, Relic, RelicProcessingJob } from "@prisma/client";
 import { RELIC_STORAGE_ROOT } from "@/lib/relicStorage";
 
 export type PipelineDirs = {
@@ -18,7 +18,7 @@ export type PipelineDirs = {
 export type PipelineContext = {
   job: RelicProcessingJob;
   relic: Relic;
-  agent: Agent;
+  cleric: Cleric;
   dirs: PipelineDirs;
   /** Mutable map of step.id -> arbitrary result data shared with downstream steps. */
   results: Map<string, unknown>;

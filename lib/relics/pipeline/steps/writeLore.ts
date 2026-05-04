@@ -4,12 +4,12 @@ import { promises as fs } from "node:fs";
 import { prisma } from "@/lib/db";
 import {
   writeLoreCapability,
-} from "@/lib/agents/diva-001/write-lore";
+} from "@/lib/clerics/diva-001/write-lore";
 import type {
   StructuredNamingImage,
   StructuredNamingMediaType,
-} from "@/lib/agents/diva-001/structured-naming";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+} from "@/lib/clerics/diva-001/structured-naming";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { PipelineContext, StepResult } from "../context";
 import type { RemoveBgResult } from "./removeBg";
 import type { StructuredFieldsResult } from "./structuredFields";
@@ -22,7 +22,7 @@ export type WriteLoreResult = {
   reason?: string;
 };
 
-const PLACEHOLDER_EN = "(Awaiting agent composition.)";
+const PLACEHOLDER_EN = "(Awaiting cleric composition.)";
 const PLACEHOLDER_ZH = "（等候代理撰写。）";
 
 export async function stepWriteLore(
@@ -58,7 +58,7 @@ export async function stepWriteLore(
   }
 
   try {
-    const out = await writeLoreCapability.run(ctx.agent, {
+    const out = await writeLoreCapability.run(ctx.cleric, {
       nameEn: fields.nameEn,
       nameZh: fields.nameZh,
       classifEn: fields.classifEn,

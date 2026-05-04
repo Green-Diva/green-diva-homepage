@@ -1,16 +1,18 @@
-import type { AgentSkill, AgentSkillLevel } from "@/lib/agentTypes";
+import type { ClericSkill, ClericSkillLevel, ClericSkillKind } from "@/lib/clericTypes";
 
-export type AgentStatus = "ONLINE" | "STANDBY" | "OFFLINE";
-export type AgentProvider = "ANTHROPIC" | "OPENAI" | "INTERNAL" | "ECHO";
+export type ClericStatus = "ONLINE" | "STANDBY" | "OFFLINE";
+export type ClericProvider = "ANTHROPIC" | "OPENAI" | "INTERNAL" | "ECHO";
+export type ClericMode = "MECHANICAL" | "AUTONOMOUS";
 
-export interface AgentRow {
+export interface ClericRow {
   id: string;
   serial: number | null;
   codename: string;
   nameEn: string;
   nameZh: string;
   classification: string | null;
-  status: AgentStatus;
+  mode: ClericMode;
+  status: ClericStatus;
   avatarUrl: string | null;
   descriptionEn: string | null;
   descriptionZh: string | null;
@@ -22,10 +24,10 @@ export interface AgentRow {
   bioSync: number;
   logic: number;
   compassion: number;
-  skills: AgentSkill[] | null;
+  skills: ClericSkill[] | null;
   availableAp: number;
   enabled: boolean;
-  provider: AgentProvider;
+  provider: ClericProvider;
   model: string | null;
   systemPrompt: string | null;
   internalHandler: string | null;
@@ -39,4 +41,28 @@ export interface AgentRow {
   createdBy: { id: string; name: string } | null;
 }
 
-export type SkillLevel = AgentSkillLevel;
+export type SkillLevel = ClericSkillLevel;
+
+export interface SkillRow {
+  id: string;
+  level: number;
+  icon: string;
+  nameEn: string;
+  nameZh: string;
+  kind: ClericSkillKind;
+  costAp: number;
+  descriptionEn: string;
+  descriptionZh: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id: string; name: string } | null;
+}
+
+export interface EquipRow {
+  id: string;
+  clericId: string;
+  skillId: string;
+  skill: SkillRow;
+  unlocked: boolean;
+  equippedAt: string;
+}

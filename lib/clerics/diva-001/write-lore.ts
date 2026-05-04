@@ -1,8 +1,8 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import type { AgentCapability } from "../types";
+import type { ClericCapability } from "../types";
 import { withInvocationLogging } from "../types";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { StructuredNamingImage, StructuredNamingMediaType } from "./structured-naming";
 
 const SYSTEM_PROMPT = `You are the Lore-Weaver of the Green Diva Sanctuary. Given an item's catalogue entry, photographs of the item, and a few research snippets from the open web, you compose a short evocative lore in BOTH English and Chinese.
@@ -37,9 +37,9 @@ async function getClient(): Promise<Anthropic> {
   return new Anthropic({ apiKey: key });
 }
 
-const baseCapability: AgentCapability<WriteLoreInput, WriteLoreOutput> = {
+const baseCapability: ClericCapability<WriteLoreInput, WriteLoreOutput> = {
   id: "write-lore",
-  agentCodename: "DIVA-001",
+  clericCodename: "DIVA-001",
   metadata: {
     iconKey: "auto_stories",
     nameEn: "Lore Weaver",
@@ -48,6 +48,7 @@ const baseCapability: AgentCapability<WriteLoreInput, WriteLoreOutput> = {
     descriptionZh: "综合照片、归档字段与检索片段，撰写简短中英 lore。",
     provider: "anthropic",
     requiredEnvVars: ["ANTHROPIC_API_KEY"],
+    autonomyLevel: 1,
   },
   serializeInput(input) {
     return {
@@ -65,7 +66,7 @@ const baseCapability: AgentCapability<WriteLoreInput, WriteLoreOutput> = {
       ).slice(0, 8),
     };
   },
-  async run(agent, input) {
+  async run(cleric, input) {
     const c = await getClient();
 
     type Block =
@@ -106,15 +107,15 @@ const baseCapability: AgentCapability<WriteLoreInput, WriteLoreOutput> = {
       ].join("\n"),
     });
 
-    const overlay = (agent.systemPrompt ?? "").trim();
+    const overlay = (cleric.systemPrompt ?? "").trim();
     const systemText = overlay
       ? `${SYSTEM_PROMPT}\n\n--- Style overlay (do not break the JSON contract above) ---\n${overlay}`
       : SYSTEM_PROMPT;
 
     const resp = await c.messages.create({
-      model: agent.model ?? "claude-haiku-4-5-20251001",
-      max_tokens: agent.maxTokens ?? 800,
-      temperature: agent.temperature ?? 0.7,
+      model: cleric.model ?? "claude-haiku-4-5-20251001",
+      max_tokens: cleric.maxTokens ?? 800,
+      temperature: cleric.temperature ?? 0.7,
       system: [
         { type: "text", text: systemText, cache_control: { type: "ephemeral" } },
       ],

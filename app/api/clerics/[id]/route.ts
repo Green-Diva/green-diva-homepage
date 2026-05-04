@@ -13,12 +13,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     throw e;
   }
   const { id } = await params;
-  const agent = await prisma.agent.findUnique({
+  const cleric = await prisma.cleric.findUnique({
     where: { id },
     include: { createdBy: { select: { id: true, name: true } } },
   });
-  if (!agent) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(agent);
+  if (!cleric) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(cleric);
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
@@ -42,13 +42,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   try {
-    const updated = await prisma.agent.update({
+    const updated = await prisma.cleric.update({
       where: { id },
       data,
     });
     return NextResponse.json(updated);
   } catch (e) {
-    console.error("[api/agents PATCH] update failed", e);
+    console.error("[api/clerics PATCH] update failed", e);
     return NextResponse.json({ error: "update failed" }, { status: 400 });
   }
 }
@@ -62,10 +62,10 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   }
   const { id } = await params;
   try {
-    await prisma.agent.delete({ where: { id } });
+    await prisma.cleric.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[api/agents DELETE] delete failed", e);
+    console.error("[api/clerics DELETE] delete failed", e);
     return NextResponse.json({ error: "delete failed" }, { status: 400 });
   }
 }

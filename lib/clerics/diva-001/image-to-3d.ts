@@ -1,7 +1,7 @@
 import "server-only";
-import type { AgentCapability } from "../types";
+import type { ClericCapability } from "../types";
 import { withInvocationLogging } from "../types";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { StructuredNamingImage } from "./structured-naming";
 
 const MESHY_BASE = "https://api.meshy.ai/openapi";
@@ -18,12 +18,12 @@ export type ImageTo3dOutput = {
   taskId: string;
   mode: "single" | "multi";
   glbBytes: number;
-  glb: Buffer; // raw GLB bytes (not serialized into AgentInvocation)
+  glb: Buffer; // raw GLB bytes (not serialized into ClericInvocation)
 };
 
-const baseCapability: AgentCapability<ImageTo3dInput, ImageTo3dOutput> = {
+const baseCapability: ClericCapability<ImageTo3dInput, ImageTo3dOutput> = {
   id: "image-to-3d",
-  agentCodename: "DIVA-001",
+  clericCodename: "DIVA-001",
   metadata: {
     iconKey: "deployed_code",
     nameEn: "Form Forge",
@@ -32,6 +32,7 @@ const baseCapability: AgentCapability<ImageTo3dInput, ImageTo3dOutput> = {
     descriptionZh: "调度 Meshy multi-image-to-3D 端点，多视角失败时自动降级单图。",
     provider: "meshy",
     requiredEnvVars: ["MESHY_API_KEY"],
+    autonomyLevel: 0,
   },
   serializeInput(input) {
     return { imageCount: input.images.length, targetPolycount: input.targetPolycount ?? null };

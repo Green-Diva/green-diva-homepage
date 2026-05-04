@@ -197,7 +197,7 @@ html[lang="zh"] li:not([class*="leading-"]) {
   text-shadow: 0 0 12px rgba(144, 222, 205, 0.3);
 }
 
-/* === Machine Vision · Cyber Panel — holographic frame === */
+/* === AI Clergy · Cyber Panel — holographic frame === */
 .cyber-panel {
   background: rgba(18, 20, 20, 0.72);
   backdrop-filter: blur(18px);
@@ -966,7 +966,7 @@ html[lang="zh"] li:not([class*="leading-"]) {
     relic-bar-color 18s linear infinite;
 }
 
-/* 触摸设备：让 Relic Collection 与 Machine Vision 卡片自动播放悬停效果 */
+/* 触摸设备：让 Relic Collection 与 AI Clergy 卡片自动播放悬停效果 */
 @media (hover: none) {
   .module-card .animate-breathing {
     animation: breathing-glow 4s ease-in-out infinite;

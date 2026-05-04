@@ -1,5 +1,5 @@
 import "server-only";
-import { listAgentCapabilities, getRawCapability } from "./registry";
+import { listClericCapabilities, getRawCapability } from "./registry";
 
 const REGISTERED_CODENAMES = ["DIVA-001"] as const;
 
@@ -12,7 +12,7 @@ const REGISTERED_CODENAMES = ["DIVA-001"] as const;
 function buildKnownSecrets(): string[] {
   const seen = new Set<string>();
   for (const codename of REGISTERED_CODENAMES) {
-    for (const capId of listAgentCapabilities(codename)) {
+    for (const capId of listClericCapabilities(codename)) {
       const cap = getRawCapability(codename, capId);
       for (const v of cap.metadata.requiredEnvVars) seen.add(v);
     }

@@ -2,8 +2,8 @@ import "server-only";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { prisma } from "@/lib/db";
-import { removeBgCapability } from "@/lib/agents/diva-001/remove-bg";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { removeBgCapability } from "@/lib/clerics/diva-001/remove-bg";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { PipelineContext, StepResult } from "../context";
 import type { ExtractZipResult } from "./extractZip";
 
@@ -48,7 +48,7 @@ export async function stepRemoveBg(ctx: PipelineContext): Promise<StepResult<Rem
     try {
       const buf = await fs.readFile(srcAbs);
       const mediaType = mediaTypeFromExt(ext);
-      const out = await removeBgCapability.run(ctx.agent, {
+      const out = await removeBgCapability.run(ctx.cleric, {
         image: { mediaType, base64: buf.toString("base64") },
       });
       const cleanName = `clean-${i + 1}.png`;

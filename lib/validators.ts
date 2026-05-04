@@ -78,3 +78,27 @@ export type AgentUpdateInput = z.infer<typeof agentUpdateSchema>;
 
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
+
+export const skillCreateSchema = z.object({
+  level: z.number().int().min(1).max(6),
+  icon: z.string().min(1).max(64),
+  nameEn: z.string().min(1).max(80),
+  nameZh: z.string().min(1).max(80),
+  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]),
+  costAp: z.number().int().min(0).max(99),
+  descriptionEn: z.string().max(2000),
+  descriptionZh: z.string().max(2000),
+});
+export const skillUpdateSchema = skillCreateSchema.partial();
+
+export const clericSkillEquipSchema = z.object({
+  skillId: z.string().cuid(),
+  unlocked: z.boolean().optional().default(false),
+});
+
+export const clericSkillUnlockSchema = z.object({
+  unlocked: z.boolean(),
+});
+
+export type SkillCreateInput = z.infer<typeof skillCreateSchema>;
+export type SkillUpdateInput = z.infer<typeof skillUpdateSchema>;

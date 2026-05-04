@@ -37,9 +37,10 @@ model User {
   grantsIssued      RelicGrant[]      @relation("RelicGrantGranter")
   vaultProfile      VaultProfile?
   vaultItems        VaultItem[]
-  agentsCreated     Agent[]
-  agentInvocations  AgentInvocation[] @relation("AgentInvocationCaller")
-  agentSecrets      AgentSecret[]
+  clericsCreated    Cleric[]
+  clericInvocations ClericInvocation[] @relation("ClericInvocationCaller")
+  clericSecrets     ClericSecret[]
+  skillsCreated     Skill[]            @relation("SkillCreator")
 }
 
 // End-to-end encrypted vault — server stores only ciphertext.
@@ -219,8 +220,8 @@ model RelicProcessingJob {
   id           String         @id @default(cuid())
   relicId      String
   relic        Relic          @relation(fields: [relicId], references: [id], onDelete: Cascade)
-  agentId      String?
-  agent        Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  clericId     String?
+  cleric       Cleric?        @relation(fields: [clericId], references: [id], onDelete: SetNull)
   status       RelicJobStatus @default(PENDING)
   step         RelicJobStep   @default(ENQUEUED)
   progress     Int            @default(0)
@@ -270,27 +271,33 @@ model RelicUnlock {
   @@index([expiresAt])
 }
 
-enum AgentStatus {
+enum ClericStatus {
   ONLINE
   STANDBY
   OFFLINE
 }
 
-enum AgentProvider {
+enum ClericProvider {
   ANTHROPIC
   OPENAI
   INTERNAL
   ECHO
 }
 
-model Agent {
+enum ClericMode {
+  MECHANICAL
+  AUTONOMOUS
+}
+
+model Cleric {
   id               String               @id @default(cuid())
   serial           Int?                 @unique
   codename         String               @unique
   nameEn           String
   nameZh           String
   classification   String?
-  status           AgentStatus          @default(STANDBY)
+  mode             ClericMode           @default(MECHANICAL)
+  status           ClericStatus         @default(STANDBY)
   avatarUrl        String?
   descriptionEn    String?
   descriptionZh    String?
@@ -303,9 +310,10 @@ model Agent {
   logic            Int                  @default(50)
   compassion       Int                  @default(50)
   skills           Json?
+  skillEquips      ClericSkillEquip[]
   availableAp      Int                  @default(0)
   enabled          Boolean              @default(true)
-  provider         AgentProvider        @default(ECHO)
+  provider         ClericProvider       @default(ECHO)
   model            String?
   systemPrompt     String?
   internalHandler  String?
@@ -316,7 +324,7 @@ model Agent {
   rateLimitPerMin  Int?                 @default(20)
   createdById      String?
   createdBy        User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  invocations      AgentInvocation[]
+  invocations      ClericInvocation[]
   processingJobs   RelicProcessingJob[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -325,7 +333,7 @@ model Agent {
   @@index([enabled, provider])
 }
 
-model AgentSecret {
+model ClericSecret {
   id          String   @id @default(cuid())
   name        String   @unique
   ciphertext  String
@@ -338,12 +346,12 @@ model AgentSecret {
   updatedAt   DateTime @updatedAt
 }
 
-model AgentInvocation {
+model ClericInvocation {
   id           String   @id @default(cuid())
-  agentId      String
-  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  clericId     String
+  cleric       Cleric   @relation(fields: [clericId], references: [id], onDelete: Cascade)
   callerUserId String?
-  caller       User?    @relation("AgentInvocationCaller", fields: [callerUserId], references: [id], onDelete: SetNull)
+  caller       User?    @relation("ClericInvocationCaller", fields: [callerUserId], references: [id], onDelete: SetNull)
   source       String
   inputJson    String
   outputJson   String?
@@ -352,6 +360,46 @@ model AgentInvocation {
   latencyMs    Int?
   createdAt    DateTime @default(now())
 
-  @@index([agentId, createdAt])
+  @@index([clericId, createdAt])
   @@index([callerUserId, createdAt])
+}
+
+enum SkillKind {
+  PASSIVE
+  ACTIVE
+  ULTIMATE
+}
+
+model Skill {
+  id            String             @id @default(cuid())
+  level         Int
+  icon          String             @db.VarChar(64)
+  nameEn        String             @db.VarChar(80)
+  nameZh        String             @db.VarChar(80)
+  kind          SkillKind
+  costAp        Int                @default(0)
+  descriptionEn String             @db.VarChar(2000)
+  descriptionZh String             @db.VarChar(2000)
+  createdById   String?
+  createdBy     User?              @relation("SkillCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  equips        ClericSkillEquip[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([kind])
+  @@index([level])
+}
+
+model ClericSkillEquip {
+  id         String   @id @default(cuid())
+  clericId   String
+  cleric     Cleric   @relation(fields: [clericId], references: [id], onDelete: Cascade)
+  skillId    String
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  unlocked   Boolean  @default(false)
+  equippedAt DateTime @default(now())
+
+  @@unique([clericId, skillId])
+  @@index([clericId])
+  @@index([skillId])
 }

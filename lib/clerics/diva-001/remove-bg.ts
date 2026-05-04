@@ -1,7 +1,7 @@
 import "server-only";
-import type { AgentCapability } from "../types";
+import type { ClericCapability } from "../types";
 import { withInvocationLogging } from "../types";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 
 const ENDPOINT = "https://api.remove.bg/v1.0/removebg";
 
@@ -13,9 +13,9 @@ export type RemoveBgOutput = {
   cleanImage: { mediaType: "image/png"; base64: string };
 };
 
-const baseCapability: AgentCapability<RemoveBgInput, RemoveBgOutput> = {
+const baseCapability: ClericCapability<RemoveBgInput, RemoveBgOutput> = {
   id: "remove-bg",
-  agentCodename: "DIVA-001",
+  clericCodename: "DIVA-001",
   metadata: {
     iconKey: "background_replace",
     nameEn: "Silhouette Lift",
@@ -24,6 +24,7 @@ const baseCapability: AgentCapability<RemoveBgInput, RemoveBgOutput> = {
     descriptionZh: "去除单张照片背景，返回透明底 PNG。",
     provider: "remove.bg",
     requiredEnvVars: ["REMOVE_BG_API_KEY"],
+    autonomyLevel: 0,
   },
   serializeInput(input) {
     return {

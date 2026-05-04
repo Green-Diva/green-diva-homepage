@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AuthError, requireAdmin } from "@/lib/auth";
-import { listSecretStatus, setSecret } from "@/lib/agentSecrets";
-import { ALL_KNOWN_CAPABILITY_SECRETS, isKnownSecretName } from "@/lib/agents/knownSecrets";
+import { listSecretStatus, setSecret } from "@/lib/clericSecrets";
+import { ALL_KNOWN_CAPABILITY_SECRETS, isKnownSecretName } from "@/lib/clerics/knownSecrets";
 
 export async function GET() {
   try {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     await setSecret(parsed.data.name, parsed.data.value, me.id);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[api/admin/agent-secrets POST] failed", e);
+    console.error("[api/admin/cleric-secrets POST] failed", e);
     return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
 }

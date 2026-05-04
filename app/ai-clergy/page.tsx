@@ -1,31 +1,48 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getDictionary } from "@/lib/i18n/server";
 import UserMenu from "@/components/UserMenu";
-import AgentClient from "./AgentClient";
-import type { AgentRow } from "./types";
-import type { AgentSkill } from "@/lib/agentTypes";
-import { getCapabilitySummariesByAgent } from "@/lib/agents/summary";
+import ClericClient from "./ClericClient";
+import type { ClericRow, SkillRow, EquipRow } from "./types";
+import type { ClericSkill } from "@/lib/clericTypes";
+import { getCapabilitySummariesByCleric } from "@/lib/clerics/summary";
 
 export default async function MachineVisionPage() {
   const me = await getCurrentUser();
-  if (!me) redirect("/login?from=/machine-vision");
+  if (!me) redirect("/login?from=/ai-clergy");
   const t = await getDictionary();
 
-  const agents = await prisma.agent.findMany({
-    orderBy: [{ serial: "asc" }, { createdAt: "asc" }],
-    include: { createdBy: { select: { id: true, name: true } } },
-  });
+  const [clerics, skillsRaw, equipRecords] = await Promise.all([
+    prisma.cleric.findMany({
+      orderBy: [{ serial: "asc" }, { createdAt: "asc" }],
+      include: { createdBy: { select: { id: true, name: true } } },
+    }),
+    prisma.skill.findMany({
+      orderBy: [{ level: "asc" }, { kind: "asc" }],
+      include: { createdBy: { select: { id: true, name: true } } },
+    }),
+    prisma.clericSkillEquip.findMany({
+      include: {
+        skill: { include: { createdBy: { select: { id: true, name: true } } } },
+      },
+    }),
+  ]);
 
-  const rows: AgentRow[] = agents.map((a) => ({
+  const capabilitiesByCodename = await getCapabilitySummariesByCleric(
+    clerics.map((c) => ({ id: c.id, codename: c.codename })),
+  );
+
+  const rows: ClericRow[] = clerics.map((a) => ({
     id: a.id,
     serial: a.serial,
     codename: a.codename,
     nameEn: a.nameEn,
     nameZh: a.nameZh,
     classification: a.classification,
+    mode: a.mode,
     status: a.status,
     avatarUrl: a.avatarUrl,
     descriptionEn: a.descriptionEn,
@@ -38,7 +55,7 @@ export default async function MachineVisionPage() {
     bioSync: a.bioSync,
     logic: a.logic,
     compassion: a.compassion,
-    skills: (a.skills as AgentSkill[] | null) ?? null,
+    skills: (a.skills as ClericSkill[] | null) ?? null,
     availableAp: a.availableAp,
     enabled: a.enabled,
     provider: a.provider,
@@ -55,11 +72,48 @@ export default async function MachineVisionPage() {
     createdBy: a.createdBy,
   }));
 
-  const isAdmin = me.level >= ADMIN_LEVEL;
+  const skills: SkillRow[] = skillsRaw.map((s) => ({
+    id: s.id,
+    level: s.level,
+    icon: s.icon,
+    nameEn: s.nameEn,
+    nameZh: s.nameZh,
+    kind: s.kind as SkillRow["kind"],
+    costAp: s.costAp,
+    descriptionEn: s.descriptionEn,
+    descriptionZh: s.descriptionZh,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+    createdBy: s.createdBy,
+  }));
 
-  const capabilitiesByCodename = await getCapabilitySummariesByAgent(
-    rows.map((r) => ({ id: r.id, codename: r.codename })),
-  );
+  const equipsByClericId = equipRecords.reduce<Record<string, EquipRow[]>>((acc, r) => {
+    const equip: EquipRow = {
+      id: r.id,
+      clericId: r.clericId,
+      skillId: r.skillId,
+      skill: {
+        id: r.skill.id,
+        level: r.skill.level,
+        icon: r.skill.icon,
+        nameEn: r.skill.nameEn,
+        nameZh: r.skill.nameZh,
+        kind: r.skill.kind as SkillRow["kind"],
+        costAp: r.skill.costAp,
+        descriptionEn: r.skill.descriptionEn,
+        descriptionZh: r.skill.descriptionZh,
+        createdAt: r.skill.createdAt.toISOString(),
+        updatedAt: r.skill.updatedAt.toISOString(),
+        createdBy: r.skill.createdBy,
+      },
+      unlocked: r.unlocked,
+      equippedAt: r.equippedAt.toISOString(),
+    };
+    (acc[r.clericId] ??= []).push(equip);
+    return acc;
+  }, {});
+
+  const isAdmin = me.level >= ADMIN_LEVEL;
 
   return (
     <div className="flex flex-col flex-1 w-full">
@@ -71,12 +125,12 @@ export default async function MachineVisionPage() {
           Green Diva
         </Link>
         <div className="hidden md:flex items-center gap-4 font-label text-[11px] tracking-[0.3em] text-primary/70 uppercase">
-          <span className="hidden lg:inline text-secondary">{t.machineVision.pageLabel}</span>
+          <span className="hidden lg:inline text-secondary">{t.aiClergy.pageLabel}</span>
           <Link
             href="/"
             className="hover:text-primary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
           >
-            {t.machineVision.backToSanctuary}
+            {t.aiClergy.backToSanctuary}
           </Link>
         </div>
         <div className="flex items-center gap-3 sm:gap-5 md:gap-7">
@@ -92,7 +146,15 @@ export default async function MachineVisionPage() {
         </div>
       </header>
 
-      <AgentClient agents={rows} isAdmin={isAdmin} capabilitiesByCodename={capabilitiesByCodename} />
+      <Suspense fallback={null}>
+        <ClericClient
+          clerics={rows}
+          isAdmin={isAdmin}
+          capabilitiesByCodename={capabilitiesByCodename}
+          skills={skills}
+          equipsByClericId={equipsByClericId}
+        />
+      </Suspense>
     </div>
   );
 }

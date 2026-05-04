@@ -10,13 +10,13 @@ export async function GET() {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
-  const agents = await prisma.agent.findMany({
+  const clerics = await prisma.cleric.findMany({
     orderBy: [{ serial: "asc" }, { createdAt: "asc" }],
     include: {
       createdBy: { select: { id: true, name: true } },
     },
   });
-  return NextResponse.json(agents);
+  return NextResponse.json(clerics);
 }
 
 export async function POST(req: NextRequest) {
@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
   try {
     const created = await prisma.$transaction(async (tx) => {
-      const max = await tx.agent.aggregate({ _max: { serial: true } });
+      const max = await tx.cleric.aggregate({ _max: { serial: true } });
       const nextSerial = (max._max.serial ?? 0) + 1;
-      return tx.agent.create({
+      return tx.cleric.create({
         data: {
           serial: nextSerial,
           codename: data.codename,
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(created, { status: 201 });
   } catch (e) {
-    console.error("[api/agents POST] create failed", e);
+    console.error("[api/clerics POST] create failed", e);
     return NextResponse.json({ error: "create failed" }, { status: 400 });
   }
 }

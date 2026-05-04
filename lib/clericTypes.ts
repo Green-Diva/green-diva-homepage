@@ -1,20 +1,20 @@
-export type AgentSkillKind = "PASSIVE" | "ACTIVE" | "ULTIMATE";
+export type ClericSkillKind = "PASSIVE" | "ACTIVE" | "ULTIMATE";
 
-export type AgentSkillLevel = 1 | 2 | 3 | 4 | 5 | 6;
+export type ClericSkillLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
-export interface AgentSkill {
-  level: AgentSkillLevel;
+export interface ClericSkill {
+  level: ClericSkillLevel;
   icon: string;
   nameEn: string;
   nameZh: string;
-  kind: AgentSkillKind;
+  kind: ClericSkillKind;
   costAp: number;
   descriptionEn: string;
   descriptionZh: string;
   unlocked: boolean;
 }
 
-export const AGENT_STAT_KEYS = [
+export const CLERIC_STAT_KEYS = [
   "quickness",
   "intelligence",
   "neuralLink",
@@ -22,22 +22,22 @@ export const AGENT_STAT_KEYS = [
   "logic",
   "compassion",
 ] as const;
-export type AgentStatKey = (typeof AGENT_STAT_KEYS)[number];
+export type ClericStatKey = (typeof CLERIC_STAT_KEYS)[number];
 
-export type AgentInvokeOk = {
+export type ClericInvokeOk = {
   ok: true;
   output: unknown;
   latencyMs: number;
   invocationId: string;
 };
 
-export type AgentInvokeErr = {
+export type ClericInvokeErr = {
   ok: false;
   error: string;
   latencyMs: number;
   invocationId: string | null;
 };
 
-export type AgentInvokeResult = AgentInvokeOk | AgentInvokeErr;
+export type ClericInvokeResult = ClericInvokeOk | ClericInvokeErr;
 
 export type AgentInvokeSource = "ui-console" | "internal" | "http";

@@ -1,7 +1,7 @@
 import "server-only";
-import type { AgentCapability } from "../types";
+import type { ClericCapability } from "../types";
 import { withInvocationLogging } from "../types";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 
 const ENDPOINT = "https://api.tavily.com/search";
 
@@ -21,9 +21,9 @@ export type WebResearchOutput = {
   snippets: ResearchSnippet[];
 };
 
-const baseCapability: AgentCapability<WebResearchInput, WebResearchOutput> = {
+const baseCapability: ClericCapability<WebResearchInput, WebResearchOutput> = {
   id: "web-research",
-  agentCodename: "DIVA-001",
+  clericCodename: "DIVA-001",
   metadata: {
     iconKey: "travel_explore",
     nameEn: "Sigil Scan",
@@ -32,6 +32,7 @@ const baseCapability: AgentCapability<WebResearchInput, WebResearchOutput> = {
     descriptionZh: "在开放网络搜索相关片段，让 lore 写作有真实来源可依。",
     provider: "tavily",
     requiredEnvVars: ["TAVILY_API_KEY"],
+    autonomyLevel: 1,
   },
   serializeInput(input) {
     return { query: input.query, lang: input.lang ?? "en", maxResults: input.maxResults ?? 5 };

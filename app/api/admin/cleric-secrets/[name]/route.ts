@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, requireAdmin } from "@/lib/auth";
-import { deleteSecret } from "@/lib/agentSecrets";
-import { isKnownSecretName } from "@/lib/agents/knownSecrets";
+import { deleteSecret } from "@/lib/clericSecrets";
+import { isKnownSecretName } from "@/lib/clerics/knownSecrets";
 
 export async function DELETE(
   _req: Request,
@@ -21,7 +21,7 @@ export async function DELETE(
     await deleteSecret(name);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[api/admin/agent-secrets DELETE] failed", e);
+    console.error("[api/admin/cleric-secrets DELETE] failed", e);
     return NextResponse.json({ error: "delete failed" }, { status: 500 });
   }
 }

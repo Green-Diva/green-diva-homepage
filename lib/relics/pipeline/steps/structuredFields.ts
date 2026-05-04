@@ -7,8 +7,8 @@ import {
   structuredNamingCapability,
   type StructuredNamingImage,
   type StructuredNamingMediaType,
-} from "@/lib/agents/diva-001/structured-naming";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+} from "@/lib/clerics/diva-001/structured-naming";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { PipelineContext, StepResult } from "../context";
 import type { RemoveBgResult } from "./removeBg";
 
@@ -52,7 +52,7 @@ export async function stepStructuredFields(
 
   let out;
   try {
-    out = await structuredNamingCapability.run(ctx.agent, { description, images });
+    out = await structuredNamingCapability.run(ctx.cleric, { description, images });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[pipeline/structuredFields] capability failed; using placeholder", msg);

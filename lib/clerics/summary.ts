@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { listAgentCapabilities, getRawCapability } from "./registry";
-import { getConfiguredSecretNames } from "@/lib/agentSecrets";
+import { listClericCapabilities, getRawCapability } from "./registry";
+import { getConfiguredSecretNames } from "@/lib/clericSecrets";
 import type { CapabilityStats, CapabilitySummary } from "./capabilityTypes";
 
 export type { CapabilityStats, CapabilitySummary };
@@ -16,11 +16,11 @@ const EMPTY_STATS: CapabilityStats = {
   last: null,
 };
 
-export async function getCapabilitySummariesForAgent(
+export async function getCapabilitySummariesForCleric(
   codename: string,
-  agentId: string,
+  clericId: string,
 ): Promise<CapabilitySummary[]> {
-  const ids = listAgentCapabilities(codename);
+  const ids = listClericCapabilities(codename);
   if (ids.length === 0) return [];
 
   const allRequiredEnvVars = new Set<string>();
@@ -30,8 +30,8 @@ export async function getCapabilitySummariesForAgent(
   }
 
   const [recent, configuredSecrets] = await Promise.all([
-    prisma.agentInvocation.findMany({
-      where: { agentId, source: { in: ids.map((id) => `capability:${id}`) } },
+    prisma.clericInvocation.findMany({
+      where: { clericId, source: { in: ids.map((id) => `capability:${id}`) } },
       orderBy: { createdAt: "desc" },
       take: RECENT_INVOCATION_WINDOW * ids.length,
       select: { source: true, ok: true, latencyMs: true, createdAt: true },
@@ -55,7 +55,7 @@ export async function getCapabilitySummariesForAgent(
     const invs = bySource.get(`capability:${id}`) ?? [];
     return {
       id,
-      agentCodename: codename,
+      clericCodename: codename,
       metadata: meta,
       envOk: missingEnvVars.length === 0,
       missingEnvVars,
@@ -64,13 +64,13 @@ export async function getCapabilitySummariesForAgent(
   });
 }
 
-export async function getCapabilitySummariesByAgent(
-  agents: Array<{ id: string; codename: string }>,
+export async function getCapabilitySummariesByCleric(
+  clerics: Array<{ id: string; codename: string }>,
 ): Promise<Record<string, CapabilitySummary[]>> {
   const out: Record<string, CapabilitySummary[]> = {};
   await Promise.all(
-    agents.map(async (a) => {
-      out[a.codename] = await getCapabilitySummariesForAgent(a.codename, a.id);
+    clerics.map(async (a) => {
+      out[a.codename] = await getCapabilitySummariesForCleric(a.codename, a.id);
     }),
   );
   return out;

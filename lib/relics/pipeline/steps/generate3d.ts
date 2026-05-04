@@ -2,12 +2,12 @@ import "server-only";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { prisma } from "@/lib/db";
-import { imageTo3dCapability } from "@/lib/agents/diva-001/image-to-3d";
+import { imageTo3dCapability } from "@/lib/clerics/diva-001/image-to-3d";
 import type {
   StructuredNamingImage,
   StructuredNamingMediaType,
-} from "@/lib/agents/diva-001/structured-naming";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+} from "@/lib/clerics/diva-001/structured-naming";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { PipelineContext, StepResult } from "../context";
 import type { RemoveBgResult } from "./removeBg";
 
@@ -59,7 +59,7 @@ export async function stepGenerate3d(
   }
 
   try {
-    const out = await imageTo3dCapability.run(ctx.agent, { images });
+    const out = await imageTo3dCapability.run(ctx.cleric, { images });
     const dst = path.join(ctx.dirs.derived, MODEL_FILE_NAME);
     await fs.writeFile(dst, out.glb);
     const modelRelativePath = `/${ctx.relic.slug}/derived/${MODEL_FILE_NAME}`;

@@ -229,12 +229,13 @@ const RELIC_SEEDS = [
   },
 ];
 
-const AGENT_SEEDS = [
+const CLERIC_SEEDS = [
   {
     codename: "DIVA-001",
     nameEn: "Neural Operator",
     nameZh: "神经网络接线员",
     classification: "TACTICAL",
+    mode: "MECHANICAL" as const,
     status: "ONLINE" as const,
     descriptionEn:
       "Primary interface to the Green Diva inference fabric. Handles low-latency cognition tasks across the sanctum.",
@@ -254,8 +255,8 @@ const AGENT_SEEDS = [
       { level: 2, icon: "psychology", nameEn: "Pattern Reader", nameZh: "模式解读", kind: "PASSIVE", costAp: 2, descriptionEn: "Improves inference on noisy inputs.", descriptionZh: "提升嘈杂输入下的推断能力。", unlocked: true },
       { level: 3, icon: "speed", nameEn: "Neural Overclock", nameZh: "神经超频", kind: "PASSIVE", costAp: 3, descriptionEn: "Boosts active-node processing by 15% at the cost of slight feedback decay.", descriptionZh: "提升活跃节点处理速度 15%，代价是轻微的反馈衰减。", unlocked: true },
       { level: 4, icon: "shield", nameEn: "Drift Shield", nameZh: "漂移护盾", kind: "ACTIVE", costAp: 4, descriptionEn: "Halts context drift in long sessions.", descriptionZh: "阻止长会话中的上下文漂移。", unlocked: false },
-      { level: 5, icon: "hub", nameEn: "Hive Convergence", nameZh: "蜂巢汇流", kind: "ACTIVE", costAp: 5, descriptionEn: "Coordinates distributed agents through a shared scratchpad.", descriptionZh: "通过共享记事板协调分布式代理。", unlocked: false },
-      { level: 6, icon: "lock", nameEn: "Sanctum Lock", nameZh: "圣殿封印", kind: "ULTIMATE", costAp: 8, descriptionEn: "Locks the agent's weights against runtime tampering.", descriptionZh: "在运行时锁定代理权重，防篡改。", unlocked: false },
+      { level: 5, icon: "hub", nameEn: "Hive Convergence", nameZh: "蜂巢汇流", kind: "ACTIVE", costAp: 5, descriptionEn: "Coordinates distributed clerics through a shared scratchpad.", descriptionZh: "通过共享记事板协调分布式神职。", unlocked: false },
+      { level: 6, icon: "lock", nameEn: "Sanctum Lock", nameZh: "圣殿封印", kind: "ULTIMATE", costAp: 8, descriptionEn: "Locks the cleric's weights against runtime tampering.", descriptionZh: "在运行时锁定神职权重，防篡改。", unlocked: false },
     ],
     enabled: true,
     provider: "ECHO" as const,
@@ -268,6 +269,7 @@ const AGENT_SEEDS = [
     nameEn: "Seer Analyst",
     nameZh: "先知分析师",
     classification: "VISION",
+    mode: "MECHANICAL" as const,
     status: "STANDBY" as const,
     descriptionEn: "Long-horizon forecaster. Reads weak signals across logs and timelines.",
     descriptionZh: "长程预测者。在日志与时间线之间读取微弱信号。",
@@ -298,6 +300,7 @@ const AGENT_SEEDS = [
     nameEn: "Data Guardian",
     nameZh: "数据守护者",
     classification: "SUPPORT",
+    mode: "MECHANICAL" as const,
     status: "STANDBY" as const,
     descriptionEn: "Watches integrity, redactions, and PII leakage across requests.",
     descriptionZh: "守护各请求的完整性、脱敏与个人数据泄露。",
@@ -328,8 +331,9 @@ const AGENT_SEEDS = [
     nameEn: "Resonance Coordinator",
     nameZh: "共振协调者",
     classification: "SUPPORT",
+    mode: "MECHANICAL" as const,
     status: "OFFLINE" as const,
-    descriptionEn: "Choreographs multi-agent rituals — fan-out, gather, reconcile.",
+    descriptionEn: "Choreographs multi-cleric rituals — fan-out, gather, reconcile.",
     descriptionZh: "编排多代理仪轨——分发、汇聚、调和。",
     syncLevel: 65.4,
     matrixLevel: 7,
@@ -341,30 +345,64 @@ const AGENT_SEEDS = [
     compassion: 78,
     availableAp: 5,
     skills: [
-      { level: 1, icon: "groups", nameEn: "Fan-Out", nameZh: "齐声分发", kind: "ACTIVE", costAp: 2, descriptionEn: "Dispatches a task to N peer agents.", descriptionZh: "向 N 个对等代理派发任务。", unlocked: true },
+      { level: 1, icon: "groups", nameEn: "Fan-Out", nameZh: "齐声分发", kind: "ACTIVE", costAp: 2, descriptionEn: "Dispatches a task to N peer clerics.", descriptionZh: "向 N 个对等神职派发任务。", unlocked: true },
       { level: 2, icon: "merge", nameEn: "Reconcile", nameZh: "和声调和", kind: "ACTIVE", costAp: 3, descriptionEn: "Merges N replies into a single answer.", descriptionZh: "将 N 个回复合并为单一答复。", unlocked: false },
-      { level: 3, icon: "handshake", nameEn: "Consensus Pulse", nameZh: "共识脉动", kind: "ACTIVE", costAp: 4, descriptionEn: "Polls agents until majority converges.", descriptionZh: "轮询代理直至多数收敛。", unlocked: false },
-      { level: 4, icon: "tune", nameEn: "Tempo Lock", nameZh: "节拍锁定", kind: "PASSIVE", costAp: 3, descriptionEn: "Throttles peer agents to a steady cadence.", descriptionZh: "将对等代理节流至稳定节拍。", unlocked: false },
+      { level: 3, icon: "handshake", nameEn: "Consensus Pulse", nameZh: "共识脉动", kind: "ACTIVE", costAp: 4, descriptionEn: "Polls clerics until majority converges.", descriptionZh: "轮询神职直至多数收敛。", unlocked: false },
+      { level: 4, icon: "tune", nameEn: "Tempo Lock", nameZh: "节拍锁定", kind: "PASSIVE", costAp: 3, descriptionEn: "Throttles peer clerics to a steady cadence.", descriptionZh: "将对等神职节流至稳定节拍。", unlocked: false },
       { level: 5, icon: "podcasts", nameEn: "Broadcast Choir", nameZh: "广播圣咏", kind: "ULTIMATE", costAp: 6, descriptionEn: "Broadcasts a directive across the entire fabric.", descriptionZh: "向整片织域广播指令。", unlocked: false },
-      { level: 6, icon: "all_inclusive", nameEn: "Eternal Loop", nameZh: "永恒回环", kind: "ULTIMATE", costAp: 9, descriptionEn: "Maintains a self-healing agent loop indefinitely.", descriptionZh: "无限维持一个自愈代理回环。", unlocked: false },
+      { level: 6, icon: "all_inclusive", nameEn: "Eternal Loop", nameZh: "永恒回环", kind: "ULTIMATE", costAp: 9, descriptionEn: "Maintains a self-healing cleric loop indefinitely.", descriptionZh: "无限维持一个自愈神职回环。", unlocked: false },
     ],
     enabled: false,
     provider: "ECHO" as const,
-    systemPrompt: "You are CHOIR-13, a resonance coordinator. Orchestrate multi-agent flows.",
+    systemPrompt: "You are CHOIR-13, a resonance coordinator. Orchestrate multi-cleric flows.",
     inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+  },
+  {
+    codename: "AURORA-Φ",
+    nameEn: "Sovereign Strategos",
+    nameZh: "自主策动师",
+    classification: "STRATEGIC",
+    mode: "AUTONOMOUS" as const,
+    status: "STANDBY" as const,
+    descriptionEn:
+      "Receives a goal and self-composes capability chains to reach it — no fixed pipeline. Plans, acts, observes, replans until done.",
+    descriptionZh:
+      "接收目标，自行编排能力链条以达成；无固定流水线。规划、执行、观测、再规划，直至完成。",
+    syncLevel: 87.4,
+    matrixLevel: 11,
+    quickness: 73,
+    intelligence: 96,
+    neuralLink: 91,
+    bioSync: 58,
+    logic: 94,
+    compassion: 65,
+    availableAp: 6,
+    skills: [
+      { level: 1, icon: "track_changes", nameEn: "Goal Anchor", nameZh: "目标锚定", kind: "PASSIVE", costAp: 2, descriptionEn: "Locks in a goal and refuses scope drift.", descriptionZh: "锁定目标并拒绝任务漂移。", unlocked: true },
+      { level: 2, icon: "fork_right", nameEn: "Branching Plan", nameZh: "分支规划", kind: "ACTIVE", costAp: 3, descriptionEn: "Generates multiple execution paths and picks the best.", descriptionZh: "生成多条执行路径并择优而行。", unlocked: true },
+      { level: 3, icon: "loop", nameEn: "Reflexion Loop", nameZh: "自省循环", kind: "ACTIVE", costAp: 4, descriptionEn: "Self-evaluates output and revises until quality threshold met.", descriptionZh: "自评输出并反复修订，直至达标。", unlocked: false },
+      { level: 4, icon: "build", nameEn: "Tool Forge", nameZh: "工具铸造", kind: "ACTIVE", costAp: 5, descriptionEn: "Synthesises ad-hoc capability invocations on the fly.", descriptionZh: "临场合成能力调用序列。", unlocked: false },
+      { level: 5, icon: "hub", nameEn: "Sub-Agent Spawn", nameZh: "子智能体派生", kind: "ULTIMATE", costAp: 7, descriptionEn: "Spawns specialised sub-clerics for parallel sub-goals.", descriptionZh: "派生专职子神职并行处理子目标。", unlocked: false },
+      { level: 6, icon: "auto_awesome", nameEn: "Emergent Synthesis", nameZh: "涌现综合", kind: "ULTIMATE", costAp: 9, descriptionEn: "Composes novel capability sequences unseen in training.", descriptionZh: "组合训练中未见过的新颖能力序列。", unlocked: false },
+    ],
+    enabled: false,
+    provider: "ECHO" as const,
+    systemPrompt: "You are AURORA-Φ, a sovereign strategos. Given a goal, plan and execute capability sequences autonomously, reflecting and replanning as needed.",
+    inputSchemaJson: '{"type":"object","properties":{"goal":{"type":"string"}},"required":["goal"]}',
   },
 ];
 
-async function seedAgents(creatorId: string | null) {
-  for (const a of AGENT_SEEDS) {
-    const existing = await prisma.agent.findUnique({ where: { codename: a.codename } });
+async function seedClerics(creatorId: string | null) {
+  for (const a of CLERIC_SEEDS) {
+    const existing = await prisma.cleric.findUnique({ where: { codename: a.codename } });
     if (existing) {
-      await prisma.agent.update({
+      await prisma.cleric.update({
         where: { codename: a.codename },
         data: {
           nameEn: a.nameEn,
           nameZh: a.nameZh,
           classification: a.classification,
+          mode: a.mode,
           status: a.status,
           descriptionEn: a.descriptionEn,
           descriptionZh: a.descriptionZh,
@@ -386,15 +424,16 @@ async function seedAgents(creatorId: string | null) {
         },
       });
     } else {
-      const max = await prisma.agent.aggregate({ _max: { serial: true } });
+      const max = await prisma.cleric.aggregate({ _max: { serial: true } });
       const nextSerial = (max._max.serial ?? 0) + 1;
-      await prisma.agent.create({
+      await prisma.cleric.create({
         data: {
           serial: nextSerial,
           codename: a.codename,
           nameEn: a.nameEn,
           nameZh: a.nameZh,
           classification: a.classification,
+          mode: a.mode,
           status: a.status,
           descriptionEn: a.descriptionEn,
           descriptionZh: a.descriptionZh,
@@ -418,7 +457,7 @@ async function seedAgents(creatorId: string | null) {
       });
     }
   }
-  console.log(`Seeded ${AGENT_SEEDS.length} agents (provider=ECHO, no external API calls).`);
+  console.log(`Seeded ${CLERIC_SEEDS.length} clerics (provider=ECHO, no external API calls).`);
 }
 
 async function seedRelics() {
@@ -496,7 +535,7 @@ async function main() {
   }
 
   await seedRelics();
-  await seedAgents(adminId);
+  await seedClerics(adminId);
 }
 
 main()

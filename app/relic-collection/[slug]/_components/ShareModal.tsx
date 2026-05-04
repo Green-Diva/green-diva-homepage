@@ -67,9 +67,9 @@ export default function ShareModal({ relicId, relicName, onClose, onFinish }: Pr
     };
   }, [onClose]);
 
-  if (typeof document === "undefined") return null;
-
   const initialSharedSet = useMemo(() => new Set(shares.map((s) => s.userId)), [shares]);
+
+  if (typeof document === "undefined") return null;
 
   function queueConfirm() {
     if (!confirmAction) return;

@@ -45,7 +45,7 @@ export interface Dictionary {
     enterFrame: string;
     sacredArtifact: string;
     relicCollectionTitle: string;
-    machineVisionTitle: string;
+    aiClergyTitle: string;
     syntheticHallucinations: string;
     neuralSync: string;
   };
@@ -288,16 +288,24 @@ export interface Dictionary {
     cellProcessing: string;
     viewerForging: string;
   };
-  machineVision: {
+  aiClergy: {
     pageLabel: string;
     pageTitle: string;
     pageSubtitle: string; // {{filled}}/{{total}}
     backToSanctuary: string;
-    agentCluster: string;
-    unlockAgent: string;
+    clericRoster: string;
+    ordainCleric: string;
     statusOnline: string;
     statusStandby: string;
     statusOffline: string;
+    modeMechanical: string;
+    modeAutonomous: string;
+    modeMechanicalHint: string;
+    modeAutonomousHint: string;
+    autonomyL0: string;
+    autonomyL1: string;
+    autonomyL2: string;
+    autonomyL3: string;
     classLabel: string;
     syncLevel: string;
     matrixLevel: string;
@@ -340,7 +348,7 @@ export interface Dictionary {
     confirmRemove: string; // {{name}}
     deleteFailed: string;
     emptyState: string;
-    noAgentSelected: string;
+    noClericSelected: string;
     editorNewLabel: string;
     editorNewTitle: string;
     editorEditLabel: string;
@@ -388,6 +396,28 @@ export interface Dictionary {
     invokeAdminOnly: string;
     invokeRateLimited: string;
     invokeBadJson: string;
+    tabClerics: string;
+    tabSkillLibrary: string;
+    skillLibraryTitle: string;
+    skillKindPassive: string;
+    skillKindActive: string;
+    skillKindUltimate: string;
+    skillLevel: string;
+    skillCostAp: string;
+    skillEquip: string;
+    skillUnequip: string;
+    skillUnlock: string;
+    skillLock: string;
+    skillEquipped: string;
+    skillCreateNew: string;
+    skillEdit: string;
+    skillDeleteConfirm: string;
+    skillDeleteFailed: string;
+    skillSaveFailed: string;
+    skillEquippedSkills: string;
+    skillEquipFromLibrary: string;
+    skillEmptyEquipped: string;
+    skillEmptyLibrary: string;
   };
   adminRelics: {
     pageTitle: string;

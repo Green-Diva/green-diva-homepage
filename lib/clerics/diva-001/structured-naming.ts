@@ -1,8 +1,8 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import type { AgentCapability } from "../types";
+import type { ClericCapability } from "../types";
 import { withInvocationLogging } from "../types";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 
 const SYSTEM_PROMPT = `You are the Cataloguer of the Green Diva Sanctuary's relic vault. Given a brief description and one or more photos of a personal item, you propose vault catalogue entries based on the combined visual + textual evidence.
 
@@ -50,9 +50,9 @@ async function getClient(): Promise<Anthropic> {
   return new Anthropic({ apiKey: key });
 }
 
-const baseCapability: AgentCapability<StructuredNamingInput, StructuredNamingOutput> = {
+const baseCapability: ClericCapability<StructuredNamingInput, StructuredNamingOutput> = {
   id: "structured-naming",
-  agentCodename: "DIVA-001",
+  clericCodename: "DIVA-001",
   metadata: {
     iconKey: "psychology",
     nameEn: "Cataloguer",
@@ -61,6 +61,7 @@ const baseCapability: AgentCapability<StructuredNamingInput, StructuredNamingOut
     descriptionZh: "读图与描述，给出中英名号、副标、品阶、图标，结构化为一条 JSON。",
     provider: "anthropic",
     requiredEnvVars: ["ANTHROPIC_API_KEY"],
+    autonomyLevel: 1,
   },
   serializeInput(input) {
     return {
@@ -68,7 +69,7 @@ const baseCapability: AgentCapability<StructuredNamingInput, StructuredNamingOut
       imageCount: input.images.length,
     };
   },
-  async run(agent, input) {
+  async run(cleric, input) {
     const c = await getClient();
 
     type Block =
@@ -89,15 +90,15 @@ const baseCapability: AgentCapability<StructuredNamingInput, StructuredNamingOut
       text: input.description.trim() || "(no description provided — infer from the photos)",
     });
 
-    const overlay = (agent.systemPrompt ?? "").trim();
+    const overlay = (cleric.systemPrompt ?? "").trim();
     const systemText = overlay
       ? `${SYSTEM_PROMPT}\n\n--- Style overlay (do not break the JSON contract above) ---\n${overlay}`
       : SYSTEM_PROMPT;
 
     const resp = await c.messages.create({
-      model: agent.model ?? "claude-haiku-4-5-20251001",
-      max_tokens: agent.maxTokens ?? 800,
-      temperature: agent.temperature ?? 0.7,
+      model: cleric.model ?? "claude-haiku-4-5-20251001",
+      max_tokens: cleric.maxTokens ?? 800,
+      temperature: cleric.temperature ?? 0.7,
       system: [
         {
           type: "text",

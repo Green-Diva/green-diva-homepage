@@ -36,12 +36,12 @@ export default function SecretDialog({ name, onClose, onSaved }: Props) {
     e.preventDefault();
     setError(null);
     if (!value.trim()) {
-      setError(t.machineVision.secretEmptyValue);
+      setError(t.aiClergy.secretEmptyValue);
       return;
     }
     setSubmitting(true);
     try {
-      const r = await fetch("/api/admin/agent-secrets", {
+      const r = await fetch("/api/admin/cleric-secrets", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -49,14 +49,14 @@ export default function SecretDialog({ name, onClose, onSaved }: Props) {
       });
       if (!r.ok) {
         setSubmitting(false);
-        setError(t.machineVision.secretSaveFailed);
+        setError(t.aiClergy.secretSaveFailed);
         return;
       }
       onSaved();
     } catch (err) {
       console.error("[SecretDialog] save failed", err);
       setSubmitting(false);
-      setError(t.machineVision.secretSaveFailed);
+      setError(t.aiClergy.secretSaveFailed);
     }
   }
 
@@ -75,10 +75,10 @@ export default function SecretDialog({ name, onClose, onSaved }: Props) {
       >
         <div>
           <h2 className="text-primary text-xl tracking-wider">
-            {format(t.machineVision.secretDialogTitle, { name })}
+            {format(t.aiClergy.secretDialogTitle, { name })}
           </h2>
           <p className="mt-2 text-[12px] text-on-surface-variant leading-relaxed">
-            {t.machineVision.secretDialogHint}
+            {t.aiClergy.secretDialogHint}
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export default function SecretDialog({ name, onClose, onSaved }: Props) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={submitting}
-            placeholder={t.machineVision.secretDialogPlaceholder}
+            placeholder={t.aiClergy.secretDialogPlaceholder}
             className="w-full bg-background/60 border border-primary/30 px-3 py-2 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:border-primary font-mono"
           />
         </div>
@@ -112,14 +112,14 @@ export default function SecretDialog({ name, onClose, onSaved }: Props) {
             disabled={submitting}
             className="px-4 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant hover:text-on-surface disabled:opacity-40"
           >
-            {t.machineVision.secretDialogCancel}
+            {t.aiClergy.secretDialogCancel}
           </button>
           <button
             type="submit"
             disabled={submitting || !value.trim()}
             className="px-6 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-background bg-secondary hover:bg-secondary/90 disabled:bg-on-surface-variant/30 disabled:text-on-surface-variant disabled:cursor-not-allowed"
           >
-            {submitting ? t.machineVision.secretDialogSaving : t.machineVision.secretDialogSave}
+            {submitting ? t.aiClergy.secretDialogSaving : t.aiClergy.secretDialogSave}
           </button>
         </div>
       </form>

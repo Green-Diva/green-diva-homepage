@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
 
   const slotRaw = form.get("slot");
   const description = String(form.get("description") ?? "").slice(0, MAX_DESCRIPTION);
-  const agentCodename =
-    String(form.get("agentCodename") ?? "").trim() || DEFAULT_AGENT_CODENAME;
+  const clericCodename =
+    String(form.get("clericCodename") ?? "").trim() || DEFAULT_AGENT_CODENAME;
   const archive = form.get("archive");
 
   const slot = Number(slotRaw);
@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "slot occupied" }, { status: 409 });
   }
 
-  const agent = await prisma.agent.findUnique({ where: { codename: agentCodename } });
-  if (!agent || !agent.enabled || agent.status === "OFFLINE") {
-    return NextResponse.json({ error: "agent unavailable" }, { status: 503 });
+  const cleric = await prisma.cleric.findUnique({ where: { codename: clericCodename } });
+  if (!cleric || !cleric.enabled || cleric.status === "OFFLINE") {
+    return NextResponse.json({ error: "cleric unavailable" }, { status: 503 });
   }
 
   const slugSuffix = crypto.randomBytes(4).toString("hex").slice(0, 6);
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       const job = await tx.relicProcessingJob.create({
         data: {
           relicId: relic.id,
-          agentId: agent.id,
+          clericId: cleric.id,
           status: "PENDING",
           step: "ENQUEUED",
           progress: 0,
@@ -127,13 +127,13 @@ export async function POST(req: NextRequest) {
       action: "CREATED",
       relic: { id: relicId, slug, name: created.relic.nameEn },
       actor: { id: me.id, name: me.name },
-      details: { slot, draft: true, agentCodename },
+      details: { slot, draft: true, clericCodename },
     });
     await recordRelicLog({
       action: "PROCESSING_STARTED",
       relic: { id: relicId, slug, name: created.relic.nameEn },
       actor: { id: me.id, name: me.name },
-      details: { agentCodename, jobId },
+      details: { clericCodename, jobId },
     });
   } catch (e) {
     console.error("[api/relics/draft] db failed", e);

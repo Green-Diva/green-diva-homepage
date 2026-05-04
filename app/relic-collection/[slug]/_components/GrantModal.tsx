@@ -67,9 +67,9 @@ export default function GrantModal({ relicId, relicName, onClose, onFinish }: Pr
     };
   }, [onClose]);
 
-  if (typeof document === "undefined") return null;
-
   const initialGrantedSet = useMemo(() => new Set(grants.map((g) => g.user.id)), [grants]);
+
+  if (typeof document === "undefined") return null;
 
   function queueConfirm() {
     if (!confirmAction) return;

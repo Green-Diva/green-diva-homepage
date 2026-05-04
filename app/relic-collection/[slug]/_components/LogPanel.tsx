@@ -38,12 +38,8 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
   const t = useT();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [lang, setLang] = useState<"zh" | "en">("en");
+  const [lang] = useState<"zh" | "en">(() => detectLang());
   const [page, setPage] = useState(0);
-
-  useEffect(() => {
-    setLang(detectLang());
-  }, []);
 
   useEffect(() => {
     fetch(`/api/relics/${relicId}/log`)

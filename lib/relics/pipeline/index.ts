@@ -75,18 +75,18 @@ async function runInner(
 ): Promise<void> {
   const initial = await prisma.relicProcessingJob.findUnique({
     where: { id: jobId },
-    include: { relic: true, agent: true },
+    include: { relic: true, cleric: true },
   });
   if (!initial) {
     console.warn("[pipeline] job vanished before start", { jobId });
     return;
   }
-  if (!initial.agent) {
+  if (!initial.cleric) {
     await prisma.relicProcessingJob.update({
       where: { id: jobId },
       data: {
         status: "FAILED",
-        errorMessage: "no agent attached to job",
+        errorMessage: "no cleric attached to job",
         finishedAt: new Date(),
       },
     });
@@ -130,10 +130,10 @@ async function runInner(
     // Reload the relic + job to pick up upstream writes.
     const fresh = await prisma.relicProcessingJob.findUnique({
       where: { id: jobId },
-      include: { relic: true, agent: true },
+      include: { relic: true, cleric: true },
     });
-    if (!fresh || !fresh.agent) {
-      throw new Error("job or agent vanished mid-pipeline");
+    if (!fresh || !fresh.cleric) {
+      throw new Error("job or cleric vanished mid-pipeline");
     }
     if (fresh.status === "CANCELLED") {
       console.warn("[pipeline] cancelled mid-run", { jobId });
@@ -148,7 +148,7 @@ async function runInner(
     const ctx: PipelineContext = {
       job: fresh,
       relic: fresh.relic,
-      agent: fresh.agent,
+      cleric: fresh.cleric,
       dirs,
       results,
     };

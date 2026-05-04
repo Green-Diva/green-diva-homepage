@@ -1,6 +1,6 @@
 import "server-only";
-import { webResearchCapability } from "@/lib/agents/diva-001/web-research";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { webResearchCapability } from "@/lib/clerics/diva-001/web-research";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import type { PipelineContext, StepResult } from "../context";
 import type { StructuredFieldsResult } from "./structuredFields";
 
@@ -37,7 +37,7 @@ export async function stepWebResearch(
   const query = queryParts.join(" — ").trim() || ctx.relic.nameEn;
 
   try {
-    const out = await webResearchCapability.run(ctx.agent, { query, maxResults: 5 });
+    const out = await webResearchCapability.run(ctx.cleric, { query, maxResults: 5 });
     return {
       ok: true,
       data: { snippets: out.snippets, status: "succeeded", query },

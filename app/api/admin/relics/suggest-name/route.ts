@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getSecretOrEnv } from "@/lib/agentSecrets";
+import { getSecretOrEnv } from "@/lib/clericSecrets";
 import {
   parseImageDataUrl,
   structuredNamingCapability,
   type StructuredNamingImage,
-} from "@/lib/agents/diva-001/structured-naming";
+} from "@/lib/clerics/diva-001/structured-naming";
 
 // Per-IP rate limit (in-memory; single-instance only — see CLAUDE.md note).
 const FAIL_DELAY_MS = 600;
@@ -69,11 +69,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ai-not-configured" }, { status: 503 });
   }
 
-  const diva = await prisma.agent.findUnique({
-    where: { codename: structuredNamingCapability.agentCodename },
+  const diva = await prisma.cleric.findUnique({
+    where: { codename: structuredNamingCapability.clericCodename },
   });
   if (!diva || !diva.enabled || diva.status === "OFFLINE") {
-    return NextResponse.json({ error: "agent-unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "cleric-unavailable" }, { status: 503 });
   }
 
   const images: StructuredNamingImage[] = [];

@@ -26,7 +26,7 @@ function getKek(): Buffer {
       "AGENT_SECRETS_KEK (or SAFETY_SECRET fallback) missing or too short (>=16 chars)",
     );
   }
-  cachedKek = createHash("sha256").update("agent-secret-v1\0" + seed).digest();
+  cachedKek = createHash("sha256").update("cleric-secret-v1\0" + seed).digest();
   return cachedKek;
 }
 
@@ -60,7 +60,7 @@ export async function setSecret(
   }
   const enc = encrypt(value);
   const hint = value.length <= 4 ? "••••" : value.slice(-4);
-  await prisma.agentSecret.upsert({
+  await prisma.clericSecret.upsert({
     where: { name },
     create: {
       name,
@@ -81,7 +81,7 @@ export async function setSecret(
 }
 
 export async function deleteSecret(name: string): Promise<void> {
-  await prisma.agentSecret.delete({ where: { name } }).catch(() => {
+  await prisma.clericSecret.delete({ where: { name } }).catch(() => {
     // already gone or never existed — idempotent
   });
 }
@@ -91,12 +91,12 @@ export async function deleteSecret(name: string): Promise<void> {
  * normally use `getSecretOrEnv` instead so .env is honoured as a fallback.
  */
 export async function getDbSecret(name: string): Promise<string | null> {
-  const row = await prisma.agentSecret.findUnique({ where: { name } });
+  const row = await prisma.clericSecret.findUnique({ where: { name } });
   if (!row) return null;
   try {
     return decrypt(row);
   } catch (e) {
-    console.error("[agentSecrets] decrypt failed; secret unusable", { name, e });
+    console.error("[clericSecrets] decrypt failed; secret unusable", { name, e });
     return null;
   }
 }
@@ -128,7 +128,7 @@ export type ConfiguredSecret = {
  */
 export async function getConfiguredSecretNames(names: string[]): Promise<Set<string>> {
   if (names.length === 0) return new Set();
-  const rows = await prisma.agentSecret.findMany({
+  const rows = await prisma.clericSecret.findMany({
     where: { name: { in: names } },
     select: { name: true },
   });
@@ -145,7 +145,7 @@ export async function getConfiguredSecretNames(names: string[]): Promise<Set<str
  * just configuration status + a hint suffix for UI affordance.
  */
 export async function listSecretStatus(names: string[]): Promise<ConfiguredSecret[]> {
-  const rows = await prisma.agentSecret.findMany({
+  const rows = await prisma.clericSecret.findMany({
     where: { name: { in: names } },
     select: { name: true, hint: true, updatedAt: true },
   });

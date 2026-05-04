@@ -1,42 +1,42 @@
 import "server-only";
-import type { Agent } from "@prisma/client";
+import type { Cleric } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import type { AgentCapabilityMeta } from "./capabilityTypes";
+import type { ClericCapabilityMeta } from "./capabilityTypes";
 
-export type { AgentCapabilityMeta };
+export type { ClericCapabilityMeta };
 
-export interface AgentCapability<TInput, TOutput> {
+export interface ClericCapability<TInput, TOutput> {
   id: string;
-  agentCodename: string;
-  metadata: AgentCapabilityMeta;
-  run(agent: Agent, input: TInput): Promise<TOutput>;
+  clericCodename: string;
+  metadata: ClericCapabilityMeta;
+  run(cleric: Cleric, input: TInput): Promise<TOutput>;
   serializeInput?(input: TInput): unknown;
   serializeOutput?(output: TOutput): unknown;
 }
 
-export class AgentCapabilityNotFound extends Error {
+export class ClericCapabilityNotFound extends Error {
   constructor(codename: string, capabilityId: string) {
-    super(`Agent ${codename} does not provide capability '${capabilityId}'`);
-    this.name = "AgentCapabilityNotFound";
+    super(`Cleric ${codename} does not provide capability '${capabilityId}'`);
+    this.name = "ClericCapabilityNotFound";
   }
 }
 
 export function withInvocationLogging<I, O>(
-  capability: AgentCapability<I, O>,
-): AgentCapability<I, O> {
+  capability: ClericCapability<I, O>,
+): ClericCapability<I, O> {
   return {
     id: capability.id,
-    agentCodename: capability.agentCodename,
+    clericCodename: capability.clericCodename,
     metadata: capability.metadata,
     serializeInput: capability.serializeInput,
     serializeOutput: capability.serializeOutput,
-    async run(agent, input) {
+    async run(cleric, input) {
       const startedAt = Date.now();
       let output: O | undefined;
       let ok = false;
       let errorMessage: string | null = null;
       try {
-        output = await capability.run(agent, input);
+        output = await capability.run(cleric, input);
         ok = true;
         return output;
       } catch (e) {
@@ -50,10 +50,10 @@ export function withInvocationLogging<I, O>(
         const serializedOutput = ok && output !== undefined && capability.serializeOutput
           ? capability.serializeOutput(output)
           : output;
-        prisma.agentInvocation
+        prisma.clericInvocation
           .create({
             data: {
-              agentId: agent.id,
+              clericId: cleric.id,
               source: `capability:${capability.id}`,
               inputJson: safeStringify(serializedInput),
               outputJson: ok ? safeStringify(serializedOutput) : null,

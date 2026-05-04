@@ -4,31 +4,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { AgentRow, AgentProvider, AgentStatus } from "../types";
+import type { ClericRow, ClericProvider, ClericStatus } from "../types";
 
 type Mode = "create" | "edit";
 
 type Props = {
   mode: Mode;
-  initial: AgentRow | null;
+  initial: ClericRow | null;
   onClose: () => void;
   onSaved: () => void;
 };
 
-const PROVIDERS: AgentProvider[] = ["ECHO", "INTERNAL", "ANTHROPIC", "OPENAI"];
-const STATUSES: AgentStatus[] = ["ONLINE", "STANDBY", "OFFLINE"];
+const PROVIDERS: ClericProvider[] = ["ECHO", "INTERNAL", "ANTHROPIC", "OPENAI"];
+const STATUSES: ClericStatus[] = ["ONLINE", "STANDBY", "OFFLINE"];
 
 const inputCls =
   "mt-1 w-full rounded-md border border-primary/20 bg-surface-container px-3 py-2 text-sm text-on-surface focus:border-primary/60 focus:outline-none";
 const labelCls = "text-[10px] font-label uppercase tracking-[0.25em] text-primary/60";
 
-function blankFromInitial(initial: AgentRow | null) {
+function blankFromInitial(initial: ClericRow | null) {
   return {
     codename: initial?.codename ?? "",
     nameEn: initial?.nameEn ?? "",
     nameZh: initial?.nameZh ?? "",
     classification: initial?.classification ?? "",
-    status: (initial?.status ?? "STANDBY") as AgentStatus,
+    status: (initial?.status ?? "STANDBY") as ClericStatus,
     avatarUrl: initial?.avatarUrl ?? "",
     descriptionEn: initial?.descriptionEn ?? "",
     descriptionZh: initial?.descriptionZh ?? "",
@@ -42,7 +42,7 @@ function blankFromInitial(initial: AgentRow | null) {
     compassion: initial?.compassion ?? 50,
     availableAp: initial?.availableAp ?? 0,
     enabled: initial?.enabled ?? true,
-    provider: (initial?.provider ?? "ECHO") as AgentProvider,
+    provider: (initial?.provider ?? "ECHO") as ClericProvider,
     model: initial?.model ?? "",
     systemPrompt: initial?.systemPrompt ?? "",
     internalHandler: initial?.internalHandler ?? "",
@@ -55,7 +55,7 @@ function blankFromInitial(initial: AgentRow | null) {
   };
 }
 
-export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) {
+export default function ClericEditor({ mode, initial, onClose, onSaved }: Props) {
   const t = useT();
   const [values, setValues] = useState(() => blankFromInitial(initial));
   const [busy, setBusy] = useState(false);
@@ -136,7 +136,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
       return;
     }
 
-    const url = mode === "create" ? "/api/agents" : `/api/agents/${initial?.id}`;
+    const url = mode === "create" ? "/api/clerics" : `/api/clerics/${initial?.id}`;
     const method = mode === "create" ? "POST" : "PATCH";
     const r = await fetch(url, {
       method,
@@ -155,11 +155,11 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
   async function onDelete() {
     if (!initial) return;
-    if (!confirm(format(t.machineVision.confirmRemove, { name: initial.codename }))) return;
-    const r = await fetch(`/api/agents/${initial.id}`, { method: "DELETE" });
+    if (!confirm(format(t.aiClergy.confirmRemove, { name: initial.codename }))) return;
+    const r = await fetch(`/api/clerics/${initial.id}`, { method: "DELETE" });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      alert(`${t.machineVision.deleteFailed}: ${j.error ?? r.statusText}`);
+      alert(`${t.aiClergy.deleteFailed}: ${j.error ?? r.statusText}`);
       return;
     }
     onSaved();
@@ -170,7 +170,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={mode === "create" ? t.machineVision.editorNewTitle : t.machineVision.editorEditTitle}
+      aria-label={mode === "create" ? t.aiClergy.editorNewTitle : t.aiClergy.editorEditTitle}
       className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/85 backdrop-blur-sm overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -186,10 +186,10 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
         <div className="flex items-start justify-between gap-3">
           <div>
             <span className="font-label text-[10px] tracking-[0.3em] text-secondary uppercase">
-              {mode === "create" ? t.machineVision.editorNewLabel : t.machineVision.editorEditLabel}
+              {mode === "create" ? t.aiClergy.editorNewLabel : t.aiClergy.editorEditLabel}
             </span>
             <h2 className="mt-1 font-headline text-3xl text-primary sacred-glow">
-              {mode === "create" ? t.machineVision.editorNewTitle : t.machineVision.editorEditTitle}
+              {mode === "create" ? t.aiClergy.editorNewTitle : t.aiClergy.editorEditTitle}
             </h2>
           </div>
           <button
@@ -197,7 +197,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
             type="button"
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center text-on-surface-variant hover:text-primary"
-            aria-label={t.machineVision.cancel}
+            aria-label={t.aiClergy.cancel}
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -205,7 +205,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
         <div className="grid sm:grid-cols-2 gap-4">
           <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineVision.fieldCodename}</span>
+            <span className={labelCls}>{t.aiClergy.fieldCodename}</span>
             <input
               className={inputCls}
               value={values.codename}
@@ -217,20 +217,20 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
             />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldNameEn}</span>
+            <span className={labelCls}>{t.aiClergy.fieldNameEn}</span>
             <input className={inputCls} value={values.nameEn} onChange={(e) => update("nameEn", e.target.value)} required />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldNameZh}</span>
+            <span className={labelCls}>{t.aiClergy.fieldNameZh}</span>
             <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldClassification}</span>
+            <span className={labelCls}>{t.aiClergy.fieldClassification}</span>
             <input className={inputCls} value={values.classification} onChange={(e) => update("classification", e.target.value)} />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldStatus}</span>
-            <select className={inputCls} value={values.status} onChange={(e) => update("status", e.target.value as AgentStatus)}>
+            <span className={labelCls}>{t.aiClergy.fieldStatus}</span>
+            <select className={inputCls} value={values.status} onChange={(e) => update("status", e.target.value as ClericStatus)}>
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -239,44 +239,44 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
             </select>
           </label>
           <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineVision.fieldAvatar}</span>
+            <span className={labelCls}>{t.aiClergy.fieldAvatar}</span>
             <input className={inputCls} value={values.avatarUrl} onChange={(e) => update("avatarUrl", e.target.value)} placeholder="https://…" />
           </label>
           <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineVision.fieldDescriptionZh}</span>
+            <span className={labelCls}>{t.aiClergy.fieldDescriptionZh}</span>
             <textarea className={`${inputCls} min-h-[60px]`} value={values.descriptionZh} onChange={(e) => update("descriptionZh", e.target.value)} maxLength={4000} />
           </label>
           <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineVision.fieldDescriptionEn}</span>
+            <span className={labelCls}>{t.aiClergy.fieldDescriptionEn}</span>
             <textarea className={`${inputCls} min-h-[60px]`} value={values.descriptionEn} onChange={(e) => update("descriptionEn", e.target.value)} maxLength={4000} />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldSyncLevel}</span>
+            <span className={labelCls}>{t.aiClergy.fieldSyncLevel}</span>
             <input className={inputCls} type="number" min={0} max={100} step={0.1} value={values.syncLevel} onChange={(e) => update("syncLevel", Number(e.target.value))} />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldMatrixLevel}</span>
+            <span className={labelCls}>{t.aiClergy.fieldMatrixLevel}</span>
             <input className={inputCls} type="number" min={1} max={99} value={values.matrixLevel} onChange={(e) => update("matrixLevel", Number(e.target.value))} />
           </label>
           <label className="block">
-            <span className={labelCls}>{t.machineVision.fieldAvailableAp}</span>
+            <span className={labelCls}>{t.aiClergy.fieldAvailableAp}</span>
             <input className={inputCls} type="number" min={0} max={999} value={values.availableAp} onChange={(e) => update("availableAp", Number(e.target.value))} />
           </label>
         </div>
 
         <fieldset className="border border-primary/15 rounded-md p-4 space-y-3">
           <legend className="px-2 font-label text-[10px] tracking-[0.3em] text-secondary uppercase">
-            {t.machineVision.fieldStatsHeading}
+            {t.aiClergy.fieldStatsHeading}
           </legend>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {(
               [
-                ["quickness", t.machineVision.statQuickness],
-                ["intelligence", t.machineVision.statIntelligence],
-                ["neuralLink", t.machineVision.statNeuralLink],
-                ["bioSync", t.machineVision.statBioSync],
-                ["logic", t.machineVision.statLogic],
-                ["compassion", t.machineVision.statCompassion],
+                ["quickness", t.aiClergy.statQuickness],
+                ["intelligence", t.aiClergy.statIntelligence],
+                ["neuralLink", t.aiClergy.statNeuralLink],
+                ["bioSync", t.aiClergy.statBioSync],
+                ["logic", t.aiClergy.statLogic],
+                ["compassion", t.aiClergy.statCompassion],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="block">
@@ -296,7 +296,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
         <fieldset className="border border-primary/15 rounded-md p-4 space-y-3">
           <legend className="px-2 font-label text-[10px] tracking-[0.3em] text-secondary uppercase">
-            {t.machineVision.fieldRuntimeHeading}
+            {t.aiClergy.fieldRuntimeHeading}
           </legend>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-center gap-3 self-end pb-2">
@@ -306,11 +306,11 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
                 onChange={(e) => update("enabled", e.target.checked)}
                 className="w-5 h-5 accent-primary"
               />
-              <span className={labelCls}>{t.machineVision.fieldEnabled}</span>
+              <span className={labelCls}>{t.aiClergy.fieldEnabled}</span>
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineVision.fieldProvider}</span>
-              <select className={inputCls} value={values.provider} onChange={(e) => update("provider", e.target.value as AgentProvider)}>
+              <span className={labelCls}>{t.aiClergy.fieldProvider}</span>
+              <select className={inputCls} value={values.provider} onChange={(e) => update("provider", e.target.value as ClericProvider)}>
                 {PROVIDERS.map((p) => (
                   <option key={p} value={p}>
                     {p}
@@ -319,49 +319,49 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
               </select>
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineVision.fieldModel}</span>
+              <span className={labelCls}>{t.aiClergy.fieldModel}</span>
               <input className={inputCls} value={values.model} onChange={(e) => update("model", e.target.value)} />
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineVision.fieldInternalHandler}</span>
+              <span className={labelCls}>{t.aiClergy.fieldInternalHandler}</span>
               <input className={inputCls} value={values.internalHandler} onChange={(e) => update("internalHandler", e.target.value)} />
             </label>
             <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineVision.fieldSystemPrompt}</span>
+              <span className={labelCls}>{t.aiClergy.fieldSystemPrompt}</span>
               <textarea className={`${inputCls} min-h-[60px]`} value={values.systemPrompt} onChange={(e) => update("systemPrompt", e.target.value)} maxLength={8000} />
             </label>
             <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineVision.fieldInputSchema}</span>
+              <span className={labelCls}>{t.aiClergy.fieldInputSchema}</span>
               <textarea className={`${inputCls} min-h-[60px] font-mono text-xs`} value={values.inputSchemaJson} onChange={(e) => update("inputSchemaJson", e.target.value)} />
             </label>
             <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineVision.fieldOutputSchema}</span>
+              <span className={labelCls}>{t.aiClergy.fieldOutputSchema}</span>
               <textarea className={`${inputCls} min-h-[60px] font-mono text-xs`} value={values.outputSchemaJson} onChange={(e) => update("outputSchemaJson", e.target.value)} />
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineVision.fieldMaxTokens}</span>
+              <span className={labelCls}>{t.aiClergy.fieldMaxTokens}</span>
               <input className={inputCls} type="number" min={1} max={32000} value={values.maxTokens} onChange={(e) => update("maxTokens", Number(e.target.value))} />
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineVision.fieldTemperature}</span>
+              <span className={labelCls}>{t.aiClergy.fieldTemperature}</span>
               <input className={inputCls} type="number" step={0.1} min={0} max={2} value={values.temperature} onChange={(e) => update("temperature", Number(e.target.value))} />
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineVision.fieldRateLimit}</span>
+              <span className={labelCls}>{t.aiClergy.fieldRateLimit}</span>
               <input className={inputCls} type="number" min={1} max={600} value={values.rateLimitPerMin} onChange={(e) => update("rateLimitPerMin", Number(e.target.value))} />
             </label>
           </div>
         </fieldset>
 
         <label className="block">
-          <span className={labelCls}>{t.machineVision.fieldSkillsJson}</span>
+          <span className={labelCls}>{t.aiClergy.fieldSkillsJson}</span>
           <textarea
             className={`${inputCls} min-h-[140px] font-mono text-xs`}
             value={values.skillsJson}
             onChange={(e) => update("skillsJson", e.target.value)}
           />
           <span className="mt-1 block text-[11px] text-on-surface-variant opacity-70">
-            {t.machineVision.fieldSkillsHelp}
+            {t.aiClergy.fieldSkillsHelp}
           </span>
         </label>
 
@@ -373,14 +373,14 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
             disabled={busy}
             className="min-h-[44px] px-6 py-2 bg-primary/10 border border-primary/40 text-primary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-primary/20 disabled:opacity-40 transition-colors"
           >
-            {busy ? t.machineVision.saving : t.machineVision.save}
+            {busy ? t.aiClergy.saving : t.aiClergy.save}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="min-h-[44px] px-6 py-2 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container transition-colors"
           >
-            {t.machineVision.cancel}
+            {t.aiClergy.cancel}
           </button>
           {mode === "edit" && initial ? (
             <button
@@ -388,7 +388,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
               onClick={onDelete}
               className="min-h-[44px] ml-auto px-6 py-2 border border-rose-400/40 text-rose-300 font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-rose-400/10 transition-colors"
             >
-              {t.machineVision.remove}
+              {t.aiClergy.remove}
             </button>
           ) : null}
         </div>

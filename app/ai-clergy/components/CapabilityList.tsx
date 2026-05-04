@@ -1,22 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/types";
-import type { CapabilitySummary } from "@/lib/agents/capabilityTypes";
+import type { CapabilitySummary } from "@/lib/clerics/capabilityTypes";
 import SecretDialog from "./SecretDialog";
+import { LEVEL_TOKENS } from "./capabilityState";
 
 type Props = {
   summaries: CapabilitySummary[];
   locale: Locale;
   activeId?: string | null;
+  hoveredId?: string | null;
   onSelect?: (id: string) => void;
+  onHover?: (id: string | null) => void;
   isAdmin?: boolean;
 };
 
-export default function CapabilityList({ summaries, locale, activeId, onSelect, isAdmin }: Props) {
+export default function CapabilityList({
+  summaries,
+  locale,
+  activeId,
+  hoveredId,
+  onSelect,
+  onHover,
+  isAdmin,
+}: Props) {
   const t = useT();
   const router = useRouter();
   const enabledCount = summaries.filter((s) => s.envOk).length;
@@ -24,8 +35,8 @@ export default function CapabilityList({ summaries, locale, activeId, onSelect, 
   const [editingSecret, setEditingSecret] = useState<string | null>(null);
 
   const requestClear = async (name: string) => {
-    if (!confirm(format(t.machineVision.secretDialogClearConfirm, { name }))) return;
-    const r = await fetch(`/api/admin/agent-secrets/${encodeURIComponent(name)}`, {
+    if (!confirm(format(t.aiClergy.secretDialogClearConfirm, { name }))) return;
+    const r = await fetch(`/api/admin/cleric-secrets/${encodeURIComponent(name)}`, {
       method: "DELETE",
       credentials: "include",
     });
@@ -36,11 +47,11 @@ export default function CapabilityList({ summaries, locale, activeId, onSelect, 
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h3 className="font-label text-[10px] tracking-[0.3em] text-outline uppercase">
-          {t.machineVision.activeCapabilities}
+          {t.aiClergy.activeCapabilities}
         </h3>
         {summaries.length > 0 ? (
           <span className="font-label text-[9px] tracking-[0.25em] text-on-surface-variant uppercase">
-            {format(t.machineVision.activeCapabilitiesSummary, {
+            {format(t.aiClergy.activeCapabilitiesSummary, {
               enabled: enabledCount,
               total: summaries.length,
             })}
@@ -50,7 +61,7 @@ export default function CapabilityList({ summaries, locale, activeId, onSelect, 
 
       {summaries.length === 0 ? (
         <p className="text-on-surface-variant text-sm py-4 text-center">
-          {t.machineVision.capabilityEmpty}
+          {t.aiClergy.capabilityEmpty}
         </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
@@ -61,7 +72,9 @@ export default function CapabilityList({ summaries, locale, activeId, onSelect, 
               isZh={isZh}
               t={t}
               active={summary.id === activeId}
+              hovered={summary.id === hoveredId}
               onSelect={onSelect}
+              onHover={onHover}
               isAdmin={!!isAdmin}
               onConfigure={(name) => setEditingSecret(name)}
               onClear={requestClear}
@@ -89,7 +102,9 @@ function CapabilityRow({
   isZh,
   t,
   active,
+  hovered,
   onSelect,
+  onHover,
   isAdmin,
   onConfigure,
   onClear,
@@ -98,23 +113,28 @@ function CapabilityRow({
   isZh: boolean;
   t: ReturnType<typeof useT>;
   active: boolean;
+  hovered: boolean;
   onSelect?: (id: string) => void;
+  onHover?: (id: string | null) => void;
   isAdmin: boolean;
   onConfigure: (name: string) => void;
   onClear: (name: string) => void;
 }) {
   const meta = summary.metadata;
   const name = isZh ? meta.nameZh : meta.nameEn;
-  const altName = isZh ? meta.nameEn : meta.nameZh;
   const description = isZh ? meta.descriptionZh : meta.descriptionEn;
 
-  // Status dot color logic: green if env ok AND no recent failures;
-  // amber if env ok but last call failed; grey if env not configured.
-  const ledClass = !summary.envOk
-    ? "bg-on-surface-variant/40"
-    : summary.stats.last?.ok === false
-      ? "bg-secondary shadow-[0_0_6px_currentColor] text-secondary"
-      : "bg-primary shadow-[0_0_6px_currentColor] text-primary";
+  // Card visual identity is driven by autonomy LEVEL (rarity colour), not by
+  // status. Status leaks into the Configure-key button (rose when missing).
+  const tokens = LEVEL_TOKENS[meta.autonomyLevel];
+  const liRef = useRef<HTMLLIElement>(null);
+
+  // Smooth-scroll into view when this card becomes active (e.g. via rail click).
+  useEffect(() => {
+    if (active && liRef.current) {
+      liRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [active]);
 
   const successRate =
     summary.stats.total > 0
@@ -122,17 +142,27 @@ function CapabilityRow({
       : null;
 
   const interactive = !!onSelect;
-  const baseRing = active
-    ? "border-primary bg-primary/[0.05] shadow-[inset_0_0_0_1px_rgba(144,222,205,0.4)]"
-    : summary.envOk
-      ? "border-outline-variant/40 hover:border-primary/40"
-      : "border-outline-variant/30 opacity-75 hover:opacity-100";
+
+  // Layered visual driven by LEVEL tokens (rarity palette):
+  //   - left edge: 4px level-coloured strip
+  //   - card bg: faint level tint always; brightens slightly on hover
+  //   - card border: level-soft default, level-bright on hover, primary teal on active
+  const ringClass = active
+    ? `border-primary ${tokens.bgTint} shadow-[inset_0_0_0_1px_rgba(144,222,205,0.45)]`
+    : hovered
+      ? `${tokens.border} ${tokens.bgTint}`
+      : `${tokens.borderSoft} ${tokens.bgTintSoft}`;
 
   return (
     <li
+      ref={liRef}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       onClick={interactive ? () => onSelect!(summary.id) : undefined}
+      onMouseEnter={() => onHover?.(summary.id)}
+      onMouseLeave={() => onHover?.(null)}
+      onFocus={() => onHover?.(summary.id)}
+      onBlur={() => onHover?.(null)}
       onKeyDown={
         interactive
           ? (e) => {
@@ -143,32 +173,26 @@ function CapabilityRow({
             }
           : undefined
       }
-      className={
-        "relative border bg-background/40 p-3 sm:p-3.5 transition-colors " +
-        baseRing +
-        (interactive ? " cursor-pointer focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" : "")
-      }
+      className={[
+        "relative border bg-background/40 p-3 sm:p-3.5 transition-all duration-200 overflow-hidden",
+        ringClass,
+        interactive ? "cursor-pointer focus:outline-none" : "",
+      ].join(" ")}
     >
-      <div className="flex gap-3">
-        <span
-          className="material-symbols-outlined text-primary/70 text-[26px] shrink-0 mt-0.5"
-          style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
-          aria-hidden
-        >
-          {meta.iconKey}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className={"w-2 h-2 rounded-full " + ledClass} aria-hidden />
-            <span className="text-on-surface text-sm font-medium leading-tight">{name}</span>
-            <span className="font-label text-[9px] tracking-[0.25em] text-on-surface-variant/70 uppercase">
-              {altName}
-            </span>
-          </div>
-          <p className="mt-1 text-[12px] text-on-surface-variant leading-relaxed line-clamp-2">
+      <div className="flex gap-3 sm:gap-4 items-stretch">
+        {/* Left identity cell — Vault-Cell-style: icon centered, name + Lv subtitle */}
+        <IdentityCell
+          icon={meta.iconKey}
+          name={name}
+          level={meta.autonomyLevel}
+          t={t}
+          tokens={tokens}
+        />
+        <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+          <p className="text-[12.5px] text-on-surface-variant leading-relaxed">
             {description}
           </p>
-          <div className="mt-2 flex items-center gap-2 flex-wrap font-label text-[9px] tracking-[0.2em] uppercase">
+          <div className="flex items-center gap-2 flex-wrap font-label text-[9px] tracking-[0.2em] uppercase">
             <span className="px-1.5 py-0.5 border border-outline-variant/40 text-on-surface-variant/80">
               {meta.provider}
             </span>
@@ -176,6 +200,9 @@ function CapabilityRow({
               {summary.id}
             </span>
             {!summary.envOk ? (
+              // KEY missing — the only place status (warning) leaks into the
+              // card. Painted in rose so it stands out against the level-themed
+              // rest of the row.
               isAdmin && summary.missingEnvVars.length > 0 ? (
                 <button
                   type="button"
@@ -184,35 +211,35 @@ function CapabilityRow({
                     onConfigure(summary.missingEnvVars[0]);
                   }}
                   title={summary.missingEnvVars.join(", ")}
-                  className="px-1.5 py-0.5 border border-secondary/60 text-secondary hover:bg-secondary/10 normal-case tracking-normal font-mono"
+                  className="px-1.5 py-0.5 border border-rose-400/70 text-rose-300 bg-rose-400/[0.08] hover:bg-rose-400/[0.15] normal-case tracking-normal font-mono shadow-[0_0_6px_rgba(251,113,133,0.25)]"
                 >
-                  {t.machineVision.secretConfigure} · {summary.missingEnvVars[0]}
+                  {t.aiClergy.secretConfigure} · {summary.missingEnvVars[0]}
                 </button>
               ) : (
                 <span
-                  className="px-1.5 py-0.5 border border-secondary/40 text-secondary normal-case tracking-normal font-mono"
+                  className="px-1.5 py-0.5 border border-rose-400/50 text-rose-300 bg-rose-400/[0.06] normal-case tracking-normal font-mono"
                   title={summary.missingEnvVars.join(", ")}
                 >
-                  {format(t.machineVision.capabilityRequiresEnv, {
+                  {format(t.aiClergy.capabilityRequiresEnv, {
                     vars: summary.missingEnvVars.join(", "),
                   })}
                 </span>
               )
             ) : summary.stats.total === 0 ? (
               <span className="text-on-surface-variant/60 normal-case tracking-normal">
-                {t.machineVision.capabilityNoCalls}
+                {t.aiClergy.capabilityNoCalls}
               </span>
             ) : (
               <>
                 <span className="text-on-surface-variant/80 normal-case tracking-normal">
-                  {format(t.machineVision.capabilityRecentSummary, {
+                  {format(t.aiClergy.capabilityRecentSummary, {
                     count: summary.stats.total,
                     successRate: successRate ?? 0,
                   })}
                 </span>
                 {summary.stats.avgLatencyMs != null ? (
                   <span className="text-on-surface-variant/60 normal-case tracking-normal">
-                    {format(t.machineVision.capabilityAvgLatency, {
+                    {format(t.aiClergy.capabilityAvgLatency, {
                       ms: summary.stats.avgLatencyMs,
                     })}
                   </span>
@@ -231,7 +258,7 @@ function CapabilityRow({
                       title={envName}
                       className="px-1.5 py-0.5 border border-outline-variant/40 text-on-surface-variant/80 hover:border-primary/60 hover:text-primary normal-case tracking-normal font-mono"
                     >
-                      {t.machineVision.secretReconfigure} · {envName}
+                      {t.aiClergy.secretReconfigure} · {envName}
                     </button>
                     <button
                       type="button"
@@ -242,7 +269,7 @@ function CapabilityRow({
                       title={envName}
                       className="px-1.5 py-0.5 border border-outline-variant/40 text-on-surface-variant/60 hover:border-error/60 hover:text-error normal-case tracking-normal font-mono"
                     >
-                      {t.machineVision.secretClear}
+                      {t.aiClergy.secretClear}
                     </button>
                   </span>
                 ))
@@ -251,5 +278,63 @@ function CapabilityRow({
         </div>
       </div>
     </li>
+  );
+}
+
+const AUTONOMY_KEYS = ["autonomyL0", "autonomyL1", "autonomyL2", "autonomyL3"] as const;
+
+/**
+ * Vault-Cell-style identity card on the left of each capability row.
+ *   - Big icon centred at top
+ *   - Capability name (primary tone)
+ *   - Lv subtitle ("L1 · ASSISTED") in rarity colour
+ *
+ * The whole cell is bordered + tinted by autonomy level (rarity palette),
+ * making the skill's class readable at a glance — same visual language as
+ * the relic vault grid.
+ */
+function IdentityCell({
+  icon,
+  name,
+  level,
+  t,
+  tokens,
+}: {
+  icon: string;
+  name: string;
+  level: 0 | 1 | 2 | 3;
+  t: ReturnType<typeof useT>;
+  tokens: typeof LEVEL_TOKENS[0 | 1 | 2 | 3];
+}) {
+  const subtitle = t.aiClergy[AUTONOMY_KEYS[level]];
+  return (
+    <div
+      className={[
+        "shrink-0 self-stretch w-[140px] sm:w-[160px] flex flex-col items-center justify-center",
+        "px-3 py-3 border rounded-sm relative",
+        tokens.border,
+        tokens.bgTint,
+      ].join(" ")}
+      aria-label={`${name} · L${level} · ${subtitle}`}
+    >
+      <span className="absolute top-1.5 left-2 font-label text-[9px] tracking-[0.25em] text-on-surface-variant/60 tabular-nums">
+        L{String(level).padStart(2, "0")}
+      </span>
+      <span
+        className={`material-symbols-outlined text-[40px] leading-none ${tokens.text}`}
+        style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <span className="mt-3 text-on-surface text-sm font-medium leading-tight text-center line-clamp-1">
+        {name}
+      </span>
+      <span
+        className={`mt-2 font-label text-[10px] tracking-[0.3em] uppercase ${tokens.text}`}
+      >
+        L{level} · {subtitle}
+      </span>
+    </div>
   );
 }

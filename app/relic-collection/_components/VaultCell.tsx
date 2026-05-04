@@ -107,13 +107,11 @@ function CellInner({
   locale,
   access,
   t,
-  isAdmin,
 }: {
   relic: CellRelic;
   locale: Locale;
   access: AccessResult;
   t: Dictionary;
-  isAdmin?: boolean;
 }) {
   const name = locale === "zh" ? relic.nameZh : relic.nameEn;
   const classif = locale === "zh" ? relic.classifZh : relic.classifEn;
@@ -236,7 +234,7 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
           aria-label={t.relicCollection.extractedTag + " · " + (locale === "zh" ? relic.nameZh : relic.nameEn)}
           className={greyBase + " hover:opacity-90 focus-visible:opacity-90 cursor-pointer hover:bg-surface-container/80 hover:shadow-[inset_0_0_42px_rgba(0,0,0,0.7)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-on-surface-variant focus-visible:outline-offset-1"}
         >
-          <CellInner relic={relic} locale={locale} access={access ?? { level: "GREEN", reason: "admin" }} t={t} isAdmin={isAdmin} />
+          <CellInner relic={relic} locale={locale} access={access ?? { level: "GREEN", reason: "admin" }} t={t} />
         </Link>
       );
     }
@@ -246,7 +244,7 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
         aria-label={t.relicCollection.extractedTag + " · " + (locale === "zh" ? relic.nameZh : relic.nameEn)}
         aria-disabled
       >
-        <CellInner relic={relic} locale={locale} access={access ?? { level: "GREEN", reason: "admin" }} t={t} isAdmin={isAdmin} />
+        <CellInner relic={relic} locale={locale} access={access ?? { level: "GREEN", reason: "admin" }} t={t} />
       </div>
     );
   }
@@ -271,7 +269,6 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
           locale={locale}
           access={access ?? { level: "RED", reason }}
           t={t}
-          isAdmin={isAdmin}
         />
       </UnlockTrigger>
     );
@@ -290,7 +287,7 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
         rarityFocusClass(relic.rarity)
       }
     >
-      <CellInner relic={relic} locale={locale} access={access} t={t} isAdmin={isAdmin} />
+      <CellInner relic={relic} locale={locale} access={access} t={t} />
       <span
         className={
           "pointer-events-none absolute left-[18%] right-[18%] top-0 h-px bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:top-[85%] transition-all duration-700 ease-out " +
