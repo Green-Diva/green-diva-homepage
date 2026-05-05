@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="600" height="800" role="img" aria-label="agent brain fallback">
+  <defs>
+    <radialGradient id="b1" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#bff0e2" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#90decd" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#0a2a25" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#90decd" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#1d6f5e" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="800" fill="#040707"/>
+  <ellipse cx="300" cy="380" rx="280" ry="320" fill="url(#b1)" opacity="0.9"/>
+  <g stroke="url(#b2)" stroke-width="3" fill="none" opacity="0.9">
+    <path d="M 120 380 Q 160 180 320 160 Q 480 180 510 360 Q 510 540 360 600 Q 200 600 130 480 Z" stroke-width="3"/>
+    <path d="M 200 280 Q 280 200 360 220 Q 420 250 420 320 Q 420 380 340 380 Q 280 380 240 340 Z"/>
+    <path d="M 220 460 Q 280 420 360 440 Q 420 470 420 520 Q 380 580 320 560 Q 260 540 220 500 Z"/>
+    <path d="M 300 220 V 580" stroke-dasharray="4 6"/>
+  </g>
+  <g fill="#90decd" opacity="0.65">
+    <circle cx="300" cy="380" r="4"/>
+  </g>
+  <g fill="none" stroke="#90decd" stroke-width="0.6" opacity="0.35">
+    <circle cx="300" cy="380" r="180"/>
+    <circle cx="300" cy="380" r="220"/>
+    <circle cx="300" cy="380" r="260"/>
+  </g>
+  <text x="300" y="780" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas" font-size="14" fill="#90decd" opacity="0.5">BRAIN · FALLBACK</text>
+</svg>

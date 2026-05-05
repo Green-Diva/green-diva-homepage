@@ -37,9 +37,7 @@ model User {
   grantsIssued      RelicGrant[]      @relation("RelicGrantGranter")
   vaultProfile      VaultProfile?
   vaultItems        VaultItem[]
-  clericsCreated    Cleric[]
-  clericInvocations ClericInvocation[] @relation("ClericInvocationCaller")
-  clericSecrets     ClericSecret[]
+  agentsCreated    Agent[]
   skillsCreated     Skill[]            @relation("SkillCreator")
 }
 
@@ -207,11 +205,6 @@ enum RelicJobStatus {
 enum RelicJobStep {
   ENQUEUED
   EXTRACT_ZIP
-  REMOVE_BG
-  STRUCTURED_FIELDS
-  GEN_3D
-  WEB_RESEARCH
-  WRITE_LORE
   PACK_DERIVED
   FINALIZE
 }
@@ -220,14 +213,11 @@ model RelicProcessingJob {
   id           String         @id @default(cuid())
   relicId      String
   relic        Relic          @relation(fields: [relicId], references: [id], onDelete: Cascade)
-  clericId     String?
-  cleric       Cleric?        @relation(fields: [clericId], references: [id], onDelete: SetNull)
   status       RelicJobStatus @default(PENDING)
   step         RelicJobStep   @default(ENQUEUED)
   progress     Int            @default(0)
   attempt      Int            @default(0)
   maxAttempts  Int            @default(3)
-  meshyTaskId  String?
   errorMessage String?
   stepResults  Json?
   startedAt    DateTime?
@@ -271,49 +261,55 @@ model RelicUnlock {
   @@index([expiresAt])
 }
 
-enum ClericStatus {
+enum AgentStatus {
   ONLINE
   STANDBY
   OFFLINE
 }
 
-enum ClericProvider {
+enum AgentProvider {
   ANTHROPIC
   OPENAI
   INTERNAL
   ECHO
 }
 
-enum ClericMode {
+enum AgentMode {
   MECHANICAL
   AUTONOMOUS
 }
 
-model Cleric {
+model Agent {
   id               String               @id @default(cuid())
   serial           Int?                 @unique
   codename         String               @unique
   nameEn           String
   nameZh           String
   classification   String?
-  mode             ClericMode           @default(MECHANICAL)
-  status           ClericStatus         @default(STANDBY)
-  avatarUrl        String?
+  mode             AgentMode           @default(MECHANICAL)
+  status           AgentStatus         @default(STANDBY)
+  avatarUrl        String
   descriptionEn    String?
   descriptionZh    String?
   syncLevel        Float                @default(0)
   matrixLevel      Int                  @default(1)
-  quickness        Int                  @default(50)
-  intelligence     Int                  @default(50)
-  neuralLink       Int                  @default(50)
-  bioSync          Int                  @default(50)
-  logic            Int                  @default(50)
-  compassion       Int                  @default(50)
+  // Derived stats — see lib/agents/derived.ts (TODO). Stored as Int 0-100,
+  // 0 means "not yet computed". Real algorithms ship in a later iteration.
+  chaosLevel       Int                  @default(0)
+  costTier         Int                  @default(0)
+  activityLevel    Int                  @default(0)
+  stabilityLevel   Int                  @default(0)
+  // Central control slot data (one Json blob each, not skill references):
+  //   pipelineConfig  → MECHANICAL workflow (nodes/edges/params)
+  //   dispatcherConfig → AUTONOMOUS orchestrator (strategy/model/prompt)
+  pipelineConfig   Json?
+  dispatcherConfig Json?
+  deployedAt       DateTime?
   skills           Json?
-  skillEquips      ClericSkillEquip[]
+  skillEquips      AgentSkillEquip[]
   availableAp      Int                  @default(0)
   enabled          Boolean              @default(true)
-  provider         ClericProvider       @default(ECHO)
+  provider         AgentProvider       @default(ECHO)
   model            String?
   systemPrompt     String?
   internalHandler  String?
@@ -324,44 +320,11 @@ model Cleric {
   rateLimitPerMin  Int?                 @default(20)
   createdById      String?
   createdBy        User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  invocations      ClericInvocation[]
-  processingJobs   RelicProcessingJob[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
   @@index([status, createdAt])
   @@index([enabled, provider])
-}
-
-model ClericSecret {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  ciphertext  String
-  iv          String
-  authTag     String
-  hint        String?
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model ClericInvocation {
-  id           String   @id @default(cuid())
-  clericId     String
-  cleric       Cleric   @relation(fields: [clericId], references: [id], onDelete: Cascade)
-  callerUserId String?
-  caller       User?    @relation("ClericInvocationCaller", fields: [callerUserId], references: [id], onDelete: SetNull)
-  source       String
-  inputJson    String
-  outputJson   String?
-  ok           Boolean  @default(false)
-  errorMessage String?
-  latencyMs    Int?
-  createdAt    DateTime @default(now())
-
-  @@index([clericId, createdAt])
-  @@index([callerUserId, createdAt])
 }
 
 enum SkillKind {
@@ -382,7 +345,7 @@ model Skill {
   descriptionZh String             @db.VarChar(2000)
   createdById   String?
   createdBy     User?              @relation("SkillCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  equips        ClericSkillEquip[]
+  equips        AgentSkillEquip[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
@@ -390,16 +353,22 @@ model Skill {
   @@index([level])
 }
 
-model ClericSkillEquip {
+model AgentSkillEquip {
   id         String   @id @default(cuid())
-  clericId   String
-  cleric     Cleric   @relation(fields: [clericId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent      Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
   skillId    String
   skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  // 0..5 — index of the spine/brain slot. NULL = legacy equip with no slot.
+  // App-level uniqueness: at most one equip per (agentId, slotIndex) when
+  // slotIndex is not null. Enforced in API transactions, not as a partial
+  // unique index (db push doesn't carry one).
+  slotIndex  Int?
   unlocked   Boolean  @default(false)
   equippedAt DateTime @default(now())
 
-  @@unique([clericId, skillId])
-  @@index([clericId])
+  @@unique([agentId, skillId])
+  @@index([agentId])
+  @@index([agentId, slotIndex])
   @@index([skillId])
 }

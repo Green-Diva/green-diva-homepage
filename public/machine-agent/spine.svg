@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="600" height="800" role="img" aria-label="machine spine fallback">
+  <defs>
+    <radialGradient id="g1" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#fff7d6" stop-opacity="0.85"/>
+      <stop offset="55%" stop-color="#e9c176" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#3a1f04" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e9c176" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#7d5510" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="800" fill="#050505"/>
+  <ellipse cx="300" cy="320" rx="280" ry="380" fill="url(#g1)" opacity="0.9"/>
+  <g stroke="url(#g2)" stroke-width="3" fill="none" opacity="0.9">
+    <path d="M 300 60 V 740" stroke-width="6"/>
+    <g>
+      <ellipse cx="300" cy="120" rx="36" ry="14"/>
+      <ellipse cx="300" cy="200" rx="40" ry="16"/>
+      <ellipse cx="300" cy="280" rx="44" ry="18"/>
+      <ellipse cx="300" cy="360" rx="48" ry="20"/>
+      <ellipse cx="300" cy="440" rx="52" ry="22"/>
+      <ellipse cx="300" cy="520" rx="48" ry="20"/>
+      <ellipse cx="300" cy="600" rx="44" ry="18"/>
+      <ellipse cx="300" cy="680" rx="36" ry="14"/>
+    </g>
+  </g>
+  <g fill="none" stroke="#e9c176" stroke-width="0.7" opacity="0.4">
+    <path d="M 80 100 Q 240 240 80 400 Q 240 560 80 700"/>
+    <path d="M 520 100 Q 360 240 520 400 Q 360 560 520 700"/>
+  </g>
+  <text x="300" y="780" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas" font-size="14" fill="#e9c176" opacity="0.5">SPINE · FALLBACK</text>
+</svg>

@@ -81,9 +81,6 @@ export default function RelicForm({
         }
       : { ...EMPTY, slot: presetSlot ?? EMPTY.slot },
   );
-  const [aiPending, setAiPending] = useState(false);
-  const [aiDesc, setAiDesc] = useState("");
-  const [aiError, setAiError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<"model" | "photo" | "archive" | "derived" | null>(null);
@@ -168,78 +165,6 @@ export default function RelicForm({
     }
   }
 
-  async function suggestName() {
-    if (aiPending) return;
-    setAiError(null);
-    setAiPending(true);
-    try {
-      // Optionally fetch first uploaded photo and convert to data URL so the
-      // AI can see it. We fetch through our auth-gated proxy and re-encode.
-      let imageDataUrl: string | null = null;
-      // Note: photos uploaded just-now were saved to private/ and recorded in
-      // state.photoPaths as relative paths. We can't fetch them via the proxy
-      // because the relic doesn't exist yet — so for the new-relic case, the
-      // AI relies on the description only. If editing an existing relic, we
-      // can pull photo 0.
-      if (initial && state.photoPaths.length > 0) {
-        try {
-          const r = await fetch(`/api/relics/${initial.id}/photos/0`);
-          if (r.ok) {
-            const blob = await r.blob();
-            if (blob.size <= 4 * 1024 * 1024) {
-              imageDataUrl = await new Promise<string>((resolve, reject) => {
-                const fr = new FileReader();
-                fr.onload = () => resolve(String(fr.result));
-                fr.onerror = () => reject(fr.error);
-                fr.readAsDataURL(blob);
-              });
-            }
-          }
-        } catch {
-          // ignore — proceed with description only
-        }
-      }
-
-      const res = await fetch("/api/admin/relics/suggest-name", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: aiDesc, imageDataUrl }),
-      });
-      if (res.status === 503) {
-        setAiError(t.adminRelics.aiNotConfigured);
-        return;
-      }
-      if (!res.ok) {
-        setAiError(t.adminRelics.aiFailed);
-        return;
-      }
-      const sug = await res.json();
-      setState((s) => ({
-        ...s,
-        nameEn: sug.nameEn ?? s.nameEn,
-        nameZh: sug.nameZh ?? s.nameZh,
-        classifEn: sug.classifEn ?? s.classifEn,
-        classifZh: sug.classifZh ?? s.classifZh,
-        rarity: sug.rarity ?? s.rarity,
-        iconKey: sug.iconKey ?? s.iconKey,
-        loreEn: sug.loreEn ?? s.loreEn,
-        loreZh: sug.loreZh ?? s.loreZh,
-        // auto-derive a slug from English name if empty
-        slug:
-          s.slug ||
-          String(sug.nameEn ?? "")
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .slice(0, 64),
-      }));
-    } catch {
-      setAiError(t.adminRelics.aiFailed);
-    } finally {
-      setAiPending(false);
-    }
-  }
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
@@ -304,36 +229,6 @@ export default function RelicForm({
         <h2 className="font-headline text-xl text-primary tracking-wide uppercase mb-2">
           {isEdit ? t.adminRelics.formEdit : t.adminRelics.formNew}
         </h2>
-
-        <div className="border border-secondary/20 bg-secondary/5 p-3 space-y-2">
-          <p className="font-label text-[10px] tracking-[0.25em] uppercase text-secondary">
-            {t.adminRelics.aiHint}
-          </p>
-          <textarea
-            rows={2}
-            value={aiDesc}
-            onChange={(e) => setAiDesc(e.target.value)}
-            placeholder={t.adminRelics.aiDescriptionPlaceholder}
-            className={inputClass}
-          />
-          <div className="flex items-center justify-between gap-3">
-            {aiError ? (
-              <p role="alert" className="font-label text-[10px] tracking-[0.2em] uppercase text-error">
-                {aiError}
-              </p>
-            ) : (
-              <span />
-            )}
-            <button
-              type="button"
-              onClick={suggestName}
-              disabled={aiPending || (!aiDesc.trim() && !(initial && state.photoPaths.length > 0))}
-              className="px-4 py-2 border border-secondary/60 bg-secondary/10 hover:bg-secondary/20 disabled:opacity-40 disabled:cursor-not-allowed font-label text-[11px] tracking-[0.2em] uppercase text-secondary"
-            >
-              {aiPending ? t.adminRelics.aiThinking : t.adminRelics.aiSuggest}
-            </button>
-          </div>
-        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label={t.adminRelics.fSlot}>

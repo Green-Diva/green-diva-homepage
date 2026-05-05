@@ -7,17 +7,7 @@ import { runRelicPipeline } from "@/lib/relics/pipeline";
 import { ensureServerInit } from "@/lib/server-init";
 
 const fromStepSchema = z
-  .enum([
-    "ENQUEUED",
-    "EXTRACT_ZIP",
-    "REMOVE_BG",
-    "STRUCTURED_FIELDS",
-    "GEN_3D",
-    "WEB_RESEARCH",
-    "WRITE_LORE",
-    "PACK_DERIVED",
-    "FINALIZE",
-  ])
+  .enum(["ENQUEUED", "EXTRACT_ZIP", "PACK_DERIVED", "FINALIZE"])
   .optional();
 
 export async function POST(

@@ -45,7 +45,7 @@ export interface Dictionary {
     enterFrame: string;
     sacredArtifact: string;
     relicCollectionTitle: string;
-    aiClergyTitle: string;
+    machineAgentTitle: string;
     syntheticHallucinations: string;
     neuralSync: string;
   };
@@ -262,11 +262,6 @@ export interface Dictionary {
     jobStatusCancelled: string;
     jobStepEnqueued: string;
     jobStepExtractZip: string;
-    jobStepRemoveBg: string;
-    jobStepStructuredFields: string;
-    jobStepGen3d: string;
-    jobStepWebResearch: string;
-    jobStepWriteLore: string;
     jobStepPackDerived: string;
     jobStepFinalize: string;
     draftPanelTitle: string;
@@ -288,13 +283,13 @@ export interface Dictionary {
     cellProcessing: string;
     viewerForging: string;
   };
-  aiClergy: {
+  machineAgent: {
     pageLabel: string;
     pageTitle: string;
     pageSubtitle: string; // {{filled}}/{{total}}
     backToSanctuary: string;
-    clericRoster: string;
-    ordainCleric: string;
+    agentRoster: string;
+    ordainAgent: string;
     statusOnline: string;
     statusStandby: string;
     statusOffline: string;
@@ -310,45 +305,52 @@ export interface Dictionary {
     syncLevel: string;
     matrixLevel: string;
     baseStats: string;
-    statQuickness: string;
-    statIntelligence: string;
-    statNeuralLink: string;
-    statBioSync: string;
-    statLogic: string;
-    statCompassion: string;
-    skillProgression: string;
+    statChaos: string;
+    statChaosHint: string;
+    statCost: string;
+    statCostHint: string;
+    statActivity: string;
+    statActivityHint: string;
+    statStability: string;
+    statStabilityHint: string;
     availableAp: string; // {{n}}
+    filterAll: string;
+    filterMachines: string;
+    filterAgents: string;
+    avatarRequired: string;
+    deploy: string;
+    redeploy: string;
+    deploying: string;
+    deploySuccess: string;
+    deployFailed: string;
+    deployedAt: string; // {{when}}
+    deployStatusDraft: string;
+    deployStatusDeployed: string;
+    controlConfigTitle: string;
+    controlConfigEdit: string;
+    controlConfigEmpty: string;
+    controlConfigSummary: string; // {{n}}
+    pipelineConfigTitle: string;
+    pipelineConfigPlaceholder: string;
+    pipelineConfigPending: string;
+    dispatcherConfigTitle: string;
+    dispatcherConfigPlaceholder: string;
+    dispatcherConfigPending: string;
+    controlConfigSaving: string;
+    controlConfigSave: string;
+    controlConfigInvalid: string;
+    skillSlotLabel: string; // {{n}}
+    skillSlotEmpty: string;
+    skillCentralSlotLabel: string;
+    skillSlotDetailTitle: string;
+    skillSlotDetailUnequip: string;
     skillEmpty: string;
-    activeCapabilities: string;
-    activeCapabilitiesSummary: string; // {{enabled}} {{total}}
-    capabilityEmpty: string;
-    capabilityRequiresEnv: string; // {{vars}}
-    capabilityReady: string;
-    capabilityNoCalls: string;
-    capabilityRecentSummary: string; // {{count}} {{successRate}}
-    capabilityAvgLatency: string; // {{ms}}
-    capabilityLastSucceeded: string;
-    capabilityLastFailed: string;
-    secretConfigure: string;
-    secretReconfigure: string;
-    secretClear: string;
-    secretDialogTitle: string; // {{name}}
-    secretDialogHint: string;
-    secretDialogPlaceholder: string;
-    secretDialogSave: string;
-    secretDialogSaving: string;
-    secretDialogCancel: string;
-    secretDialogClearConfirm: string; // {{name}}
-    secretSourceDb: string;
-    secretSourceEnv: string;
-    secretEmptyValue: string;
-    secretSaveFailed: string;
     edit: string;
     remove: string;
     confirmRemove: string; // {{name}}
     deleteFailed: string;
     emptyState: string;
-    noClericSelected: string;
+    noAgentSelected: string;
     editorNewLabel: string;
     editorNewTitle: string;
     editorEditLabel: string;
@@ -382,21 +384,7 @@ export interface Dictionary {
     cancel: string;
     saving: string;
     saveFailed: string;
-    invocationConsole: string;
-    invocationConsoleHint: string;
-    invokeInputLabel: string;
-    invokeButton: string;
-    invoking: string;
-    invokeOutputLabel: string;
-    invokeFailed: string;
-    invokeDisabled: string;
-    invokeLatency: string; // {{ms}}
-    invokeRecent: string;
-    invokeNoHistory: string;
-    invokeAdminOnly: string;
-    invokeRateLimited: string;
-    invokeBadJson: string;
-    tabClerics: string;
+    tabAgents: string;
     tabSkillLibrary: string;
     skillLibraryTitle: string;
     skillKindPassive: string;
@@ -468,12 +456,6 @@ export interface Dictionary {
     saving: string;
     finish: string;
     saveFailed: string;
-    aiSuggest: string;
-    aiThinking: string;
-    aiFailed: string;
-    aiNotConfigured: string;
-    aiDescriptionPlaceholder: string;
-    aiHint: string;
     extract: string;
     extractConfirm: string; // {{name}}
     move: string;

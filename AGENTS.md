@@ -62,16 +62,7 @@ ADMIN_TOKEN="..."             # seed 初始 admin token
 SAFETY_SECRET="..."     # ≥32 字节，openssl rand -base64 32（详细影响范围见下方运维约定段）
 SECRET_DOOR_PASSWORD=""       # /vault 暗门 UI 输入的明文密码（与 SAFETY_SECRET 是两个独立 env，协作完成"密码 → 签 cookie"）
 # ALLOW_PROD_SEED=1           # 生产环境强行运行 seed 才需要
-
-# AI agent capabilities — 缺 KEY 对应 pipeline step graceful skip，不阻塞整条流程
-ANTHROPIC_API_KEY=""          # DIVA-001 的 structured-naming / write-lore + relic 自动命名
-REMOVE_BG_API_KEY=""          # DIVA-001 抠图（remove.bg）
-TAVILY_API_KEY=""             # DIVA-001 联网检索（Tavily）
-MESHY_API_KEY=""              # DIVA-001 image-to-3d（Meshy）
-AGENT_SECRETS_KEK=""          # 可选，独立加密 KEK；不设则 fallback 到 SAFETY_SECRET
 ```
-
-> 上面 4 个 API key 也可以通过 admin UI（机器之眼 → capability 卡片"配置 · KEY"按钮）加密录入到 `AgentSecret` 表，运行时 **DB > .env 优先**。详见下方"AI Agent / Pipeline 子系统"段。
 
 ## 本地数据库（Postgres + Homebrew）
 
@@ -114,68 +105,26 @@ dropdb green_diva && createdb -O gd_dev green_diva && npm run db:push && npm run
 - **最小权限账户**：应用连接的 DB user 仅 `CONNECT / SELECT / INSERT / UPDATE / DELETE / USAGE`，**禁止** `DROP / TRUNCATE / CREATE`。Schema 变更走单独的 owner 账户 + `prisma migrate deploy`，不要让 app user 持有这些权限。
 - **每日 dump 备份**：`pg_dump --format=custom` 每日一次，保留至少 7 天，dump 文件加密存储（KMS / SSE-S3）。恢复演练每季度一次。
 - **`.env` 永不进仓**：`.gitignore` 已覆盖 `.env*`。线上 secrets 走平台环境变量或 secret manager，不进 git。
-- **`SAFETY_SECRET`** 是 server-side 安全 root，**5 处直接读取 / 4 大功能用途**：① [`lib/userToken.ts`](lib/userToken.ts) HMAC 派生 `tokenLookup`（O(1) 登录查表）；② [`lib/vault-token.ts`](lib/vault-token.ts) + [`middleware.ts`](middleware.ts) 签 / 验 `gd_vault` cookie（暗门会话）；③ [`lib/relicCookie.ts`](lib/relicCookie.ts) 签 `gd_relic_unlocks` cookie；④ [`lib/agentSecrets.ts`](lib/agentSecrets.ts) SHA-256 派生 AES-256-GCM KEK，加密 admin 录入的 capability API key（domain prefix `"agent-secret-v1\0"` 隔离用法，与 ①②③ 的 HMAC 输出永不碰撞）。**生产必填且 ≥32 字节**（`openssl rand -base64 32`）。轮换它会让以上**全部**失效（用户重登录 / 重 unseal vault / 重录 API key），但**用户的 vault master password 与此完全无关**——`VaultItem` 是客户端 E2E 加密，server 没有解密能力。如需让 API key 加密与登录态解耦轮换，单独设 `AGENT_SECRETS_KEK`（不设则 fallback 到此 secret，零配置维持现状）。
+- **`SAFETY_SECRET`** 是 server-side 安全 root，**3 处直接读取**：① [`lib/userToken.ts`](lib/userToken.ts) HMAC 派生 `tokenLookup`（O(1) 登录查表）；② [`lib/vault-token.ts`](lib/vault-token.ts) + [`middleware.ts`](middleware.ts) 签 / 验 `gd_vault` cookie（暗门会话）；③ [`lib/relicCookie.ts`](lib/relicCookie.ts) 签 `gd_relic_unlocks` cookie。**生产必填且 ≥32 字节**（`openssl rand -base64 32`）。轮换它会让以上**全部**失效（用户重登录 / 重 unseal vault），但**用户的 vault master password 与此完全无关**——`VaultItem` 是客户端 E2E 加密，server 没有解密能力。
 - **未来加密码**：当前 `User.token` 是 random bytes 不可逆，安全。如未来引入密码字段，**必须** bcrypt（cost ≥12）或 argon2id 哈希后入库，**绝不存明文或可逆加密**。
 - **`prisma db seed` 在生产被拒绝**：[prisma/seed.ts](prisma/seed.ts) 已加 `NODE_ENV === "production"` 守卫，需要 `ALLOW_PROD_SEED=1` 才能强行跑。仅在初始化新环境时使用。
 
-## AI Agent / Pipeline 子系统（machine-vision + relic pipeline）
+## Relic 上传流水线（极简版）
 
-跨 `lib/agents/`、`lib/relics/pipeline/`、`lib/agentSecrets.ts`、`/api/relics/draft|job|jobs/[jobId]/retry`、`/api/admin/agent-secrets`、`app/machine-vision/` 协作的子系统。改任一处都要读完本段，否则容易踩 5 类陷阱。
+跨 `lib/relics/pipeline/`、`/api/relics/draft|job|jobs/[jobId]/retry`、`app/relic-collection/` 的子系统。当前 pipeline **只有 2 个 step**：`EXTRACT_ZIP`（解压上传 ZIP）→ `PACK_DERIVED`（把解压产物 + 原 ZIP + metadata 打包成 derived ZIP）。
 
-### 数据模型扩展（详见 `prisma/schema.prisma`）
+要点：
+- **Fire-and-forget**：`/api/relics/draft` 创建 Job 后 `void runRelicPipeline(jobId)` 立即返回 201，**绝不 await**。
+- **顶层永不 throw**：`runRelicPipeline` 顶层 `try/catch` 把任何错误写到 `Job.errorMessage` + `status=FAILED`。
+- **自动重试**：runner 对瞬时错误（5xx / timeout / ECONN / EAI_AGAIN / "fetch failed"）退避（`2^attempt * 1s`）至 `Job.maxAttempts=3`。
+- **续跑**：`POST /api/relics/[id]/jobs/[jobId]/retry?fromStep=PACK_DERIVED` 从指定 step 续跑；上游 step 结果从 `Job.stepResults` JSON 还原。
+- **Crash recovery**：[`lib/server-init.ts::ensureServerInit()`](lib/server-init.ts) 在 `/api/relics/draft` + `/api/relics/[id]/job` 入口懒触发，重启 `RUNNING & updatedAt < 10min ago` 的 job。**新加 job-creating endpoint 时也要调** `await ensureServerInit()`。
+- **文件布局**：`private/relics/{slug}/{source/{archive-{ts}.zip, extracted/}, derived/}`；`Relic.derivedArchivePath` 是最终归档 ZIP（详情页"下载归档资料包"按钮自动 enabled）。
+- **进度 UI** = **3 秒 setInterval 轮询**（参考 [`RelicProcessingBanner.tsx`](app/relic-collection/[slug]/_components/RelicProcessingBanner.tsx)），完成后 `router.refresh()`。
+- **简化的新建路径**：[`RelicDraftPanel`](app/relic-collection/_components/RelicDraftPanel.tsx) 上传 ZIP + 描述 → 自动跳详情页 → banner 展示进度。旧 [`RelicForm`](app/admin/relics/RelicForm.tsx) 仅作"编修"。
+- VaultCell 在 `relic.status === "PROCESSING" / "DRAFT"` 时显示右下 `progress_activity` 旋转图标。
 
-- `Agent` —— machine-vision 的"代理圣徒"。`skills` JSON 字段是 `AgentSkill[]`（**展示型**：icon/level 1-6/unlocked，UI 装饰），与下面"capability"是**两层**，不要互相覆盖。
-- `AgentInvocation` —— agent 工作流水（machine-vision 调用台 + capability `withInvocationLogging` wrapper 都写）。
-- `AgentSecret` —— admin 通过 UI 加密录入的 API key 行，AES-256-GCM 加密；`hint` 是末 4 字符 mask；**永不**返回 ciphertext / 明文给客户端。
-- `Relic` 加 `status: RelicStatus`（`DRAFT/PROCESSING/READY/PARTIAL/FAILED`，默认 READY 兼容存量）+ `draftNote`（用户提交的描述）+ `jobs[]`。
-- `RelicProcessingJob` —— 单次 pipeline 跑的状态机：`status / step / progress(0-100) / attempt / maxAttempts / meshyTaskId / errorMessage / stepResults(Json)`。
-- `RelicAction` enum 加 4 个 `PROCESSING_*`，自动出现在 relic 详情页活动日志时间线（i18n key 已加，UI 不用改）。
-
-### 陷阱 1：`AgentSkill` vs `AgentCapability` 命名冲突 ⚠️
-
-- [`lib/agentTypes.ts::AgentSkill`](lib/agentTypes.ts) —— **展示型**（icon/nameEn/level/costAp/unlocked），机器之眼 SKILL PROGRESSION 渲染用，**不可执行**。
-- [`lib/agents/types.ts::AgentCapability<I, O>`](lib/agents/types.ts) —— **可执行**接口（`run(agent, input)`），物理上归属具体 agent，目录 `lib/agents/<codename>/`（当前只有 `diva-001/`）。
-- **首要陷阱**：grep / 写代码时千万别混。client 组件需要 capability 类型时，**必须**从 [`lib/agents/capabilityTypes.ts`](lib/agents/capabilityTypes.ts) import（无 `server-only` 守卫的纯类型文件），**不要**从 `lib/agents/types.ts`（有 `server-only`，client 打包会炸）。
-
-### 陷阱 2：API key 必须 `await getSecretOrEnv(name)`
-
-外部 API key（ANTHROPIC / REMOVE_BG / TAVILY / MESHY）**绝不直接** `process.env.X` 读：
-- 优先级 **DB > .env**（admin 通过 UI 录入加密存 `AgentSecret` 表，运行时即时生效，无需重启 server）
-- Capability 内部 + pipeline step graceful skip 检查统一 `const key = await getSecretOrEnv("X")`（async！），缺则 throw / skip
-- 加新 capability / 改既有 capability 时跟随这个模式
-- 通用 [`invokeAgent`](lib/agents/invoke.ts) + `/api/agents/[id]/invoke` 仍保留给"调用台手动玩 agent"，**capability 不走它**（capability 是确定性多步流程，不是单次 LLM tool-call）
-
-### 陷阱 3：Relic Pipeline runner 约束
-
-- 7 step 串行：`EXTRACT_ZIP → REMOVE_BG → STRUCTURED_FIELDS → GEN_3D → WEB_RESEARCH → WRITE_LORE → PACK_DERIVED`
-- **Fire-and-forget**：`/api/relics/draft` 创建 Job 后 `void runRelicPipeline(jobId)` 立即返回 201，**绝不 await**
-- **顶层永不 throw**：`runRelicPipeline` 顶层 `try/catch` 把任何错误写到 `Job.errorMessage` + `status=FAILED`；throw 会变 unhandled rejection
-- **Graceful skip**：缺 KEY / 单 step 内部失败 → `return { ok: true, data: { status: "skipped", reason } }`，pipeline 不整体崩；最终 `Relic.status` 视产物完整度落 `READY` / `PARTIAL`
-- **自动重试**：runner 对瞬时错误（5xx / timeout / ECONN / EAI_AGAIN / "fetch failed"）退避（`2^attempt * 1s`）至 `Job.maxAttempts=3`
-- **续跑**：`POST /api/relics/[id]/jobs/[jobId]/retry?fromStep=GEN_3D` 从指定 step 续跑；上游 step 结果从 `Job.stepResults` JSON 还原（无需重跑）
-- **Crash recovery**：[`lib/server-init.ts::ensureServerInit()`](lib/server-init.ts) 在 `/api/relics/draft` + `/api/relics/[id]/job` 入口懒触发，重启 `RUNNING & updatedAt < 10min ago` 的 job。**新加 job-creating endpoint 时也要调** `await ensureServerInit()`
-- **文件布局**：`private/relics/{slug}/{source/{archive-{ts}.zip, extracted/}, derived/}`；`Relic.derivedArchivePath` 是最终归档 ZIP（详情页"下载归档资料包"按钮自动 enabled）
-
-### 加新 capability 的标准流程
-
-1. 在 `lib/agents/<codename>/<id>.ts` 实现 `AgentCapability<I, O>`；**必须**填 `metadata: { iconKey, nameEn/Zh, descriptionEn/Zh, provider, requiredEnvVars }`（machine-vision UI 直接读 metadata 渲染卡片）
-2. 用 `withInvocationLogging(baseCap)` 包一层 → 自动写 `AgentInvocation`（`source = "capability:<id>"`，UI 调用台流水自动反映）
-3. 在 `<codename>/index.ts` 注册到 capability map；[`lib/agents/registry.ts`](lib/agents/registry.ts) 把 codename 加到 `REGISTRY` 即可
-4. 自动获得：machine-vision UI 列出该能力 + admin 看到"配置 · ENV_NAME"按钮 + capability 状态点联动 SKILL PROGRESSION rail + summary 流水统计
-5. 如新 capability 需要 KEY，UI 配置入口**自动出现**——不用单独写（`lib/agents/knownSecrets.ts` 从所有 capability 的 `metadata.requiredEnvVars` 自动派生白名单）
-
-### UI 模式
-
-- **进度展示** = **3 秒 setInterval 轮询**（参考 [`RelicProcessingBanner.tsx`](app/relic-collection/[slug]/_components/RelicProcessingBanner.tsx)），完成后 `router.refresh()`。**不要**上 SSE / WebSocket，除非有 100ms 级实时性需求
-- **加密 KEY 录入** = capability 卡片"配置 · ENV_NAME"按钮 → 弹 [`SecretDialog`](app/machine-vision/components/SecretDialog.tsx)（password input + POST `/api/admin/agent-secrets`）；已配置时显示"重设 / 清除"。这些 UI 用 `isAdmin` 控制可见，非 admin 看到的是只读"需配置"徽章
-- **Rail ↔ List 联动** = [`CapabilityPair`](app/machine-vision/AgentClient.tsx) 子组件持有 `activeCapId` state + `key={agent.id}` 让切换 agent 时 React 自动 remount + lazy `useState` init 选首个 envOk capability。**这是规避 React 19 set-state-in-effect lint rule 的范本**，新加联动两件套时沿用
-
-### 简化的添加 Relic 流程（替代 RelicForm）
-
-- [`RelicDraftPanel`](app/relic-collection/_components/RelicDraftPanel.tsx) 仅 2 输入：ZIP + 描述。POST `/api/relics/draft` → 自动跳详情页 → banner 展示 pipeline 进度
-- 旧 [`RelicForm`](app/admin/relics/RelicForm.tsx) 仅作"编修"用（admin 改字段），不再走"新建"路径
-- VaultCell 在 `relic.status === "PROCESSING" / "DRAFT"` 时显示右下 `progress_activity` 旋转图标
-- Slot 范围按 schema 实际（60 槽位 / 2 页），不是旧 RelicForm 误写的 1-30
+> 历史版本曾有 `REMOVE_BG / STRUCTURED_FIELDS / GEN_3D / WEB_RESEARCH / WRITE_LORE` 5 步 AI 处理 + capability 子系统（lib/clerics/ + ClericSecret 表 + admin 配置 UI），已于 2026-05-05 整体移除。当前 pipeline 不调任何外部 AI 服务。
 
 ## 设计约定（已踩坑结论）
 

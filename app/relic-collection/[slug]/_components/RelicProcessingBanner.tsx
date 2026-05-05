@@ -8,16 +8,7 @@ import { format } from "@/lib/i18n/format";
 const POLL_MS = 3000;
 type RelicStatus = "DRAFT" | "PROCESSING" | "READY" | "PARTIAL" | "FAILED";
 type JobStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-type JobStep =
-  | "ENQUEUED"
-  | "EXTRACT_ZIP"
-  | "REMOVE_BG"
-  | "STRUCTURED_FIELDS"
-  | "GEN_3D"
-  | "WEB_RESEARCH"
-  | "WRITE_LORE"
-  | "PACK_DERIVED"
-  | "FINALIZE";
+type JobStep = "ENQUEUED" | "EXTRACT_ZIP" | "PACK_DERIVED" | "FINALIZE";
 
 type JobPayload = {
   hasJob: boolean;
@@ -34,11 +25,6 @@ type JobPayload = {
 const STEP_KEY: Record<JobStep, keyof ReturnType<typeof useT>["relicCollection"]> = {
   ENQUEUED: "jobStepEnqueued",
   EXTRACT_ZIP: "jobStepExtractZip",
-  REMOVE_BG: "jobStepRemoveBg",
-  STRUCTURED_FIELDS: "jobStepStructuredFields",
-  GEN_3D: "jobStepGen3d",
-  WEB_RESEARCH: "jobStepWebResearch",
-  WRITE_LORE: "jobStepWriteLore",
   PACK_DERIVED: "jobStepPackDerived",
   FINALIZE: "jobStepFinalize",
 };

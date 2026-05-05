@@ -36,23 +36,34 @@ export const agentSkillSchema = z.object({
 
 const stat = z.number().int().min(0).max(100);
 
+// Json blob — both pipeline and dispatcher configs are opaque at the API layer.
+// Concrete shapes will be enforced by their respective editors.
+const jsonObject = z.record(z.unknown());
+
+export const pipelineConfigSchema = jsonObject.nullable();
+export const dispatcherConfigSchema = jsonObject.nullable();
+
 export const agentCreateSchema = z.object({
   codename: z.string().min(2).max(32).regex(/^[A-Z0-9-]+$/, "codename must be uppercase letters, digits, dashes"),
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
   classification: z.string().max(40).optional().nullable(),
+  mode: z.enum(["MECHANICAL", "AUTONOMOUS"]).optional(),
   status: z.enum(["ONLINE", "STANDBY", "OFFLINE"]).optional(),
-  avatarUrl: z.string().url().optional().nullable(),
+  // Avatar required: every agent must have a portrait.
+  avatarUrl: z.string().url(),
   descriptionEn: z.string().max(4000).optional().nullable(),
   descriptionZh: z.string().max(4000).optional().nullable(),
   syncLevel: z.number().min(0).max(100).optional(),
   matrixLevel: z.number().int().min(1).max(99).optional(),
-  quickness: stat.optional(),
-  intelligence: stat.optional(),
-  neuralLink: stat.optional(),
-  bioSync: stat.optional(),
-  logic: stat.optional(),
-  compassion: stat.optional(),
+  // Derived stats — clients usually shouldn't write these directly,
+  // but admin can override during testing.
+  chaosLevel: stat.optional(),
+  costTier: stat.optional(),
+  activityLevel: stat.optional(),
+  stabilityLevel: stat.optional(),
+  pipelineConfig: pipelineConfigSchema.optional(),
+  dispatcherConfig: dispatcherConfigSchema.optional(),
   skills: z.array(agentSkillSchema).max(12).optional().nullable(),
   availableAp: z.number().int().min(0).max(999).optional(),
   enabled: z.boolean().optional(),
@@ -67,10 +78,24 @@ export const agentCreateSchema = z.object({
   rateLimitPerMin: z.number().int().min(1).max(600).optional().nullable(),
 });
 
-export const agentUpdateSchema = agentCreateSchema.partial();
+// Update schema relaxes avatarUrl back to optional — we don't want
+// every PATCH to require re-sending the avatar.
+export const agentUpdateSchema = agentCreateSchema
+  .partial()
+  .extend({
+    avatarUrl: z.string().url().optional(),
+  });
 
 export const agentInvokeSchema = z.object({
   input: z.unknown(),
+});
+
+export const agentPipelineSchema = z.object({
+  config: jsonObject.nullable(),
+});
+
+export const agentDispatcherSchema = z.object({
+  config: jsonObject.nullable(),
 });
 
 export type AgentCreateInput = z.infer<typeof agentCreateSchema>;
@@ -91,13 +116,16 @@ export const skillCreateSchema = z.object({
 });
 export const skillUpdateSchema = skillCreateSchema.partial();
 
-export const clericSkillEquipSchema = z.object({
+export const agentSkillEquipSchema = z.object({
   skillId: z.string().cuid(),
   unlocked: z.boolean().optional().default(false),
+  // 0..5 — the spine/brain slot. Omit or null to leave unslotted.
+  slotIndex: z.number().int().min(0).max(5).nullable().optional(),
 });
 
-export const clericSkillUnlockSchema = z.object({
-  unlocked: z.boolean(),
+export const agentSkillUnlockSchema = z.object({
+  unlocked: z.boolean().optional(),
+  slotIndex: z.number().int().min(0).max(5).nullable().optional(),
 });
 
 export type SkillCreateInput = z.infer<typeof skillCreateSchema>;

@@ -406,7 +406,7 @@ export default async function Home() {
 
             {/* AI Clergy */}
             <Link
-              href="/ai-clergy"
+              href="/machine-agent"
               className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
               <div className="absolute inset-0 pointer-events-none opacity-20 z-30">
@@ -421,14 +421,14 @@ export default async function Home() {
               </div>
               <div className="z-20 space-y-2">
                 <h4 className="font-headline text-xl text-secondary leading-tight">
-                  {t.sections.aiClergyTitle}
+                  {t.sections.machineAgentTitle}
                 </h4>
                 <p className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
                   {t.sections.syntheticHallucinations}
                 </p>
               </div>
               <div className="flex-1 flex flex-col gap-3 z-20">
-                {/* Unified ai-clergy panel: matrix rain layered over bars + centered all-seeing eye */}
+                {/* Unified machine-agent panel: matrix rain layered over bars + centered all-seeing eye */}
                 <div className="relative flex-1 min-h-[4.5rem] w-full rounded-xl overflow-hidden bg-background/80">
                   {/* Background layer: bars */}
                   <div

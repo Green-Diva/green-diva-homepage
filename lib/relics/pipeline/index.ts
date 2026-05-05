@@ -9,11 +9,6 @@ import {
   type StepResult,
 } from "./context";
 import { stepExtractZip } from "./steps/extractZip";
-import { stepRemoveBg } from "./steps/removeBg";
-import { stepStructuredFields } from "./steps/structuredFields";
-import { stepGenerate3d } from "./steps/generate3d";
-import { stepWebResearch } from "./steps/webResearch";
-import { stepWriteLore } from "./steps/writeLore";
 import { stepPackDerived } from "./steps/packDerived";
 
 const ERROR_MESSAGE_MAX_LEN = 500;
@@ -25,30 +20,15 @@ type StepDef = {
 };
 
 const STEPS: StepDef[] = [
-  { id: "EXTRACT_ZIP", weight: 5, run: stepExtractZip as StepDef["run"] },
-  { id: "REMOVE_BG", weight: 15, run: stepRemoveBg as StepDef["run"] },
-  { id: "STRUCTURED_FIELDS", weight: 10, run: stepStructuredFields as StepDef["run"] },
-  { id: "GEN_3D", weight: 40, run: stepGenerate3d as StepDef["run"] },
-  { id: "WEB_RESEARCH", weight: 10, run: stepWebResearch as StepDef["run"] },
-  { id: "WRITE_LORE", weight: 15, run: stepWriteLore as StepDef["run"] },
-  { id: "PACK_DERIVED", weight: 5, run: stepPackDerived as StepDef["run"] },
+  { id: "EXTRACT_ZIP", weight: 50, run: stepExtractZip as StepDef["run"] },
+  { id: "PACK_DERIVED", weight: 50, run: stepPackDerived as StepDef["run"] },
 ];
 
 const TOTAL_WEIGHT = STEPS.reduce((s, x) => s + x.weight, 0);
 
-/**
- * Top-level pipeline entrypoint. NEVER throws — any error is recorded onto the
- * job row and the relic is moved to PARTIAL/FAILED. Callers fire-and-forget.
- *
- * Pass `opts.fromStep` to resume from a specific step; results from previously
- * completed steps are restored from `Job.stepResults`. Used by:
- * - the manual retry endpoint (admin chooses which step to rewind to)
- * - the crash-recovery routine in lib/server-init.ts (resumes whichever step
- *   was in flight when the previous process died)
- */
 export async function runRelicPipeline(
   jobId: string,
-  opts?: { fromStep?: import("@prisma/client").RelicJobStep },
+  opts?: { fromStep?: RelicJobStep },
 ): Promise<void> {
   try {
     await runInner(jobId, opts);
@@ -69,27 +49,13 @@ export async function runRelicPipeline(
   }
 }
 
-async function runInner(
-  jobId: string,
-  opts?: { fromStep?: import("@prisma/client").RelicJobStep },
-): Promise<void> {
+async function runInner(jobId: string, opts?: { fromStep?: RelicJobStep }): Promise<void> {
   const initial = await prisma.relicProcessingJob.findUnique({
     where: { id: jobId },
-    include: { relic: true, cleric: true },
+    include: { relic: true },
   });
   if (!initial) {
     console.warn("[pipeline] job vanished before start", { jobId });
-    return;
-  }
-  if (!initial.cleric) {
-    await prisma.relicProcessingJob.update({
-      where: { id: jobId },
-      data: {
-        status: "FAILED",
-        errorMessage: "no cleric attached to job",
-        finishedAt: new Date(),
-      },
-    });
     return;
   }
 
@@ -105,7 +71,6 @@ async function runInner(
   const dirs = pipelineDirsForSlug(initial.relic.slug);
   await ensurePipelineDirs(dirs);
 
-  // Resume support: restore prior step results + skip ahead to the requested step.
   const startIdx = (() => {
     if (!opts?.fromStep) return 0;
     const idx = STEPS.findIndex((s) => s.id === opts.fromStep);
@@ -127,13 +92,12 @@ async function runInner(
 
   for (let i = startIdx; i < STEPS.length; i++) {
     const step = STEPS[i];
-    // Reload the relic + job to pick up upstream writes.
     const fresh = await prisma.relicProcessingJob.findUnique({
       where: { id: jobId },
-      include: { relic: true, cleric: true },
+      include: { relic: true },
     });
-    if (!fresh || !fresh.cleric) {
-      throw new Error("job or cleric vanished mid-pipeline");
+    if (!fresh) {
+      throw new Error("job vanished mid-pipeline");
     }
     if (fresh.status === "CANCELLED") {
       console.warn("[pipeline] cancelled mid-run", { jobId });
@@ -148,7 +112,6 @@ async function runInner(
     const ctx: PipelineContext = {
       job: fresh,
       relic: fresh.relic,
-      cleric: fresh.cleric,
       dirs,
       results,
     };
@@ -231,7 +194,6 @@ async function runInner(
     });
   }
 
-  // All steps succeeded.
   const final = await prisma.relicProcessingJob.findUnique({
     where: { id: jobId },
     include: { relic: true },

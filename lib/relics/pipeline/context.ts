@@ -1,26 +1,20 @@
 import "server-only";
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import type { Cleric, Relic, RelicProcessingJob } from "@prisma/client";
+import type { Relic, RelicProcessingJob } from "@prisma/client";
 import { RELIC_STORAGE_ROOT } from "@/lib/relicStorage";
 
 export type PipelineDirs = {
-  /** Absolute path to the relic's root storage directory. */
   root: string;
-  /** Absolute path to source/ — original ZIP + extracted/ tree. */
   source: string;
-  /** Absolute path to source/extracted/ — exploded ZIP contents. */
   extracted: string;
-  /** Absolute path to derived/ — pipeline outputs (clean photos, GLB, metadata, derived ZIP). */
   derived: string;
 };
 
 export type PipelineContext = {
   job: RelicProcessingJob;
   relic: Relic;
-  cleric: Cleric;
   dirs: PipelineDirs;
-  /** Mutable map of step.id -> arbitrary result data shared with downstream steps. */
   results: Map<string, unknown>;
 };
 
