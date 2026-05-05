@@ -7,7 +7,7 @@
     "dev": "next dev",
     "dev:stable": "npm run build && npm run start",
     "build": "next build",
-    "start": "tsx prisma/migrate-token-hash.ts && prisma db push --skip-generate && next start",
+    "start": "tsx prisma/migrate-token-hash.ts && tsx prisma/migrate-agent-loadout.ts && prisma db push --skip-generate --accept-data-loss && next start",
     "start:stable": "npm run build && npm run start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
