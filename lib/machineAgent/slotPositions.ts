@@ -19,15 +19,15 @@ export type SlotPos = {
 
 export type CentralPos = { top: string; left: string };
 
-// Spine layout: vertical column down the center, slots paired left/right at
-// three rows. Index order goes top-down, left-then-right.
+// Spine layout: two vertical columns flanking the spine, 3 slots each,
+// vertically aligned. CONTROL sits in the bright central column.
 export const MACHINE_SLOTS: SlotPos[] = [
-  { i: 0, top: "20%", left: "30%" },
-  { i: 1, top: "20%", left: "70%" },
-  { i: 2, top: "44%", left: "27%" },
-  { i: 3, top: "44%", left: "73%" },
-  { i: 4, top: "70%", left: "30%" },
-  { i: 5, top: "70%", left: "70%" },
+  { i: 0, top: "18%", left: "18%" },
+  { i: 1, top: "18%", left: "82%" },
+  { i: 2, top: "50%", left: "18%" },
+  { i: 3, top: "50%", left: "82%" },
+  { i: 4, top: "82%", left: "18%" },
+  { i: 5, top: "82%", left: "82%" },
 ];
 export const MACHINE_CENTRAL: CentralPos = { top: "50%", left: "50%" };
 
@@ -64,13 +64,13 @@ export function getLoadoutLayout(mode: "MECHANICAL" | "AUTONOMOUS"): LoadoutLayo
     ? {
         slots: MACHINE_SLOTS,
         central: MACHINE_CENTRAL,
-        background: "/machine-agent/spine.jpg",
-        fallback: "/machine-agent/spine.svg",
+        background: "/images/machine-agent/spine.jpg",
+        fallback: "/images/machine-agent/spine.svg",
       }
     : {
         slots: AGENT_SLOTS,
         central: AGENT_CENTRAL,
-        background: "/machine-agent/brain.jpg",
-        fallback: "/machine-agent/brain.svg",
+        background: "/images/machine-agent/brain.jpg",
+        fallback: "/images/machine-agent/brain.svg",
       };
 }

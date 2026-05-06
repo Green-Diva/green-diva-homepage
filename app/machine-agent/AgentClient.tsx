@@ -9,11 +9,8 @@ import AgentListItem from "./components/AgentListItem";
 import AgentEditor from "./components/AgentEditor";
 import SkillLibrary from "./components/SkillLibrary";
 import AgentFilterChips, { type ModeFilter } from "./components/AgentFilterChips";
-import DetailHeader from "./components/DetailHeader";
-import BaseStatsBar from "./components/BaseStatsBar";
-import AgentHeroPortrait from "./components/AgentHeroPortrait";
-import SkillsControlPanel from "./components/SkillsControlPanel";
-import DeployButton from "./components/DeployButton";
+import MechanicalDetailView from "./components/MechanicalDetailView";
+import AutonomousDetailView from "./components/AutonomousDetailView";
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: AgentRow | null };
 type TabKey = "agents" | "skills";
@@ -156,25 +153,23 @@ export default function AgentClient({
           {/* Right: detail (lg:9). Header row + BaseStats + 3 equal-height columns. */}
           <CyberPanel className="lg:col-span-9 p-4 min-h-0 overflow-hidden" markers={["tl", "br"]}>
             {activeAgent ? (
-              <div className="flex flex-col h-full gap-3 min-h-0">
-                <div className="flex items-start justify-between gap-3 shrink-0">
-                  <DetailHeader agent={activeAgent} isAdmin={isAdmin} onEdit={openEdit} />
-                  <DeployButton agent={activeAgent} isAdmin={isAdmin} />
-                </div>
-                <BaseStatsBar agent={activeAgent} />
-                <div className="flex-1 min-h-0 grid grid-cols-[calc((100%+48px)/4)_minmax(0,1fr)] gap-x-4 items-stretch">
-                  <AgentHeroPortrait agent={activeAgent} />
-                  <div className="min-h-0">
-                    <SkillsControlPanel
-                      key={`scp-${activeAgent.id}`}
-                      agent={activeAgent}
-                      equips={activeEquips}
-                      allSkills={skills}
-                      isAdmin={isAdmin}
-                    />
-                  </div>
-                </div>
-              </div>
+              activeAgent.mode === "MECHANICAL" ? (
+                <MechanicalDetailView
+                  agent={activeAgent}
+                  equips={activeEquips}
+                  allSkills={skills}
+                  isAdmin={isAdmin}
+                  onEdit={openEdit}
+                />
+              ) : (
+                <AutonomousDetailView
+                  agent={activeAgent}
+                  equips={activeEquips}
+                  allSkills={skills}
+                  isAdmin={isAdmin}
+                  onEdit={openEdit}
+                />
+              )
             ) : (
               <div className="h-full flex items-center justify-center text-on-surface-variant text-sm">
                 {t.machineAgent.noAgentSelected}
