@@ -12,7 +12,8 @@ import AgentFilterChips, { type ModeFilter } from "./components/AgentFilterChips
 import DetailHeader from "./components/DetailHeader";
 import BaseStatsBar from "./components/BaseStatsBar";
 import EquipmentLoadout from "./components/EquipmentLoadout";
-import ControlConfigStrip from "./components/ControlConfigStrip";
+import AgentHeroPortrait from "./components/AgentHeroPortrait";
+import SkillsLoadoutColumn from "./components/SkillsLoadoutColumn";
 import DeployButton from "./components/DeployButton";
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: AgentRow | null };
@@ -153,35 +154,32 @@ export default function AgentClient({
             </div>
           </CyberPanel>
 
-          {/* Right: detail (lg:9), 5 vertical sections */}
+          {/* Right: detail (lg:9). Header row + BaseStats + 3 equal-height columns. */}
           <CyberPanel className="lg:col-span-9 p-4 min-h-0 overflow-hidden" markers={["tl", "br"]}>
             {activeAgent ? (
               <div className="flex flex-col h-full gap-3 min-h-0">
                 <div className="flex items-start justify-between gap-3 shrink-0">
-                  <div className="flex-1 min-w-0">
-                    <DetailHeader agent={activeAgent} />
-                  </div>
-                  {isAdmin ? (
-                    <button
-                      type="button"
-                      onClick={openEdit}
-                      className="shrink-0 min-h-[36px] px-3 border border-outline-variant text-on-surface-variant font-label text-[9px] tracking-[0.25em] uppercase rounded-md hover:bg-surface-container hover:text-on-surface transition-colors flex items-center gap-1.5"
-                    >
-                      <span className="material-symbols-outlined text-[14px]" aria-hidden>edit</span>
-                      {t.machineAgent.edit}
-                    </button>
-                  ) : null}
+                  <DetailHeader agent={activeAgent} isAdmin={isAdmin} onEdit={openEdit} />
+                  <DeployButton agent={activeAgent} isAdmin={isAdmin} />
                 </div>
                 <BaseStatsBar agent={activeAgent} />
-                <EquipmentLoadout
-                  key={`loadout-${activeAgent.id}`}
-                  agent={activeAgent}
-                  equips={activeEquips}
-                  allSkills={skills}
-                  isAdmin={isAdmin}
-                />
-                <ControlConfigStrip agent={activeAgent} isAdmin={isAdmin} />
-                <DeployButton agent={activeAgent} isAdmin={isAdmin} />
+                <div className="flex-1 min-h-0 flex flex-row gap-3 items-stretch justify-center">
+                  <AgentHeroPortrait agent={activeAgent} />
+                  <EquipmentLoadout
+                    key={`loadout-${activeAgent.id}`}
+                    agent={activeAgent}
+                    equips={activeEquips}
+                    allSkills={skills}
+                    isAdmin={isAdmin}
+                  />
+                  <SkillsLoadoutColumn
+                    key={`skills-col-${activeAgent.id}`}
+                    agent={activeAgent}
+                    equips={activeEquips}
+                    allSkills={skills}
+                    isAdmin={isAdmin}
+                  />
+                </div>
               </div>
             ) : (
               <div className="h-full flex items-center justify-center text-on-surface-variant text-sm">

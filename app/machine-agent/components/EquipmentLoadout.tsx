@@ -41,8 +41,8 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
     : !!agent.dispatcherConfig && Object.keys(agent.dispatcherConfig).length > 0;
 
   return (
-    <div className="flex-1 min-h-0 flex items-center justify-center p-2">
-      <div className="relative h-full max-h-full aspect-[3/4] mx-auto">
+    <div className="relative h-full aspect-[3/4] shrink-0">
+      <div className="relative h-full w-full">
         {/* Background image — falls back to embedded SVG if jpg missing */}
         <Image
           src={bgError ? layout.fallback : layout.background}

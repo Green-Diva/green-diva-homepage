@@ -4,58 +4,66 @@ import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { AgentRow } from "../types";
 
-export default function DetailHeader({ agent }: { agent: AgentRow }) {
+// New header (post-redesign): no avatar — that's now the Hero portrait below.
+// One row of: codename + mode badge + deploy badge + EDIT button.
+// Subtitle row: localized name · classification · deployedAt.
+export default function DetailHeader({
+  agent,
+  isAdmin,
+  onEdit,
+}: {
+  agent: AgentRow;
+  isAdmin: boolean;
+  onEdit: () => void;
+}) {
   const t = useT();
   const { locale } = useI18n();
 
   const isMech = agent.mode === "MECHANICAL";
-  const modeLabel = isMech ? t.machineAgent.modeMechanical : t.machineAgent.modeAutonomous;
-  const accent = isMech ? "secondary" : "primary";
-  const ringClass = isMech ? "border-secondary/60" : "border-primary/60";
-  const modeBadgeClass = isMech
+  const accentText = isMech ? "text-secondary" : "text-primary";
+  const modeBadge = isMech
     ? "border-secondary/60 text-secondary bg-secondary/[0.10]"
     : "border-primary/60 text-primary bg-primary/[0.10]";
   const deployBadge = agent.deployedAt
-    ? {
-        label: t.machineAgent.deployStatusDeployed,
-        cls: "border-emerald-400/50 text-emerald-300 bg-emerald-400/[0.08]",
-      }
-    : {
-        label: t.machineAgent.deployStatusDraft,
-        cls: "border-amber-300/50 text-amber-200 bg-amber-300/[0.08]",
-      };
+    ? "border-emerald-400/50 text-emerald-300 bg-emerald-400/[0.08]"
+    : "border-amber-300/50 text-amber-200 bg-amber-300/[0.08]";
 
+  const modeLabel = isMech ? t.machineAgent.modeMechanical : t.machineAgent.modeAutonomous;
+  const deployLabel = agent.deployedAt ? t.machineAgent.deployStatusDeployed : t.machineAgent.deployStatusDraft;
+
+  const subtitleName = locale === "zh" ? agent.nameZh : agent.nameEn;
   const deployedWhen = agent.deployedAt
     ? format(t.machineAgent.deployedAt, { when: new Date(agent.deployedAt).toLocaleString(locale) })
     : null;
 
   return (
-    <div className="flex items-center gap-4 shrink-0">
-      <div className={`relative shrink-0 w-16 h-16 rounded-full border ${ringClass} overflow-hidden bg-surface-container-lowest`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={agent.avatarUrl}
-          alt={agent.codename}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover"
-        />
-        <span aria-hidden className="absolute inset-0 scanline-overlay opacity-60" />
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <h2 className={`font-headline text-2xl ${accentText} sacred-glow leading-tight truncate`}>
+          {agent.codename}
+        </h2>
+        <span className={`font-label text-[9px] tracking-[0.3em] uppercase border rounded px-1.5 py-0.5 ${modeBadge}`}>
+          {modeLabel}
+        </span>
+        <span className={`font-label text-[9px] tracking-[0.3em] uppercase border rounded px-1.5 py-0.5 ${deployBadge}`}>
+          {deployLabel}
+        </span>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="ml-1 min-h-[30px] px-2.5 border border-outline-variant text-on-surface-variant font-label text-[9px] tracking-[0.25em] uppercase rounded-md hover:bg-surface-container hover:text-on-surface transition-colors flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[14px]" aria-hidden>edit</span>
+            {t.machineAgent.edit}
+          </button>
+        ) : null}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`font-headline text-2xl text-${accent} sacred-glow leading-tight truncate`}>{agent.codename}</span>
-          <span className={`font-label text-[9px] tracking-[0.3em] uppercase border rounded px-1.5 py-0.5 ${modeBadgeClass}`}>{modeLabel}</span>
-          <span className={`font-label text-[9px] tracking-[0.3em] uppercase border rounded px-1.5 py-0.5 ${deployBadge.cls}`}>{deployBadge.label}</span>
-        </div>
-        <div className="font-label text-[11px] tracking-[0.18em] text-on-surface-variant truncate mt-0.5">
-          {locale === "zh" ? agent.nameZh : agent.nameEn}
-          {agent.classification ? <span className="text-secondary/70"> · {agent.classification}</span> : null}
-        </div>
+      <div className="font-label text-[11px] tracking-[0.18em] text-on-surface-variant truncate mt-0.5">
+        {subtitleName}
+        {agent.classification ? <span className="text-secondary/70"> · {agent.classification}</span> : null}
         {deployedWhen ? (
-          <div className="font-label text-[9px] tracking-[0.2em] text-on-surface-variant/80 uppercase mt-0.5">
-            {deployedWhen}
-          </div>
+          <span className="ml-2 text-on-surface-variant/70 normal-case">{deployedWhen}</span>
         ) : null}
       </div>
     </div>

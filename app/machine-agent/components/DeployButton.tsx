@@ -48,11 +48,11 @@ export default function DeployButton({ agent, isAdmin }: { agent: AgentRow; isAd
       : t.machineAgent.deploy;
 
   return (
-    <div className="shrink-0 flex items-center justify-end gap-3 relative">
+    <div className="shrink-0 relative">
       {toast ? (
         <span
           role="status"
-          className={`font-label text-[9px] tracking-[0.25em] uppercase px-2.5 py-1 rounded border ${accentBorder}/40 ${accentText} bg-background/80 ${accentGlow}`}
+          className={`absolute right-0 top-full mt-1 z-20 whitespace-nowrap font-label text-[9px] tracking-[0.25em] uppercase px-2.5 py-1 rounded border ${accentBorder}/40 ${accentText} bg-background/90 ${accentGlow}`}
         >
           {toast}
         </span>
