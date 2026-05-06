@@ -285,10 +285,8 @@ export const zh: Dictionary = {
     viewerForging: "正在锻造 3D 形态…",
   },
   machineAgent: {
-    pageLabel: "智能体控制台 · 守望序列",
     pageTitle: "智能体控制台",
     pageSubtitle: "{{filled}}/{{total}} 已就位",
-    backToSanctuary: "← 返回避难所",
     agentRoster: "代理人员 / AGENTS",
     ordainAgent: "+ 编入代理",
     statusOnline: "在线",

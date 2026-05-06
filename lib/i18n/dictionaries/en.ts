@@ -291,10 +291,8 @@ export const en: Dictionary = {
     viewerForging: "Forging the 3D form…",
   },
   machineAgent: {
-    pageLabel: "Agent Control · Sentinel Order",
     pageTitle: "The Agent Control",
     pageSubtitle: "{{filled}}/{{total}} aligned",
-    backToSanctuary: "← Sanctuary",
     agentRoster: "AGENTS",
     ordainAgent: "+ Ordain Agent",
     statusOnline: "ONLINE",

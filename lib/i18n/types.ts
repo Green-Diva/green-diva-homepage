@@ -284,10 +284,8 @@ export interface Dictionary {
     viewerForging: string;
   };
   machineAgent: {
-    pageLabel: string;
     pageTitle: string;
     pageSubtitle: string; // {{filled}}/{{total}}
-    backToSanctuary: string;
     agentRoster: string;
     ordainAgent: string;
     statusOnline: string;
