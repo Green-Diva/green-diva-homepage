@@ -371,7 +371,7 @@ const AGENT_SEEDS = [
 ];
 
 async function seedAgents(creatorId: string | null) {
-  const DEFAULT_AVATAR = "/images/machine-agent/avatars/default.svg";
+  const DEFAULT_AVATAR = "/images/agent-control/avatars/default.svg";
   for (const a of AGENT_SEEDS) {
     const existing = await prisma.agent.findUnique({ where: { codename: a.codename } });
     if (existing) {

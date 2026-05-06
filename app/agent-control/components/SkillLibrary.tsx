@@ -51,14 +51,14 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
           });
       if (!r.ok) {
         setEquipError(
-          r.status === 409 ? t.machineAgent.skillEquipCapacityFull : t.machineAgent.skillEquipFailed
+          r.status === 409 ? t.agentControl.skillEquipCapacityFull : t.agentControl.skillEquipFailed
         );
         return;
       }
       router.refresh();
     } catch (e) {
       console.error("[SkillLibrary] toggleEquip failed", e);
-      setEquipError(t.machineAgent.skillEquipFailed);
+      setEquipError(t.agentControl.skillEquipFailed);
     } finally {
       setBusyEquip(null);
     }
@@ -73,7 +73,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
     <div className="flex-1 overflow-y-auto p-5 md:p-8 flex flex-col gap-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="font-label text-[13px] tracking-[0.3em] text-primary uppercase">
-          {t.machineAgent.skillLibraryTitle}
+          {t.agentControl.skillLibraryTitle}
         </h1>
         {isAdmin && (
           <button
@@ -82,7 +82,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
             className="cyber-btn font-label text-[10px] tracking-[0.2em] uppercase min-h-[44px] px-5 flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[16px]">add</span>
-            {t.machineAgent.skillCreateNew}
+            {t.agentControl.skillCreateNew}
           </button>
         )}
       </div>
@@ -107,7 +107,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
 
       {skills.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-on-surface-variant text-sm">{t.machineAgent.skillEmptyLibrary}</p>
+          <p className="text-on-surface-variant text-sm">{t.agentControl.skillEmptyLibrary}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-8">
@@ -118,7 +118,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
               <div key={lv}>
                 <div className="flex items-center gap-3 mb-3">
                   <span className="font-label text-[10px] tracking-[0.3em] text-primary/60 uppercase">
-                    {format(t.machineAgent.skillLevel, { n: lv })}
+                    {format(t.agentControl.skillLevel, { n: lv })}
                   </span>
                   <div className="flex-1 h-px bg-primary/15" />
                 </div>
@@ -146,7 +146,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
                                 type="button"
                                 onClick={() => setEditor({ open: true, mode: "edit", initial: skill })}
                                 className="min-w-[32px] min-h-[32px] flex items-center justify-center text-on-surface-variant/50 hover:text-primary transition-colors"
-                                title={t.machineAgent.skillEdit}
+                                title={t.agentControl.skillEdit}
                               >
                                 <span className="material-symbols-outlined text-[16px]">edit</span>
                               </button>
@@ -159,17 +159,17 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
                             className={`font-label text-[8px] tracking-[0.15em] uppercase border rounded-sm px-1.5 py-0.5 ${KIND_COLOR[skill.kind] ?? ""}`}
                           >
                             {skill.kind === "PASSIVE"
-                              ? t.machineAgent.skillKindPassive
+                              ? t.agentControl.skillKindPassive
                               : skill.kind === "ACTIVE"
-                                ? t.machineAgent.skillKindActive
-                                : t.machineAgent.skillKindUltimate}
+                                ? t.agentControl.skillKindActive
+                                : t.agentControl.skillKindUltimate}
                           </span>
                           <span className="font-label text-[8px] tracking-[0.12em] text-on-surface-variant/50 uppercase">
-                            {format(t.machineAgent.skillCostAp, { n: skill.costAp })}
+                            {format(t.agentControl.skillCostAp, { n: skill.costAp })}
                           </span>
                           {isEquipped && (
                             <span className="font-label text-[8px] tracking-[0.12em] uppercase border border-primary/40 text-primary rounded-sm px-1 py-0.5">
-                              {t.machineAgent.skillEquipped}
+                              {t.agentControl.skillEquipped}
                             </span>
                           )}
                         </div>
@@ -197,8 +197,8 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
                               {busyEquip === skill.id
                                 ? "…"
                                 : isEquipped
-                                  ? t.machineAgent.skillUnequip
-                                  : t.machineAgent.skillEquip}
+                                  ? t.agentControl.skillUnequip
+                                  : t.agentControl.skillEquip}
                             </button>
                           </div>
                         )}

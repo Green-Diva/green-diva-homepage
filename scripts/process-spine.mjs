@@ -4,8 +4,8 @@ import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
-const SRC = path.join(root, "public/machine-agent/spine-source.png");
-const OUT = path.join(root, "public/images/machine-agent/spine.jpg");
+const SRC = path.join(root, "public/images/agent-control/spine-source.png");
+const OUT = path.join(root, "public/images/agent-control/spine.jpg");
 
 const meta = await sharp(SRC).metadata();
 const srcW = meta.width;

@@ -93,7 +93,7 @@ export default function AgentClient({
                   : "text-on-surface-variant border-transparent hover:text-primary/70",
               ].join(" ")}
             >
-              {tab === "agents" ? t.machineAgent.tabAgents : t.machineAgent.tabSkillLibrary}
+              {tab === "agents" ? t.agentControl.tabAgents : t.agentControl.tabSkillLibrary}
             </button>
           ))}
         </div>
@@ -118,7 +118,7 @@ export default function AgentClient({
             <div className="flex flex-col h-full min-h-0">
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <h2 className="font-label text-[10px] tracking-[0.3em] text-primary uppercase">
-                  {t.machineAgent.agentRoster}
+                  {t.agentControl.agentRoster}
                 </h2>
                 <span className="material-symbols-outlined text-outline" aria-hidden>
                   hub
@@ -126,7 +126,7 @@ export default function AgentClient({
               </div>
               {visibleAgents.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center text-on-surface-variant text-sm">
-                  {t.machineAgent.emptyState}
+                  {t.agentControl.emptyState}
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 space-y-2 overflow-y-auto custom-scrollbar pr-1">
@@ -144,7 +144,7 @@ export default function AgentClient({
                   <span className="material-symbols-outlined text-base" aria-hidden>
                     add_circle
                   </span>
-                  {t.machineAgent.ordainAgent}
+                  {t.agentControl.ordainAgent}
                 </button>
               ) : null}
             </div>
@@ -172,7 +172,7 @@ export default function AgentClient({
               )
             ) : (
               <div className="h-full flex items-center justify-center text-on-surface-variant text-sm">
-                {t.machineAgent.noAgentSelected}
+                {t.agentControl.noAgentSelected}
               </div>
             )}
           </CyberPanel>

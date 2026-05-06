@@ -21,7 +21,7 @@
 
 import { PrismaClient } from "@prisma/client";
 
-const DEFAULT_AVATAR = "/images/machine-agent/avatars/default.svg";
+const DEFAULT_AVATAR = "/images/agent-control/avatars/default.svg";
 const LEGACY_STAT_COLUMNS = [
   "quickness",
   "intelligence",
@@ -82,13 +82,23 @@ async function main() {
 
       // 2b. Rewrite legacy default-avatar path that pre-dates the /images/ prefix fix.
       // Old value `/machine-agent/avatars/default.svg` is not in middleware STATIC_PREFIXES
-      // so it 307s to /login. New value lives at /images/machine-agent/avatars/default.svg.
-      const rewritten = await prisma.$executeRawUnsafe(
+      // so it 307s to /login. New value lives at /images/agent-control/avatars/default.svg.
+      const rewrittenLegacy = await prisma.$executeRawUnsafe(
         `UPDATE "Agent" SET "avatarUrl" = $1 WHERE "avatarUrl" = '/machine-agent/avatars/default.svg'`,
         DEFAULT_AVATAR,
       );
-      if (rewritten > 0) {
-        console.log(`[migrate-agent-loadout] rewrote ${rewritten} row(s) from legacy default-avatar path`);
+      if (rewrittenLegacy > 0) {
+        console.log(`[migrate-agent-loadout] rewrote ${rewrittenLegacy} row(s) from legacy default-avatar path`);
+      }
+
+      // 2c. Rewrite asset folder rename machine-agent → agent-control (2026-05-07).
+      // All avatars previously uploaded to /images/machine-agent/avatars/<name> moved to
+      // /images/agent-control/avatars/<name>. Pure prefix swap, idempotent.
+      const rewrittenFolder = await prisma.$executeRawUnsafe(
+        `UPDATE "Agent" SET "avatarUrl" = REPLACE("avatarUrl", '/images/machine-agent/', '/images/agent-control/') WHERE "avatarUrl" LIKE '/images/machine-agent/%'`,
+      );
+      if (rewrittenFolder > 0) {
+        console.log(`[migrate-agent-loadout] rewrote ${rewrittenFolder} row(s) from /images/machine-agent/ → /images/agent-control/`);
       }
     }
 

@@ -7,7 +7,7 @@ const STORAGE_DIR = path.join(
   process.cwd(),
   "public",
   "images",
-  "machine-agent",
+  "agent-control",
   "avatars",
 );
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const buf = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(abs, buf);
 
-    const url = `/images/machine-agent/avatars/${fname}`;
+    const url = `/images/agent-control/avatars/${fname}`;
     return NextResponse.json({ url });
   } catch (e) {
     console.error("[api/agents/avatar/upload] failed", e);

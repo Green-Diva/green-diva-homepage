@@ -64,13 +64,13 @@ export function getLoadoutLayout(mode: "MECHANICAL" | "AUTONOMOUS"): LoadoutLayo
     ? {
         slots: MACHINE_SLOTS,
         central: MACHINE_CENTRAL,
-        background: "/images/machine-agent/spine.jpg",
-        fallback: "/images/machine-agent/spine.svg",
+        background: "/images/agent-control/spine.jpg",
+        fallback: "/images/agent-control/spine.svg",
       }
     : {
         slots: AGENT_SLOTS,
         central: AGENT_CENTRAL,
-        background: "/images/machine-agent/brain.jpg",
-        fallback: "/images/machine-agent/brain.svg",
+        background: "/images/agent-control/brain.jpg",
+        fallback: "/images/agent-control/brain.svg",
       };
 }

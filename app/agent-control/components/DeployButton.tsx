@@ -27,25 +27,25 @@ export default function DeployButton({ agent, isAdmin }: { agent: AgentRow; isAd
     try {
       const r = await fetch(`/api/agents/${agent.id}/deploy`, { method: "POST" });
       if (!r.ok) {
-        setToast(t.machineAgent.deployFailed);
+        setToast(t.agentControl.deployFailed);
         return;
       }
-      setToast(t.machineAgent.deploySuccess);
+      setToast(t.agentControl.deploySuccess);
       router.refresh();
       setTimeout(() => setToast(null), 3500);
     } catch (e) {
       console.error("[DeployButton] failed", e);
-      setToast(t.machineAgent.deployFailed);
+      setToast(t.agentControl.deployFailed);
     } finally {
       setBusy(false);
     }
   }
 
   const label = busy
-    ? t.machineAgent.deploying
+    ? t.agentControl.deploying
     : agent.deployedAt
-      ? t.machineAgent.redeploy
-      : t.machineAgent.deploy;
+      ? t.agentControl.redeploy
+      : t.agentControl.deploy;
 
   return (
     <div className="shrink-0 relative">

@@ -46,7 +46,7 @@ export const en: Dictionary = {
     enterFrame: "Enter the Frame",
     sacredArtifact: "Bloodborne: Holy Chalice",
     relicCollectionTitle: "The Relic Collection",
-    machineAgentTitle: "The Agent Control",
+    agentControlTitle: "The Agent Control",
     syntheticHallucinations: "Detroit: Become Human",
     neuralSync: "Neural Sync",
   },
@@ -290,7 +290,7 @@ export const en: Dictionary = {
     cellProcessing: "Processing",
     viewerForging: "Forging the 3D form…",
   },
-  machineAgent: {
+  agentControl: {
     pageTitle: "The Agent Control",
     pageSubtitle: "{{filled}}/{{total}} aligned",
     agentRoster: "AGENTS",

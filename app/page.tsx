@@ -421,7 +421,7 @@ export default async function Home() {
               </div>
               <div className="z-20 space-y-2">
                 <h4 className="font-headline text-xl text-secondary leading-tight">
-                  {t.sections.machineAgentTitle}
+                  {t.sections.agentControlTitle}
                 </h4>
                 <p className="font-label text-[11px] text-primary/70 tracking-[0.3em] uppercase">
                   {t.sections.syntheticHallucinations}

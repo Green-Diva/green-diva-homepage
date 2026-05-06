@@ -19,13 +19,13 @@ export interface AgentSkill {
 //   cost      → cumulative external API spend tier
 //   activity  → invocation count over a rolling window
 //   stability → success rate of recent invocations
-export const MACHINE_AGENT_STAT_KEYS = [
+export const AGENT_STAT_KEYS = [
   "chaosLevel",
   "costTier",
   "activityLevel",
   "stabilityLevel",
 ] as const;
-export type AgentStatKey = (typeof MACHINE_AGENT_STAT_KEYS)[number];
+export type AgentStatKey = (typeof AGENT_STAT_KEYS)[number];
 
 // Central control slot payloads — both are opaque Json blobs at the data layer.
 // `pipelineConfig` (machine) is a workflow definition; `dispatcherConfig`

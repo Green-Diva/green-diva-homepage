@@ -24,8 +24,8 @@ export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow;
   const icon = isMech ? "schema" : "psychology";
 
   const summary = isConfigured
-    ? format(t.machineAgent.controlConfigSummary, { n: JSON.stringify(cfg).length })
-    : t.machineAgent.controlConfigEmpty;
+    ? format(t.agentControl.controlConfigSummary, { n: JSON.stringify(cfg).length })
+    : t.agentControl.controlConfigEmpty;
 
   return (
     <>
@@ -63,7 +63,7 @@ export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow;
           <span className="material-symbols-outlined text-[14px]" aria-hidden>
             tune
           </span>
-          {t.machineAgent.controlConfigEdit}
+          {t.agentControl.controlConfigEdit}
         </button>
       </div>
 

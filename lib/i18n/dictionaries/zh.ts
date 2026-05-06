@@ -43,7 +43,7 @@ export const zh: Dictionary = {
     enterFrame: "步入画框",
     sacredArtifact: "血源诅咒：圣杯",
     relicCollectionTitle: "圣物典藏",
-    machineAgentTitle: "智能体控制台",
+    agentControlTitle: "智能体控制台",
     syntheticHallucinations: "底特律：化身为人",
     neuralSync: "神经同步",
   },
@@ -284,7 +284,7 @@ export const zh: Dictionary = {
     cellProcessing: "处理中",
     viewerForging: "正在锻造 3D 形态…",
   },
-  machineAgent: {
+  agentControl: {
     pageTitle: "智能体控制台",
     pageSubtitle: "{{filled}}/{{total}} 已就位",
     agentRoster: "代理人员 / AGENTS",

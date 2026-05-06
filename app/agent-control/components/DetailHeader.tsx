@@ -33,12 +33,12 @@ export default function DetailHeader({
     ? "border-emerald-400/50 text-emerald-300 bg-emerald-400/[0.08]"
     : "border-amber-300/50 text-amber-200 bg-amber-300/[0.08]";
 
-  const modeLabel = isMech ? t.machineAgent.modeMechanical : t.machineAgent.modeAutonomous;
-  const deployLabel = agent.deployedAt ? t.machineAgent.deployStatusDeployed : t.machineAgent.deployStatusDraft;
+  const modeLabel = isMech ? t.agentControl.modeMechanical : t.agentControl.modeAutonomous;
+  const deployLabel = agent.deployedAt ? t.agentControl.deployStatusDeployed : t.agentControl.deployStatusDraft;
 
   const subtitleName = locale === "zh" ? agent.nameZh : agent.nameEn;
   const deployedWhen = agent.deployedAt
-    ? format(t.machineAgent.deployedAt, { when: new Date(agent.deployedAt).toLocaleString(locale) })
+    ? format(t.agentControl.deployedAt, { when: new Date(agent.deployedAt).toLocaleString(locale) })
     : null;
 
   return (
@@ -60,7 +60,7 @@ export default function DetailHeader({
             className="ml-1 min-h-[30px] px-2.5 border border-outline-variant text-on-surface-variant font-label text-[9px] tracking-[0.25em] uppercase rounded-md hover:bg-surface-container hover:text-on-surface transition-colors flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-[14px]" aria-hidden>edit</span>
-            {t.machineAgent.edit}
+            {t.agentControl.edit}
           </button>
         ) : null}
       </div>

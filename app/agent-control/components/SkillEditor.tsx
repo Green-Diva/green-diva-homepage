@@ -84,7 +84,7 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
     setBusy(false);
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      setErr(typeof j.error === "string" ? j.error : t.machineAgent.skillSaveFailed);
+      setErr(typeof j.error === "string" ? j.error : t.agentControl.skillSaveFailed);
       return;
     }
     router.refresh();
@@ -94,10 +94,10 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
 
   async function onDelete() {
     if (!initial) return;
-    if (!confirm(format(t.machineAgent.skillDeleteConfirm, { name: initial.nameZh || initial.nameEn }))) return;
+    if (!confirm(format(t.agentControl.skillDeleteConfirm, { name: initial.nameZh || initial.nameEn }))) return;
     const r = await fetch(`/api/skills/${initial.id}`, { method: "DELETE" });
     if (!r.ok) {
-      alert(t.machineAgent.skillDeleteFailed);
+      alert(t.agentControl.skillDeleteFailed);
       return;
     }
     router.refresh();
@@ -113,7 +113,7 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={mode === "create" ? t.machineAgent.skillCreateNew : t.machineAgent.skillEdit}
+      aria-label={mode === "create" ? t.agentControl.skillCreateNew : t.agentControl.skillEdit}
       className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/85 backdrop-blur-sm overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -123,7 +123,7 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
         <div className="cyber-panel rounded-lg p-6 flex flex-col gap-5">
           <div className="flex items-center justify-between gap-4">
             <h2 className="font-label text-[11px] tracking-[0.3em] text-primary uppercase">
-              {mode === "create" ? t.machineAgent.skillCreateNew : t.machineAgent.skillEdit}
+              {mode === "create" ? t.agentControl.skillCreateNew : t.agentControl.skillEdit}
             </h2>
             <button
               ref={closeBtnRef}
@@ -244,7 +244,7 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                   disabled={busy}
                   className="font-label text-[10px] tracking-[0.2em] uppercase text-error/70 hover:text-error transition-colors min-h-[44px] px-3"
                 >
-                  {t.machineAgent.remove}
+                  {t.agentControl.remove}
                 </button>
               ) : (
                 <span />
@@ -256,14 +256,14 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                   disabled={busy}
                   className="font-label text-[10px] tracking-[0.2em] uppercase text-on-surface-variant hover:text-on-surface transition-colors min-h-[44px] px-4"
                 >
-                  {t.machineAgent.cancel}
+                  {t.agentControl.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
                   className="cyber-btn font-label text-[10px] tracking-[0.2em] uppercase min-h-[44px] px-6"
                 >
-                  {busy ? t.machineAgent.saving : t.machineAgent.save}
+                  {busy ? t.agentControl.saving : t.agentControl.save}
                 </button>
               </div>
             </div>

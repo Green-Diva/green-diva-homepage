@@ -16,9 +16,9 @@ export default function AgentFilterChips({
 }) {
   const t = useT();
   const chips: Array<{ key: ModeFilter; label: string; count: number; tone: string }> = [
-    { key: "ALL", label: t.machineAgent.filterAll, count: counts.all, tone: "primary" },
-    { key: "MECHANICAL", label: t.machineAgent.filterMachines, count: counts.machines, tone: "secondary" },
-    { key: "AUTONOMOUS", label: t.machineAgent.filterAgents, count: counts.agents, tone: "primary" },
+    { key: "ALL", label: t.agentControl.filterAll, count: counts.all, tone: "primary" },
+    { key: "MECHANICAL", label: t.agentControl.filterMachines, count: counts.machines, tone: "secondary" },
+    { key: "AUTONOMOUS", label: t.agentControl.filterAgents, count: counts.agents, tone: "primary" },
   ];
 
   return (

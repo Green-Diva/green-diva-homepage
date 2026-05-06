@@ -3,7 +3,7 @@
 import type { AgentRow } from "../types";
 import { useT } from "@/lib/i18n/client";
 
-const STATUS_STYLES: Record<AgentRow["status"], { dot: string; label: keyof ReturnType<typeof useT>["machineAgent"] }> = {
+const STATUS_STYLES: Record<AgentRow["status"], { dot: string; label: keyof ReturnType<typeof useT>["agentControl"] }> = {
   ONLINE: { dot: "bg-emerald-400", label: "statusOnline" },
   STANDBY: { dot: "bg-amber-300", label: "statusStandby" },
   OFFLINE: { dot: "bg-rose-400", label: "statusOffline" },
@@ -25,7 +25,7 @@ export default function AgentListItem({
 }) {
   const t = useT();
   const status = STATUS_STYLES[agent.status];
-  const label = t.machineAgent[status.label] as string;
+  const label = t.agentControl[status.label] as string;
   const mode = MODE_ICON[agent.mode ?? "MECHANICAL"];
 
   return (
@@ -77,7 +77,7 @@ export default function AgentListItem({
           <span
             aria-hidden
             className={`material-symbols-outlined text-[11px] leading-none ${mode.color}`}
-            title={t.machineAgent[mode.key] as string}
+            title={t.agentControl[mode.key] as string}
           >
             {mode.icon}
           </span>

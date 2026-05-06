@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useT } from "@/lib/i18n/client";
 import type { AgentRow, EquipRow, SkillRow } from "../types";
-import { getLoadoutLayout } from "@/lib/machineAgent/slotPositions";
+import { getLoadoutLayout } from "@/lib/agentControl/slotPositions";
 import SkillSlot from "./SkillSlot";
 import SkillConnections from "./SkillConnections";
 import CentralControlSlot from "./CentralControlSlot";
@@ -131,7 +131,7 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
       ) : null}
 
       {/* Suppress unused t warning when nothing else uses it (and gives skill panel a usable prop). */}
-      <span aria-hidden className="sr-only">{t.machineAgent.skillCentralSlotLabel}</span>
+      <span aria-hidden className="sr-only">{t.agentControl.skillCentralSlotLabel}</span>
     </div>
   );
 }

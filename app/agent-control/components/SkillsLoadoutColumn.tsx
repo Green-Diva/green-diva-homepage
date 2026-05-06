@@ -80,7 +80,7 @@ export default function SkillsLoadoutColumn({
         />
       ) : null}
 
-      <span aria-hidden className="sr-only">{t.machineAgent.skillEquipped}</span>
+      <span aria-hidden className="sr-only">{t.agentControl.skillEquipped}</span>
     </div>
   );
 }

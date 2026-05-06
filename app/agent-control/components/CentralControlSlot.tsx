@@ -2,7 +2,7 @@
 
 import { useT } from "@/lib/i18n/client";
 import type { AgentMode } from "../types";
-import type { CentralPos } from "@/lib/machineAgent/slotPositions";
+import type { CentralPos } from "@/lib/agentControl/slotPositions";
 
 type Props = {
   pos: CentralPos;
@@ -26,8 +26,8 @@ export default function CentralControlSlot({ pos, mode, configured, onClick, dis
       type="button"
       disabled={disabled}
       onClick={onClick}
-      aria-label={t.machineAgent.skillCentralSlotLabel}
-      title={isMech ? t.machineAgent.pipelineConfigTitle : t.machineAgent.dispatcherConfigTitle}
+      aria-label={t.agentControl.skillCentralSlotLabel}
+      title={isMech ? t.agentControl.pipelineConfigTitle : t.agentControl.dispatcherConfigTitle}
       className={[
         "absolute -translate-x-1/2 -translate-y-1/2 rounded-md flex flex-col items-center justify-center backdrop-blur-md transition-all hover:scale-110 disabled:cursor-not-allowed",
         "w-[72px] h-[72px] border-2 bg-background/80 px-1",

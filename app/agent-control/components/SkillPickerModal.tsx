@@ -92,14 +92,14 @@ export default function SkillPickerModal({
   const accentClass = mode === "MECHANICAL" ? "text-secondary" : "text-primary";
   const slotLabel =
     typeof targetSlotIndex === "number"
-      ? format(t.machineAgent.skillSlotLabel, { n: targetSlotIndex + 1 })
+      ? format(t.agentControl.skillSlotLabel, { n: targetSlotIndex + 1 })
       : null;
 
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={t.machineAgent.skillEquipFromLibrary}
+      aria-label={t.agentControl.skillEquipFromLibrary}
       className="fixed inset-0 z-[110] flex items-stretch justify-center bg-black/85 backdrop-blur-sm overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -110,7 +110,7 @@ export default function SkillPickerModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 className={`font-label text-[11px] tracking-[0.3em] uppercase ${accentClass}`}>
-                {t.machineAgent.skillEquipFromLibrary}
+                {t.agentControl.skillEquipFromLibrary}
               </h2>
               {slotLabel ? (
                 <p className="font-label text-[9px] tracking-[0.25em] text-on-surface-variant uppercase mt-1">{slotLabel}</p>
@@ -126,7 +126,7 @@ export default function SkillPickerModal({
           </div>
 
           {available.length === 0 ? (
-            <p className="text-on-surface-variant text-sm py-6 text-center">{t.machineAgent.skillEmptyLibrary}</p>
+            <p className="text-on-surface-variant text-sm py-6 text-center">{t.agentControl.skillEmptyLibrary}</p>
           ) : (
             <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1">
               {available.map((skill) => (
@@ -143,12 +143,12 @@ export default function SkillPickerModal({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-label text-[9px] tracking-[0.2em] text-on-surface-variant/60 uppercase">
-                        {format(t.machineAgent.skillLevel, { n: skill.level })}
+                        {format(t.agentControl.skillLevel, { n: skill.level })}
                       </span>
                       <span
                         className={`font-label text-[9px] tracking-[0.15em] uppercase border rounded-sm px-1.5 py-0.5 ${KIND_COLOR[skill.kind] ?? ""}`}
                       >
-                        {t.machineAgent[`skillKind${skill.kind[0]}${skill.kind.slice(1).toLowerCase()}` as keyof typeof t.machineAgent]}
+                        {t.agentControl[`skillKind${skill.kind[0]}${skill.kind.slice(1).toLowerCase()}` as keyof typeof t.agentControl]}
                       </span>
                     </div>
                     <p className="text-sm text-on-surface font-medium truncate">
@@ -161,7 +161,7 @@ export default function SkillPickerModal({
                     onClick={() => equip(skill.id)}
                     className="cyber-btn font-label text-[9px] tracking-[0.2em] uppercase min-h-[36px] px-4 shrink-0"
                   >
-                    {busy === skill.id ? "…" : t.machineAgent.skillEquip}
+                    {busy === skill.id ? "…" : t.agentControl.skillEquip}
                   </button>
                 </div>
               ))}

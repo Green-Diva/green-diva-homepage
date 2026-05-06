@@ -3,7 +3,7 @@
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { EquipRow, AgentMode } from "../types";
-import type { SlotPos } from "@/lib/machineAgent/slotPositions";
+import type { SlotPos } from "@/lib/agentControl/slotPositions";
 
 type Props = {
   pos: SlotPos;
@@ -27,8 +27,8 @@ export default function SkillSlot({ pos, equip, mode, onClick, disabled }: Props
     : "+";
 
   const ariaLabel = equip
-    ? `${t.machineAgent.skillSlotDetailTitle} · ${equip.skill.nameEn}`
-    : `${format(t.machineAgent.skillSlotLabel, { n: pos.i + 1 })} · ${t.machineAgent.skillSlotEmpty}`;
+    ? `${t.agentControl.skillSlotDetailTitle} · ${equip.skill.nameEn}`
+    : `${format(t.agentControl.skillSlotLabel, { n: pos.i + 1 })} · ${t.agentControl.skillSlotEmpty}`;
 
   return (
     <button

@@ -1,7 +1,7 @@
 "use client";
 
 import type { AgentMode, EquipRow } from "../types";
-import type { CentralPos, SlotPos } from "@/lib/machineAgent/slotPositions";
+import type { CentralPos, SlotPos } from "@/lib/agentControl/slotPositions";
 
 // Connection state: skill equipped + ONLINE → mode accent color;
 // equipped + OFFLINE → gray; empty slot → gray.

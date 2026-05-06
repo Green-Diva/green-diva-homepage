@@ -45,7 +45,7 @@ export interface Dictionary {
     enterFrame: string;
     sacredArtifact: string;
     relicCollectionTitle: string;
-    machineAgentTitle: string;
+    agentControlTitle: string;
     syntheticHallucinations: string;
     neuralSync: string;
   };
@@ -283,7 +283,7 @@ export interface Dictionary {
     cellProcessing: string;
     viewerForging: string;
   };
-  machineAgent: {
+  agentControl: {
     pageTitle: string;
     pageSubtitle: string; // {{filled}}/{{total}}
     agentRoster: string;

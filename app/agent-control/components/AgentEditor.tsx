@@ -222,7 +222,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
     if (!values.avatarUrl.trim()) {
       setBusy(false);
-      setErr(t.machineAgent.avatarRequired);
+      setErr(t.agentControl.avatarRequired);
       return;
     }
 
@@ -262,11 +262,11 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
   async function onDelete() {
     if (!initial) return;
-    if (!confirm(format(t.machineAgent.confirmRemove, { name: initial.codename }))) return;
+    if (!confirm(format(t.agentControl.confirmRemove, { name: initial.codename }))) return;
     const r = await fetch(`/api/agents/${initial.id}`, { method: "DELETE" });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      alert(`${t.machineAgent.deleteFailed}: ${j.error ?? r.statusText}`);
+      alert(`${t.agentControl.deleteFailed}: ${j.error ?? r.statusText}`);
       return;
     }
     onSaved();
@@ -277,7 +277,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={mode === "create" ? t.machineAgent.editorNewTitle : t.machineAgent.editorEditTitle}
+      aria-label={mode === "create" ? t.agentControl.editorNewTitle : t.agentControl.editorEditTitle}
       className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/85 backdrop-blur-sm overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -292,14 +292,14 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
         <div className="flex items-start justify-between gap-3">
           <h2 className={`font-headline text-3xl sacred-glow ${headingCls}`}>
-            {mode === "create" ? t.machineAgent.editorNewTitle : t.machineAgent.editorEditTitle}
+            {mode === "create" ? t.agentControl.editorNewTitle : t.agentControl.editorEditTitle}
           </h2>
           <button
             ref={closeBtnRef}
             type="button"
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center text-on-surface-variant hover:text-primary"
-            aria-label={t.machineAgent.cancel}
+            aria-label={t.agentControl.cancel}
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -309,7 +309,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
           {/* Left: portrait upload — aspect 131:304 ≈ 0.4309 to match the outer
               hero portrait CyberPanel container (262×608) including its border + padding. */}
           <div className="sm:w-[200px] shrink-0">
-            <span className={labelCls}>{t.machineAgent.fieldAvatar} *</span>
+            <span className={labelCls}>{t.agentControl.fieldAvatar} *</span>
             <label
               className={[
                 "mt-1 relative block w-full aspect-[131/304] rounded-md overflow-hidden cursor-pointer group",
@@ -366,14 +366,14 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
                 value={values.mode}
                 options={MODES.map((m) => ({
                   value: m,
-                  label: m === "MECHANICAL" ? t.machineAgent.modeMechanical : t.machineAgent.modeAutonomous,
+                  label: m === "MECHANICAL" ? t.agentControl.modeMechanical : t.agentControl.modeAutonomous,
                 }))}
                 onChange={(v) => update("mode", v as AgentMode)}
                 isMech={isMech}
               />
             </div>
             <div className="block">
-              <span className={labelCls}>{t.machineAgent.fieldStatus}</span>
+              <span className={labelCls}>{t.agentControl.fieldStatus}</span>
               <ThemedDropdown
                 value={values.status}
                 options={STATUSES.map((s) => ({ value: s, label: s }))}
@@ -384,7 +384,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
             {/* Row 2: Name (EN, slug-like codename) | Name (ZH, codenameZh) */}
             <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldCodename}</span>
+              <span className={labelCls}>{t.agentControl.fieldCodename}</span>
               <input
                 className={inputCls}
                 value={values.codename}
@@ -396,7 +396,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
               />
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldCodenameZh}</span>
+              <span className={labelCls}>{t.agentControl.fieldCodenameZh}</span>
               <input
                 className={inputCls}
                 value={values.codenameZh}
@@ -407,21 +407,21 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
             {/* Row 3: Role (EN, nameEn) | Role (ZH, nameZh) */}
             <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldNameEn}</span>
+              <span className={labelCls}>{t.agentControl.fieldNameEn}</span>
               <input className={inputCls} value={values.nameEn} onChange={(e) => update("nameEn", e.target.value)} required />
             </label>
             <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldNameZh}</span>
+              <span className={labelCls}>{t.agentControl.fieldNameZh}</span>
               <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required />
             </label>
 
             {/* Descriptions stack inside right column: EN on top, ZH below */}
             <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineAgent.fieldDescriptionEn}</span>
+              <span className={labelCls}>{t.agentControl.fieldDescriptionEn}</span>
               <textarea className={textareaCls} value={values.descriptionEn} onChange={(e) => update("descriptionEn", e.target.value)} maxLength={4000} />
             </label>
             <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineAgent.fieldDescriptionZh}</span>
+              <span className={labelCls}>{t.agentControl.fieldDescriptionZh}</span>
               <textarea className={textareaCls} value={values.descriptionZh} onChange={(e) => update("descriptionZh", e.target.value)} maxLength={4000} />
             </label>
 
@@ -433,7 +433,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
                   onClick={onDelete}
                   className="min-h-[44px] mr-auto px-6 py-2 border border-rose-400/40 text-rose-300 font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-rose-400/10 transition-colors"
                 >
-                  {t.machineAgent.remove}
+                  {t.agentControl.remove}
                 </button>
               ) : null}
               <button
@@ -441,14 +441,14 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
                 onClick={onClose}
                 className="min-h-[44px] px-6 py-2 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container transition-colors"
               >
-                {t.machineAgent.cancel}
+                {t.agentControl.cancel}
               </button>
               <button
                 type="submit"
                 disabled={busy}
                 className={submitCls}
               >
-                {busy ? t.machineAgent.saving : t.machineAgent.save}
+                {busy ? t.agentControl.saving : t.agentControl.save}
               </button>
             </div>
           </div>

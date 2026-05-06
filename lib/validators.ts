@@ -51,7 +51,7 @@ export const agentCreateSchema = z.object({
   mode: z.enum(["MECHANICAL", "AUTONOMOUS"]).optional(),
   status: z.enum(["ONLINE", "STANDBY", "OFFLINE"]).optional(),
   // Avatar required: accepts either a full URL or an absolute path served
-  // from /public (uploads land at /images/machine-agent/avatars/...).
+  // from /public (uploads land at /images/agent-control/avatars/...).
   avatarUrl: z
     .string()
     .min(1)

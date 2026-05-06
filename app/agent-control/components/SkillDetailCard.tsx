@@ -28,7 +28,7 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
     ? "hover:bg-secondary/[0.20]"
     : "hover:bg-primary/[0.20]";
 
-  const slotLabel = format(t.machineAgent.skillSlotLabel, { n: slotIndex + 1 });
+  const slotLabel = format(t.agentControl.skillSlotLabel, { n: slotIndex + 1 });
 
   if (!equip) {
     return (
@@ -41,7 +41,7 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
           "flex items-center gap-2 px-2 py-1.5 text-left transition-colors",
           "hover:bg-on-surface/[0.08] disabled:opacity-50 disabled:cursor-not-allowed",
         ].join(" ")}
-        aria-label={`${slotLabel} · ${t.machineAgent.skillSlotEmpty}`}
+        aria-label={`${slotLabel} · ${t.agentControl.skillSlotEmpty}`}
       >
         <span
           className="material-symbols-outlined text-[18px] text-on-surface-variant/50 leading-none shrink-0"
@@ -50,7 +50,7 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
           add
         </span>
         <span className="font-label text-[9px] tracking-[0.2em] text-on-surface-variant/70 uppercase truncate">
-          {slotLabel} · {t.machineAgent.skillSlotEmpty}
+          {slotLabel} · {t.agentControl.skillSlotEmpty}
         </span>
       </button>
     );
@@ -84,7 +84,7 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
         <div className="flex items-center gap-1.5 font-label text-[8px] tracking-[0.2em] uppercase">
           <span className={accentText}>{slotLabel}</span>
           <span className="text-on-surface-variant/60">·</span>
-          <span className="text-on-surface-variant">{format(t.machineAgent.skillLevel, { n: skill.level })}</span>
+          <span className="text-on-surface-variant">{format(t.agentControl.skillLevel, { n: skill.level })}</span>
           <span
             className={`border rounded-sm px-1 py-px font-label text-[7px] tracking-[0.15em] uppercase ${STATUS_BADGE[skill.status] ?? ""}`}
           >

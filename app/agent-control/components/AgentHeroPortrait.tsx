@@ -26,7 +26,7 @@ export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
           accentText,
         ].join(" ")}
       >
-        {t.machineAgent.heroPortrait}
+        {t.agentControl.heroPortrait}
       </div>
       <span
         aria-hidden

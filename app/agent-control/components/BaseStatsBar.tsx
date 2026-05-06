@@ -2,9 +2,9 @@
 
 import { useT } from "@/lib/i18n/client";
 import type { AgentRow } from "../types";
-import { MACHINE_AGENT_STAT_KEYS, type AgentStatKey } from "@/lib/agentTypes";
+import { AGENT_STAT_KEYS, type AgentStatKey } from "@/lib/agentTypes";
 
-const ROW_LABELS: Record<AgentStatKey, { label: keyof ReturnType<typeof useT>["machineAgent"]; hint: keyof ReturnType<typeof useT>["machineAgent"] }> = {
+const ROW_LABELS: Record<AgentStatKey, { label: keyof ReturnType<typeof useT>["agentControl"]; hint: keyof ReturnType<typeof useT>["agentControl"] }> = {
   chaosLevel: { label: "statChaos", hint: "statChaosHint" },
   costTier: { label: "statCost", hint: "statCostHint" },
   activityLevel: { label: "statActivity", hint: "statActivityHint" },
@@ -36,7 +36,7 @@ export default function BaseStatsBar({ agent }: { agent: AgentRow }) {
           accentText,
         ].join(" ")}
       >
-        {t.machineAgent.baseStats}
+        {t.agentControl.baseStats}
       </div>
       {/* Corner markers (top-right + bottom-left) — mode-coloured ticks */}
       <span
@@ -59,13 +59,13 @@ export default function BaseStatsBar({ agent }: { agent: AgentRow }) {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2">
-        {MACHINE_AGENT_STAT_KEYS.map((key) => {
+        {AGENT_STAT_KEYS.map((key) => {
           const value = (agent[key] as number) ?? 0;
           const meta = ROW_LABELS[key];
           return (
-            <div key={key} title={t.machineAgent[meta.hint]}>
+            <div key={key} title={t.agentControl[meta.hint]}>
               <div className="flex items-baseline justify-between font-label text-[9px] tracking-[0.18em] uppercase">
-                <span className="text-on-surface-variant truncate">{t.machineAgent[meta.label]}</span>
+                <span className="text-on-surface-variant truncate">{t.agentControl[meta.label]}</span>
                 <span className={accentText}>
                   <span className="tabular-nums">{value}</span>
                   <span className="text-on-surface-variant/60">%</span>

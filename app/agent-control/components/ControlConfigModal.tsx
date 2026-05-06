@@ -53,7 +53,7 @@ export default function ControlConfigModal({ agent, onClose }: Props) {
         }
       } catch {
         setBusy(false);
-        setErr(t.machineAgent.controlConfigInvalid);
+        setErr(t.agentControl.controlConfigInvalid);
         return;
       }
     }
@@ -81,9 +81,9 @@ export default function ControlConfigModal({ agent, onClose }: Props) {
   }
 
   const accent = isMech ? "text-secondary" : "text-primary";
-  const title = isMech ? t.machineAgent.pipelineConfigTitle : t.machineAgent.dispatcherConfigTitle;
-  const placeholder = isMech ? t.machineAgent.pipelineConfigPlaceholder : t.machineAgent.dispatcherConfigPlaceholder;
-  const pendingHint = isMech ? t.machineAgent.pipelineConfigPending : t.machineAgent.dispatcherConfigPending;
+  const title = isMech ? t.agentControl.pipelineConfigTitle : t.agentControl.dispatcherConfigTitle;
+  const placeholder = isMech ? t.agentControl.pipelineConfigPlaceholder : t.agentControl.dispatcherConfigPlaceholder;
+  const pendingHint = isMech ? t.agentControl.pipelineConfigPending : t.agentControl.dispatcherConfigPending;
 
   return createPortal(
     <div
@@ -109,7 +109,7 @@ export default function ControlConfigModal({ agent, onClose }: Props) {
               type="button"
               onClick={onClose}
               className="min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface"
-              aria-label={t.machineAgent.cancel}
+              aria-label={t.agentControl.cancel}
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -132,14 +132,14 @@ export default function ControlConfigModal({ agent, onClose }: Props) {
               disabled={busy}
               className="min-h-[44px] px-6 bg-primary/10 border border-primary/40 text-primary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-primary/20 disabled:opacity-40 transition-colors"
             >
-              {busy ? t.machineAgent.controlConfigSaving : t.machineAgent.controlConfigSave}
+              {busy ? t.agentControl.controlConfigSaving : t.agentControl.controlConfigSave}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="min-h-[44px] px-6 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container transition-colors"
             >
-              {t.machineAgent.cancel}
+              {t.agentControl.cancel}
             </button>
           </div>
         </div>
