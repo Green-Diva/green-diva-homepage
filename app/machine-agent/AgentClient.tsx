@@ -11,9 +11,8 @@ import SkillLibrary from "./components/SkillLibrary";
 import AgentFilterChips, { type ModeFilter } from "./components/AgentFilterChips";
 import DetailHeader from "./components/DetailHeader";
 import BaseStatsBar from "./components/BaseStatsBar";
-import EquipmentLoadout from "./components/EquipmentLoadout";
 import AgentHeroPortrait from "./components/AgentHeroPortrait";
-import SkillsLoadoutColumn from "./components/SkillsLoadoutColumn";
+import SkillsControlPanel from "./components/SkillsControlPanel";
 import DeployButton from "./components/DeployButton";
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: AgentRow | null };
@@ -163,22 +162,17 @@ export default function AgentClient({
                   <DeployButton agent={activeAgent} isAdmin={isAdmin} />
                 </div>
                 <BaseStatsBar agent={activeAgent} />
-                <div className="flex-1 min-h-0 flex flex-row gap-3 items-stretch justify-center">
+                <div className="flex-1 min-h-0 grid grid-cols-[calc((100%+48px)/4)_minmax(0,1fr)] gap-x-4 items-stretch">
                   <AgentHeroPortrait agent={activeAgent} />
-                  <EquipmentLoadout
-                    key={`loadout-${activeAgent.id}`}
-                    agent={activeAgent}
-                    equips={activeEquips}
-                    allSkills={skills}
-                    isAdmin={isAdmin}
-                  />
-                  <SkillsLoadoutColumn
-                    key={`skills-col-${activeAgent.id}`}
-                    agent={activeAgent}
-                    equips={activeEquips}
-                    allSkills={skills}
-                    isAdmin={isAdmin}
-                  />
+                  <div className="min-h-0">
+                    <SkillsControlPanel
+                      key={`scp-${activeAgent.id}`}
+                      agent={activeAgent}
+                      equips={activeEquips}
+                      allSkills={skills}
+                      isAdmin={isAdmin}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (

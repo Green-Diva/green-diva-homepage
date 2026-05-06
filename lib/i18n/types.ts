@@ -305,6 +305,8 @@ export interface Dictionary {
     syncLevel: string;
     matrixLevel: string;
     baseStats: string;
+    heroPortrait: string;
+    skillsAndControl: string;
     statChaos: string;
     statChaosHint: string;
     statCost: string;

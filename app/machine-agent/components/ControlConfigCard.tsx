@@ -17,8 +17,7 @@ export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow;
   const isConfigured = !!cfg && Object.keys(cfg).length > 0;
 
   const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentBorder = isMech ? "border-secondary/50" : "border-primary/50";
-  const accentBg = isMech ? "bg-secondary/[0.05]" : "bg-primary/[0.05]";
+  const accentFill = isMech ? "bg-secondary/[0.12]" : "bg-primary/[0.12]";
   const accentBtn = isMech
     ? "border-secondary/70 text-secondary hover:bg-secondary/[0.12]"
     : "border-primary/70 text-primary hover:bg-primary/[0.12]";
@@ -32,9 +31,8 @@ export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow;
     <>
       <div
         className={[
-          "shrink-0 rounded-md border p-3 flex flex-col gap-2",
-          accentBorder,
-          accentBg,
+          "shrink-0 rounded-md p-3 flex flex-col gap-2",
+          accentFill,
         ].join(" ")}
       >
         <div className="flex items-center justify-between gap-2">

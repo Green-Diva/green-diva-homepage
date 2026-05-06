@@ -312,6 +312,8 @@ export const en: Dictionary = {
     syncLevel: "SYNC LVL",
     matrixLevel: "MATRIX LEVEL",
     baseStats: "BASE_STATS",
+    heroPortrait: "HERO PORTRAIT",
+    skillsAndControl: "SKILLS & CONTROL CONFIGURE",
     statChaos: "CHAOS",
     statChaosHint: "Cross-mode skill mismatch — cyberpsychosis index",
     statCost: "COST",

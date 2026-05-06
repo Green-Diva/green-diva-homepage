@@ -306,6 +306,8 @@ export const zh: Dictionary = {
     syncLevel: "同步率 SYNC LVL",
     matrixLevel: "矩阵等级",
     baseStats: "基础参数 / BASE_STATS",
+    heroPortrait: "英雄立绘 / HERO PORTRAIT",
+    skillsAndControl: "技能与中枢 / SKILLS & CONTROL",
     statChaos: "混乱 CHAOS",
     statChaosHint: "跨类型 skill 装配的排异指数（赛博精神病模型）",
     statCost: "花费 COST",

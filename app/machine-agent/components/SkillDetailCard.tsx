@@ -23,12 +23,11 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
   const { locale } = useI18n();
   const isMech = mode === "MECHANICAL";
 
-  const accentBorder = isMech ? "border-secondary/50" : "border-primary/50";
-  const accentBg = isMech ? "bg-secondary/[0.04]" : "bg-primary/[0.04]";
+  const accentFill = isMech ? "bg-secondary/[0.12]" : "bg-primary/[0.12]";
   const accentText = isMech ? "text-secondary" : "text-primary";
   const accentHover = isMech
-    ? "hover:bg-secondary/[0.10] hover:border-secondary/70"
-    : "hover:bg-primary/[0.10] hover:border-primary/70";
+    ? "hover:bg-secondary/[0.20]"
+    : "hover:bg-primary/[0.20]";
 
   const slotLabel = format(t.machineAgent.skillSlotLabel, { n: slotIndex + 1 });
 
@@ -39,9 +38,9 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
         disabled={disabled}
         onClick={onClick}
         className={[
-          "w-full flex-1 min-h-0 rounded-md border border-dashed border-outline-variant/40 bg-background/30",
+          "w-full flex-1 min-h-0 rounded-md bg-on-surface/[0.04]",
           "flex items-center gap-2 px-2 py-1.5 text-left transition-colors",
-          "hover:border-outline-variant/70 hover:bg-background/60 disabled:opacity-50 disabled:cursor-not-allowed",
+          "hover:bg-on-surface/[0.08] disabled:opacity-50 disabled:cursor-not-allowed",
         ].join(" ")}
         aria-label={`${slotLabel} · ${t.machineAgent.skillSlotEmpty}`}
       >
@@ -68,9 +67,8 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
       disabled={disabled}
       onClick={onClick}
       className={[
-        "w-full flex-1 min-h-0 rounded-md border bg-background/40 transition-all",
-        accentBorder,
-        accentBg,
+        "w-full flex-1 min-h-0 rounded-md transition-all",
+        accentFill,
         accentHover,
         "flex items-center gap-2 px-2 py-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed",
       ].join(" ")}

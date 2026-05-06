@@ -1,12 +1,23 @@
 "use client";
 
 import { useT } from "@/lib/i18n/client";
-import type { AgentRow } from "../types";
+import EquipmentLoadout from "./EquipmentLoadout";
+import SkillsLoadoutColumn from "./SkillsLoadoutColumn";
+import type { AgentRow, EquipRow, SkillRow } from "../types";
 
-export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
+export default function SkillsControlPanel({
+  agent,
+  equips,
+  allSkills,
+  isAdmin,
+}: {
+  agent: AgentRow;
+  equips: EquipRow[];
+  allSkills: SkillRow[];
+  isAdmin: boolean;
+}) {
   const t = useT();
   const isMech = agent.mode === "MECHANICAL";
-  const tintClass = isMech ? "from-secondary/15" : "from-primary/15";
   const accentText = isMech ? "text-secondary" : "text-primary";
   const accentBorder = isMech ? "border-secondary/25" : "border-primary/25";
   const accentMarker = isMech
@@ -16,7 +27,7 @@ export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
   return (
     <div
       className={[
-        "relative h-full w-full rounded-md border bg-background/50 p-1.5",
+        "relative h-full w-full rounded-md border bg-background/50 p-3",
         accentBorder,
       ].join(" ")}
     >
@@ -26,7 +37,7 @@ export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
           accentText,
         ].join(" ")}
       >
-        {t.machineAgent.heroPortrait}
+        {t.machineAgent.skillsAndControl}
       </div>
       <span
         aria-hidden
@@ -47,28 +58,19 @@ export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
         ].join(" ")}
       />
 
-      <div className="relative h-full w-full rounded overflow-hidden bg-surface-container-lowest">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={agent.avatarUrl}
-          alt={agent.codename}
-          loading="eager"
-          decoding="async"
-          className="absolute inset-0 w-full h-full object-cover"
+      <div className="h-full flex flex-row gap-3 items-stretch min-h-0">
+        <EquipmentLoadout
+          agent={agent}
+          equips={equips}
+          allSkills={allSkills}
+          isAdmin={isAdmin}
         />
-        <div
-          aria-hidden
-          className={`absolute inset-0 pointer-events-none bg-gradient-to-t ${tintClass} via-transparent to-background/40 mix-blend-screen`}
+        <SkillsLoadoutColumn
+          agent={agent}
+          equips={equips}
+          allSkills={allSkills}
+          isAdmin={isAdmin}
         />
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none bg-gradient-to-t from-background/80 to-transparent"
-        />
-        <div aria-hidden className="absolute inset-0 pointer-events-none scanline-overlay opacity-50" />
-
-        <div className={`absolute top-2 left-2 font-label text-[9px] tracking-[0.3em] uppercase ${accentText} pointer-events-none`}>
-          ID · {agent.codename}
-        </div>
       </div>
     </div>
   );
