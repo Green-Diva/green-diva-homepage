@@ -140,8 +140,8 @@ dropdb green_diva && createdb -O gd_dev green_diva && npm run db:push && npm run
 **单屏布局** —— ≥1024px 桌面端 100vh **不出现外部滚动条**，左 `lg:col-span-3` roster + 右 `lg:col-span-9` 详情区。详情区 5 块垂直堆叠：DetailHeader → BaseStatsBar（4 条 0% 进度条）→ EquipmentLoadout（核心，`flex-1 min-h-0`）→ ControlConfigStrip → DeployButton。布局骨架在 [`AgentClient.tsx`](app/agent-control/AgentClient.tsx)。
 
 **槽位** —— 每个 Agent 6 个 skill 槽 + 1 个中央 CONTROL 槽，绝对定位 + 百分比坐标，常量集中在 [`lib/machineAgent/slotPositions.ts`](lib/machineAgent/slotPositions.ts)：
-- machine（脊柱）—— 三对左右对称排列；背景 `/public/machine-agent/spine.jpg`，缺图自动 fallback `spine.svg`。
-- agent（大脑）—— 圆弧排列 6 点；背景 `/public/machine-agent/brain.jpg`，缺图 fallback `brain.svg`。
+- machine（脊柱）—— 三对左右对称排列；背景 `/public/images/machine-agent/spine.jpg`，缺图自动 fallback `spine.svg`。
+- agent（大脑）—— 圆弧排列 6 点；背景 `/public/images/machine-agent/brain.jpg`，缺图 fallback `brain.svg`。
 - 未来要基于上传图切割自动调对齐时只改这一个文件，签名预留 `getLoadoutLayout(mode)`。
 
 **⚠️ 中央 CONTROL 槽不是 skill** —— 它存的是"如何调度 6 个 skill 协作运行"的配置：

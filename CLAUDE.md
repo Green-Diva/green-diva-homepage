@@ -147,7 +147,7 @@ dropdb green_diva && createdb -O gd_dev green_diva && npm run db:push && npm run
 **槽位** —— 每个 Agent 6 个 skill 槽 + 1 个中央 CONTROL 槽，绝对定位 + 百分比坐标，常量集中在 [`lib/machineAgent/slotPositions.ts`](lib/machineAgent/slotPositions.ts)：
 - machine（脊柱）—— 3×2 网格左右对称（top 18% / 50% / 82%，left 18% / 82%）；背景 `/public/images/machine-agent/spine.jpg`，缺图自动 fallback `spine.svg`。
 - agent（大脑）—— 圆弧排列 6 点；背景 `/public/images/machine-agent/brain.jpg`，缺图 fallback `brain.svg`。
-- **资产路径必须在 `/public/images/` 下**——`/machine-agent/*` 跟同名 page route 冲突，被 middleware 鉴权拦截，Next.js Image 优化器拿不到（详见"资源与性能"段的"静态图与 middleware 鉴权"）。
+- **资产路径必须在 `/public/images/` 下**——`/agent-control/*` 跟同名 page route 冲突，被 middleware 鉴权拦截，Next.js Image 优化器拿不到（详见"资源与性能"段的"静态图与 middleware 鉴权"）。
 - 未来要基于上传图切割自动调对齐时只改这一个文件，签名预留 `getLoadoutLayout(mode)`。
 
 **Agent 命名结构（4 字段双语对）** —— 编辑表单上呈现两组：
@@ -275,7 +275,7 @@ tsx prisma/migrate-token-hash.ts && tsx prisma/migrate-agent-loadout.ts && tsx p
 
 ### 资源与性能
 - **远程头像**：`avatarUrl` 是任意外部 host，**未在 `next.config.ts` 配置 `images.remotePatterns` 前不要换 `next/image`**（会运行时崩）。需要懒加载用 `<img loading="lazy" decoding="async">`。
-- **静态图与 middleware 鉴权（重要陷阱）** —— middleware 默认对所有路由要求登录，仅 `STATIC_PREFIXES = ["/_next", "/fonts", "/images", "/videos"]` 直通。**Next.js Image 优化器在 SSR 阶段以 server-fetch 拿源图，不带 cookie**，命中鉴权路径会被 307 → `/login`，然后报 `"isn't a valid image"` 渲染 fallback。**所有 `next/image` 要消费的静态资产必须放 `/public/images/...` 下**（路径 = `/images/...`）。把图放进 `/public/<routeName>/`（如 `/public/machine-agent/spine.jpg`）会撞 page route 鉴权。范本：所有 machine-agent 资产已迁到 `/public/images/machine-agent/`。新增模块创建 `public/<...>` 目录前先想这条。
+- **静态图与 middleware 鉴权（重要陷阱）** —— middleware 默认对所有路由要求登录，仅 `STATIC_PREFIXES = ["/_next", "/fonts", "/images", "/videos"]` 直通。**Next.js Image 优化器在 SSR 阶段以 server-fetch 拿源图，不带 cookie**，命中鉴权路径会被 307 → `/login`，然后报 `"isn't a valid image"` 渲染 fallback。**所有 `next/image` 要消费的静态资产必须放 `/public/images/...` 下**（路径 = `/images/...`）。把图放进 `/public/<routeName>/`（如 `/public/agent-control/spine.jpg`）会撞 page route 鉴权。范本：所有 agent-control 资产存放于 `/public/images/machine-agent/`（资产文件夹保留旧名，与路由解耦）。新增模块创建 `public/<...>` 目录前先想这条。
 - **`next/image` quality 白名单** —— Next 16 要求 `images.qualities` 显式列出可用 quality。当前 [`next.config.ts`](next.config.ts) 配 `[75, 95]`，需要更高质量传 `quality={95}` 的 `<Image>` 才能生效；用未列入的值会回退到默认 75。新需求要加 q 值时同步改这个数组。
 - **视频组件**：`SeamlessLoopVideo` 自动检测 `navigator.connection.saveData` / `effectiveType in {slow-2g, 2g, 3g}` / `prefers-reduced-motion`，命中即退化为静态 `<div>`（背景图 / 纯色）。新做循环视频组件沿用此模式，不要直接用 `<video autoPlay>`。HMR 中间态偶尔短暂走错分支，验证时硬刷新。
 

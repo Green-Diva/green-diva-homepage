@@ -428,7 +428,7 @@ export default async function Home() {
                 </p>
               </div>
               <div className="flex-1 flex flex-col gap-3 z-20">
-                {/* Unified machine-agent panel: matrix rain layered over bars + centered all-seeing eye */}
+                {/* Unified agent-control panel: matrix rain layered over bars + centered all-seeing eye */}
                 <div className="relative flex-1 min-h-[4.5rem] w-full rounded-xl overflow-hidden bg-background/80">
                   {/* Background layer: bars */}
                   <div

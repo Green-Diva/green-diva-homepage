@@ -8,7 +8,7 @@ import AgentClient from "./AgentClient";
 import type { AgentRow, SkillRow, EquipRow } from "./types";
 import type { AgentSkill, PipelineConfig, DispatcherConfig } from "@/lib/agentTypes";
 
-export default async function MachineAgentPage() {
+export default async function AgentControlPage() {
   const me = await getCurrentUser();
   if (!me) redirect("/login?from=/agent-control");
 
