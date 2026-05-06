@@ -21,7 +21,7 @@
 
 import { PrismaClient } from "@prisma/client";
 
-const DEFAULT_AVATAR = "/machine-agent/avatars/default.svg";
+const DEFAULT_AVATAR = "/images/machine-agent/avatars/default.svg";
 const LEGACY_STAT_COLUMNS = [
   "quickness",
   "intelligence",
@@ -78,6 +78,17 @@ async function main() {
       );
       if (updated > 0) {
         console.log(`[migrate-agent-loadout] backfilled ${updated} row(s) with default avatar`);
+      }
+
+      // 2b. Rewrite legacy default-avatar path that pre-dates the /images/ prefix fix.
+      // Old value `/machine-agent/avatars/default.svg` is not in middleware STATIC_PREFIXES
+      // so it 307s to /login. New value lives at /images/machine-agent/avatars/default.svg.
+      const rewritten = await prisma.$executeRawUnsafe(
+        `UPDATE "Agent" SET "avatarUrl" = $1 WHERE "avatarUrl" = '/machine-agent/avatars/default.svg'`,
+        DEFAULT_AVATAR,
+      );
+      if (rewritten > 0) {
+        console.log(`[migrate-agent-loadout] rewrote ${rewritten} row(s) from legacy default-avatar path`);
       }
     }
 
