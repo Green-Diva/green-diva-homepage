@@ -37,7 +37,7 @@ export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow;
       >
         <div className="flex items-center justify-between gap-2">
           <div className={`font-label text-[9px] tracking-[0.3em] uppercase ${accentText}`}>
-            {t.machineAgent.controlConfigTitle}
+            {isMech ? "Backbone Config" : "Orchestrator Config"}
           </div>
           <span
             className={`material-symbols-outlined text-[18px] ${accentText}`}

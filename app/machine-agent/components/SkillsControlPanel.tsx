@@ -1,6 +1,5 @@
 "use client";
 
-import { useT } from "@/lib/i18n/client";
 import EquipmentLoadout from "./EquipmentLoadout";
 import SkillsLoadoutColumn from "./SkillsLoadoutColumn";
 import type { AgentRow, EquipRow, SkillRow } from "../types";
@@ -16,7 +15,6 @@ export default function SkillsControlPanel({
   allSkills: SkillRow[];
   isAdmin: boolean;
 }) {
-  const t = useT();
   const isMech = agent.mode === "MECHANICAL";
   const accentText = isMech ? "text-secondary" : "text-primary";
   const accentBorder = isMech ? "border-secondary/25" : "border-primary/25";
@@ -37,7 +35,7 @@ export default function SkillsControlPanel({
           accentText,
         ].join(" ")}
       >
-        {t.machineAgent.skillsAndControl}
+        {isMech ? "Skills & Backbone Configure" : "Skills & Orchestrator Configure"}
       </div>
       <span
         aria-hidden

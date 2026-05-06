@@ -65,10 +65,6 @@ export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
           className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none bg-gradient-to-t from-background/80 to-transparent"
         />
         <div aria-hidden className="absolute inset-0 pointer-events-none scanline-overlay opacity-50" />
-
-        <div className={`absolute top-2 left-2 font-label text-[9px] tracking-[0.3em] uppercase ${accentText} pointer-events-none`}>
-          ID · {agent.codename}
-        </div>
       </div>
     </div>
   );

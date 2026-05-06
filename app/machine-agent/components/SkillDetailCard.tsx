@@ -4,10 +4,9 @@ import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { EquipRow, AgentMode } from "../types";
 
-const KIND_COLOR: Record<string, string> = {
-  PASSIVE: "text-on-surface-variant border-on-surface-variant/30",
-  ACTIVE: "text-primary border-primary/40",
-  ULTIMATE: "text-secondary border-secondary/40",
+const STATUS_BADGE: Record<string, string> = {
+  ONLINE: "text-emerald-300 border-emerald-400/50 bg-emerald-400/[0.10]",
+  OFFLINE: "text-on-surface-variant/80 border-on-surface-variant/30 bg-on-surface-variant/[0.06]",
 };
 
 type Props = {
@@ -58,7 +57,6 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
   }
 
   const skill = equip.skill;
-  const kindKey = `skillKind${skill.kind[0]}${skill.kind.slice(1).toLowerCase()}` as keyof typeof t.machineAgent;
   const skillName = locale === "zh" ? skill.nameZh : skill.nameEn;
 
   return (
@@ -88,9 +86,9 @@ export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disab
           <span className="text-on-surface-variant/60">·</span>
           <span className="text-on-surface-variant">{format(t.machineAgent.skillLevel, { n: skill.level })}</span>
           <span
-            className={`border rounded-sm px-1 py-px font-label text-[7px] tracking-[0.15em] uppercase ${KIND_COLOR[skill.kind] ?? ""}`}
+            className={`border rounded-sm px-1 py-px font-label text-[7px] tracking-[0.15em] uppercase ${STATUS_BADGE[skill.status] ?? ""}`}
           >
-            {t.machineAgent[kindKey]}
+            {skill.status}
           </span>
         </div>
         <div className="text-[11px] text-on-surface font-medium truncate leading-tight mt-0.5">

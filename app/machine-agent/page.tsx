@@ -9,7 +9,7 @@ import AgentClient from "./AgentClient";
 import type { AgentRow, SkillRow, EquipRow } from "./types";
 import type { AgentSkill, PipelineConfig, DispatcherConfig } from "@/lib/agentTypes";
 
-export default async function MachineVisionPage() {
+export default async function MachineAgentPage() {
   const me = await getCurrentUser();
   if (!me) redirect("/login?from=/machine-agent");
   const t = await getDictionary();
@@ -35,9 +35,9 @@ export default async function MachineVisionPage() {
     id: a.id,
     serial: a.serial,
     codename: a.codename,
+    codenameZh: a.codenameZh,
     nameEn: a.nameEn,
     nameZh: a.nameZh,
-    classification: a.classification,
     mode: a.mode,
     status: a.status,
     avatarUrl: a.avatarUrl,
@@ -54,16 +54,6 @@ export default async function MachineVisionPage() {
     deployedAt: a.deployedAt ? a.deployedAt.toISOString() : null,
     skills: (a.skills as AgentSkill[] | null) ?? null,
     availableAp: a.availableAp,
-    enabled: a.enabled,
-    provider: a.provider,
-    model: a.model,
-    systemPrompt: a.systemPrompt,
-    internalHandler: a.internalHandler,
-    inputSchemaJson: a.inputSchemaJson,
-    outputSchemaJson: a.outputSchemaJson,
-    maxTokens: a.maxTokens,
-    temperature: a.temperature,
-    rateLimitPerMin: a.rateLimitPerMin,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     createdBy: a.createdBy,
@@ -76,6 +66,7 @@ export default async function MachineVisionPage() {
     nameEn: s.nameEn,
     nameZh: s.nameZh,
     kind: s.kind as SkillRow["kind"],
+    status: s.status as SkillRow["status"],
     costAp: s.costAp,
     descriptionEn: s.descriptionEn,
     descriptionZh: s.descriptionZh,
@@ -96,6 +87,7 @@ export default async function MachineVisionPage() {
         nameEn: r.skill.nameEn,
         nameZh: r.skill.nameZh,
         kind: r.skill.kind as SkillRow["kind"],
+        status: r.skill.status as SkillRow["status"],
         costAp: r.skill.costAp,
         descriptionEn: r.skill.descriptionEn,
         descriptionZh: r.skill.descriptionZh,

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { agentSkillEquipSchema } from "@/lib/validators";
 import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
+import { SKILL_SLOT_COUNT } from "@/lib/agentTypes";
+
+const CAPACITY_SENTINEL = "EQUIP_CAPACITY_EXCEEDED";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -64,6 +67,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           },
         });
       }
+      // Cap total equips per agent at SKILL_SLOT_COUNT (6). Without this, repeated
+      // POSTs without slotIndex would silently pile up `slotIndex=null` rows that
+      // the UI cannot show but a future invokeAgent would still iterate over.
+      const currentCount = await tx.agentSkillEquip.count({ where: { agentId } });
+      if (currentCount >= SKILL_SLOT_COUNT) {
+        throw new Error(CAPACITY_SENTINEL);
+      }
       return tx.agentSkillEquip.create({
         data: {
           agentId,
@@ -78,6 +88,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     return NextResponse.json(equip, { status: 201 });
   } catch (e) {
+    if (e instanceof Error && e.message === CAPACITY_SENTINEL) {
+      return NextResponse.json({ error: "equip capacity exceeded" }, { status: 409 });
+    }
     console.error("[agent-skills] equip failed", e);
     return NextResponse.json({ error: "equip failed" }, { status: 500 });
   }

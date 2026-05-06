@@ -15,7 +15,10 @@ const targetRatio = 3 / 4;
 const ZOOM = 1.55;
 const cropH = Math.round(srcH / ZOOM);
 const cropW = Math.round(cropH * targetRatio);
-const cropLeft = Math.floor((srcW - cropW) / 2);
+// Source has its spine column ~1.5% right of geometric center; nudge crop
+// window right so the spine lands dead-center in output.
+const SPINE_X_OFFSET_PX = 34;
+const cropLeft = Math.floor((srcW - cropW) / 2) + SPINE_X_OFFSET_PX;
 const cropTop = Math.floor((srcH - cropH) / 2);
 
 const cropped = await sharp(SRC)
@@ -58,8 +61,7 @@ const composited = await sharp(cropped)
   .toBuffer();
 
 await sharp(composited)
-  .resize(1200, 1600, { fit: "fill" })
-  .jpeg({ quality: 84, mozjpeg: true })
+  .jpeg({ quality: 95, mozjpeg: false, chromaSubsampling: "4:4:4" })
   .toFile(OUT);
 
 const outMeta = await sharp(OUT).metadata();

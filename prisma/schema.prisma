@@ -11,7 +11,7 @@ model User {
   id                String            @id @default(cuid())
   serial            Int?              @unique
   // Tokens are stored as bcrypt hashes (one-way). tokenLookup is an
-  // HMAC-SHA256(token, VAULT_COOKIE_SECRET) for O(1) login lookup.
+  // HMAC-SHA256(token, SAFETY_SECRET) for O(1) login lookup.
   // Plaintext is returned to admins exactly once at issuance.
   tokenHash         String
   tokenLookup       String            @unique
@@ -267,13 +267,6 @@ enum AgentStatus {
   OFFLINE
 }
 
-enum AgentProvider {
-  ANTHROPIC
-  OPENAI
-  INTERNAL
-  ECHO
-}
-
 enum AgentMode {
   MECHANICAL
   AUTONOMOUS
@@ -285,7 +278,7 @@ model Agent {
   codename         String               @unique
   nameEn           String
   nameZh           String
-  classification   String?
+  codenameZh       String?
   mode             AgentMode           @default(MECHANICAL)
   status           AgentStatus         @default(STANDBY)
   avatarUrl        String
@@ -308,29 +301,23 @@ model Agent {
   skills           Json?
   skillEquips      AgentSkillEquip[]
   availableAp      Int                  @default(0)
-  enabled          Boolean              @default(true)
-  provider         AgentProvider       @default(ECHO)
-  model            String?
-  systemPrompt     String?
-  internalHandler  String?
-  inputSchemaJson  String?
-  outputSchemaJson String?
-  maxTokens        Int?                 @default(1024)
-  temperature      Float?               @default(0.7)
-  rateLimitPerMin  Int?                 @default(20)
   createdById      String?
   createdBy        User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
   @@index([status, createdAt])
-  @@index([enabled, provider])
 }
 
 enum SkillKind {
   PASSIVE
   ACTIVE
   ULTIMATE
+}
+
+enum SkillStatus {
+  ONLINE
+  OFFLINE
 }
 
 model Skill {
@@ -340,6 +327,7 @@ model Skill {
   nameEn        String             @db.VarChar(80)
   nameZh        String             @db.VarChar(80)
   kind          SkillKind
+  status        SkillStatus        @default(ONLINE)
   costAp        Int                @default(0)
   descriptionEn String             @db.VarChar(2000)
   descriptionZh String             @db.VarChar(2000)
@@ -351,6 +339,7 @@ model Skill {
 
   @@index([kind])
   @@index([level])
+  @@index([status])
 }
 
 model AgentSkillEquip {

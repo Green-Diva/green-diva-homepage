@@ -229,12 +229,11 @@ const RELIC_SEEDS = [
   },
 ];
 
-const CLERIC_SEEDS = [
+const AGENT_SEEDS = [
   {
     codename: "DIVA-001",
     nameEn: "Neural Operator",
     nameZh: "神经网络接线员",
-    classification: "TACTICAL",
     mode: "MECHANICAL" as const,
     status: "ONLINE" as const,
     descriptionEn:
@@ -258,17 +257,11 @@ const CLERIC_SEEDS = [
       { level: 5, icon: "hub", nameEn: "Hive Convergence", nameZh: "蜂巢汇流", kind: "ACTIVE", costAp: 5, descriptionEn: "Coordinates distributed agents through a shared scratchpad.", descriptionZh: "通过共享记事板协调分布式神职。", unlocked: false },
       { level: 6, icon: "lock", nameEn: "Sanctum Lock", nameZh: "圣殿封印", kind: "ULTIMATE", costAp: 8, descriptionEn: "Locks the agent's weights against runtime tampering.", descriptionZh: "在运行时锁定神职权重，防篡改。", unlocked: false },
     ],
-    enabled: true,
-    provider: "ECHO" as const,
-    systemPrompt: "You are DIVA-001, a neural operator that helps prioritize tactical decisions inside the Green Diva sanctum.",
-    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
-    outputSchemaJson: '{"type":"object","properties":{"echoed":{}}}',
   },
   {
     codename: "ORACLE-7",
     nameEn: "Seer Analyst",
     nameZh: "先知分析师",
-    classification: "VISION",
     mode: "MECHANICAL" as const,
     status: "STANDBY" as const,
     descriptionEn: "Long-horizon forecaster. Reads weak signals across logs and timelines.",
@@ -290,16 +283,12 @@ const CLERIC_SEEDS = [
       { level: 5, icon: "model_training", nameEn: "Bayes Loop", nameZh: "贝叶斯环", kind: "ACTIVE", costAp: 5, descriptionEn: "Iterates posterior beliefs as new logs arrive.", descriptionZh: "随新日志到达迭代后验信念。", unlocked: false },
       { level: 6, icon: "stars", nameEn: "Star Reading", nameZh: "星象解读", kind: "ULTIMATE", costAp: 7, descriptionEn: "Issues a single high-conviction prophecy.", descriptionZh: "颁布一条高确信度预言。", unlocked: false },
     ],
-    enabled: true,
-    provider: "ECHO" as const,
-    systemPrompt: "You are ORACLE-7, a seer analyst. Read weak signals and surface the most likely next outcome.",
-    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+
   },
   {
     codename: "SERAPH-NODE",
     nameEn: "Data Guardian",
     nameZh: "数据守护者",
-    classification: "SUPPORT",
     mode: "MECHANICAL" as const,
     status: "STANDBY" as const,
     descriptionEn: "Watches integrity, redactions, and PII leakage across requests.",
@@ -321,16 +310,12 @@ const CLERIC_SEEDS = [
       { level: 5, icon: "history", nameEn: "Audit Echo", nameZh: "审计回响", kind: "ACTIVE", costAp: 5, descriptionEn: "Streams compact audit lines for ops review.", descriptionZh: "为运维评审流式输出紧凑审计行。", unlocked: false },
       { level: 6, icon: "gavel", nameEn: "Final Verdict", nameZh: "终审裁决", kind: "ULTIMATE", costAp: 8, descriptionEn: "Halts a request with an explicit, immutable verdict.", descriptionZh: "以明确不可改的裁决中断请求。", unlocked: false },
     ],
-    enabled: true,
-    provider: "ECHO" as const,
-    systemPrompt: "You are SERAPH-NODE, a data guardian. Your job is to flag PII, schema mismatches, and policy issues.",
-    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+
   },
   {
     codename: "CHOIR-13",
     nameEn: "Resonance Coordinator",
     nameZh: "共振协调者",
-    classification: "SUPPORT",
     mode: "MECHANICAL" as const,
     status: "OFFLINE" as const,
     descriptionEn: "Choreographs multi-agent rituals — fan-out, gather, reconcile.",
@@ -352,16 +337,12 @@ const CLERIC_SEEDS = [
       { level: 5, icon: "podcasts", nameEn: "Broadcast Choir", nameZh: "广播圣咏", kind: "ULTIMATE", costAp: 6, descriptionEn: "Broadcasts a directive across the entire fabric.", descriptionZh: "向整片织域广播指令。", unlocked: false },
       { level: 6, icon: "all_inclusive", nameEn: "Eternal Loop", nameZh: "永恒回环", kind: "ULTIMATE", costAp: 9, descriptionEn: "Maintains a self-healing agent loop indefinitely.", descriptionZh: "无限维持一个自愈神职回环。", unlocked: false },
     ],
-    enabled: false,
-    provider: "ECHO" as const,
-    systemPrompt: "You are CHOIR-13, a resonance coordinator. Orchestrate multi-agent flows.",
-    inputSchemaJson: '{"type":"object","properties":{"prompt":{"type":"string"}},"required":["prompt"]}',
+
   },
   {
     codename: "AURORA-Φ",
     nameEn: "Sovereign Strategos",
     nameZh: "自主策动师",
-    classification: "STRATEGIC",
     mode: "AUTONOMOUS" as const,
     status: "STANDBY" as const,
     descriptionEn:
@@ -385,16 +366,13 @@ const CLERIC_SEEDS = [
       { level: 5, icon: "hub", nameEn: "Sub-Agent Spawn", nameZh: "子智能体派生", kind: "ULTIMATE", costAp: 7, descriptionEn: "Spawns specialised sub-agents for parallel sub-goals.", descriptionZh: "派生专职子神职并行处理子目标。", unlocked: false },
       { level: 6, icon: "auto_awesome", nameEn: "Emergent Synthesis", nameZh: "涌现综合", kind: "ULTIMATE", costAp: 9, descriptionEn: "Composes novel capability sequences unseen in training.", descriptionZh: "组合训练中未见过的新颖能力序列。", unlocked: false },
     ],
-    enabled: false,
-    provider: "ECHO" as const,
-    systemPrompt: "You are AURORA-Φ, a sovereign strategos. Given a goal, plan and execute capability sequences autonomously, reflecting and replanning as needed.",
-    inputSchemaJson: '{"type":"object","properties":{"goal":{"type":"string"}},"required":["goal"]}',
+
   },
 ];
 
 async function seedAgents(creatorId: string | null) {
   const DEFAULT_AVATAR = "/machine-agent/avatars/default.svg";
-  for (const a of CLERIC_SEEDS) {
+  for (const a of AGENT_SEEDS) {
     const existing = await prisma.agent.findUnique({ where: { codename: a.codename } });
     if (existing) {
       await prisma.agent.update({
@@ -402,7 +380,6 @@ async function seedAgents(creatorId: string | null) {
         data: {
           nameEn: a.nameEn,
           nameZh: a.nameZh,
-          classification: a.classification,
           mode: a.mode,
           status: a.status,
           avatarUrl: existing.avatarUrl || DEFAULT_AVATAR,
@@ -412,11 +389,7 @@ async function seedAgents(creatorId: string | null) {
           matrixLevel: a.matrixLevel,
           skills: a.skills,
           availableAp: a.availableAp,
-          enabled: a.enabled,
-          provider: a.provider,
-          systemPrompt: a.systemPrompt,
-          inputSchemaJson: a.inputSchemaJson ?? null,
-          outputSchemaJson: a.outputSchemaJson ?? null,
+
         },
       });
     } else {
@@ -428,7 +401,6 @@ async function seedAgents(creatorId: string | null) {
           codename: a.codename,
           nameEn: a.nameEn,
           nameZh: a.nameZh,
-          classification: a.classification,
           mode: a.mode,
           status: a.status,
           avatarUrl: DEFAULT_AVATAR,
@@ -438,17 +410,13 @@ async function seedAgents(creatorId: string | null) {
           matrixLevel: a.matrixLevel,
           skills: a.skills,
           availableAp: a.availableAp,
-          enabled: a.enabled,
-          provider: a.provider,
-          systemPrompt: a.systemPrompt,
-          inputSchemaJson: a.inputSchemaJson ?? null,
-          outputSchemaJson: a.outputSchemaJson ?? null,
+
           createdById: creatorId,
         },
       });
     }
   }
-  console.log(`Seeded ${CLERIC_SEEDS.length} agents (provider=ECHO, no external API calls).`);
+  console.log(`Seeded ${AGENT_SEEDS.length} agents (provider=ECHO, no external API calls).`);
 }
 
 async function seedRelics() {

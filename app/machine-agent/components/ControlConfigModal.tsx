@@ -100,7 +100,7 @@ export default function ControlConfigModal({ agent, onClose }: Props) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className={`font-label text-[10px] tracking-[0.3em] uppercase ${accent}`}>
-                {agent.codename} · {t.machineAgent.controlConfigTitle}
+                {agent.codename} · {isMech ? "Backbone Config" : "Orchestrator Config"}
               </p>
               <h2 className="mt-1 font-headline text-2xl text-on-surface sacred-glow">{title}</h2>
               <p className="mt-1 text-xs text-on-surface-variant">{pendingHint}</p>

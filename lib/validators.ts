@@ -45,13 +45,20 @@ export const dispatcherConfigSchema = jsonObject.nullable();
 
 export const agentCreateSchema = z.object({
   codename: z.string().min(2).max(32).regex(/^[A-Z0-9-]+$/, "codename must be uppercase letters, digits, dashes"),
+  codenameZh: z.string().max(32).optional().nullable(),
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
-  classification: z.string().max(40).optional().nullable(),
   mode: z.enum(["MECHANICAL", "AUTONOMOUS"]).optional(),
   status: z.enum(["ONLINE", "STANDBY", "OFFLINE"]).optional(),
-  // Avatar required: every agent must have a portrait.
-  avatarUrl: z.string().url(),
+  // Avatar required: accepts either a full URL or an absolute path served
+  // from /public (uploads land at /images/machine-agent/avatars/...).
+  avatarUrl: z
+    .string()
+    .min(1)
+    .refine(
+      (s) => /^https?:\/\//.test(s) || s.startsWith("/"),
+      { message: "must be a URL or absolute path" },
+    ),
   descriptionEn: z.string().max(4000).optional().nullable(),
   descriptionZh: z.string().max(4000).optional().nullable(),
   syncLevel: z.number().min(0).max(100).optional(),
@@ -66,25 +73,11 @@ export const agentCreateSchema = z.object({
   dispatcherConfig: dispatcherConfigSchema.optional(),
   skills: z.array(agentSkillSchema).max(12).optional().nullable(),
   availableAp: z.number().int().min(0).max(999).optional(),
-  enabled: z.boolean().optional(),
-  provider: z.enum(["ANTHROPIC", "OPENAI", "INTERNAL", "ECHO"]).optional(),
-  model: z.string().max(80).optional().nullable(),
-  systemPrompt: z.string().max(8000).optional().nullable(),
-  internalHandler: z.string().max(80).optional().nullable(),
-  inputSchemaJson: z.string().max(8000).optional().nullable(),
-  outputSchemaJson: z.string().max(8000).optional().nullable(),
-  maxTokens: z.number().int().min(1).max(32000).optional().nullable(),
-  temperature: z.number().min(0).max(2).optional().nullable(),
-  rateLimitPerMin: z.number().int().min(1).max(600).optional().nullable(),
 });
 
 // Update schema relaxes avatarUrl back to optional — we don't want
 // every PATCH to require re-sending the avatar.
-export const agentUpdateSchema = agentCreateSchema
-  .partial()
-  .extend({
-    avatarUrl: z.string().url().optional(),
-  });
+export const agentUpdateSchema = agentCreateSchema.partial();
 
 export const agentInvokeSchema = z.object({
   input: z.unknown(),

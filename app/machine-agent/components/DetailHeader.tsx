@@ -2,17 +2,19 @@
 
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { AgentRow } from "../types";
+import type { AgentRow, EquipRow } from "../types";
 
 // New header (post-redesign): no avatar — that's now the Hero portrait below.
 // One row of: codename + mode badge + deploy badge + EDIT button.
-// Subtitle row: localized name · classification · deployedAt.
+// Subtitle row: localized name · deployedAt.
 export default function DetailHeader({
   agent,
+  equips,
   isAdmin,
   onEdit,
 }: {
   agent: AgentRow;
+  equips: EquipRow[];
   isAdmin: boolean;
   onEdit: () => void;
 }) {
@@ -21,9 +23,12 @@ export default function DetailHeader({
 
   const isMech = agent.mode === "MECHANICAL";
   const accentText = isMech ? "text-secondary" : "text-primary";
-  const modeBadge = isMech
-    ? "border-secondary/60 text-secondary bg-secondary/[0.10]"
-    : "border-primary/60 text-primary bg-primary/[0.10]";
+  const anyOnline = equips.some((e) => e.skill.status === "ONLINE");
+  const modeBadge = !anyOnline
+    ? "border-on-surface-variant/40 text-on-surface-variant/80 bg-on-surface-variant/[0.06]"
+    : isMech
+      ? "border-secondary/60 text-secondary bg-secondary/[0.10]"
+      : "border-primary/60 text-primary bg-primary/[0.10]";
   const deployBadge = agent.deployedAt
     ? "border-emerald-400/50 text-emerald-300 bg-emerald-400/[0.08]"
     : "border-amber-300/50 text-amber-200 bg-amber-300/[0.08]";
@@ -61,7 +66,6 @@ export default function DetailHeader({
       </div>
       <div className="font-label text-[11px] tracking-[0.18em] text-on-surface-variant truncate mt-0.5">
         {subtitleName}
-        {agent.classification ? <span className="text-secondary/70"> · {agent.classification}</span> : null}
         {deployedWhen ? (
           <span className="ml-2 text-on-surface-variant/70 normal-case">{deployedWhen}</span>
         ) : null}

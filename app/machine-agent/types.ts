@@ -7,16 +7,15 @@ import type {
 } from "@/lib/agentTypes";
 
 export type AgentStatus = "ONLINE" | "STANDBY" | "OFFLINE";
-export type AgentProvider = "ANTHROPIC" | "OPENAI" | "INTERNAL" | "ECHO";
 export type AgentMode = "MECHANICAL" | "AUTONOMOUS";
 
 export interface AgentRow {
   id: string;
   serial: number | null;
   codename: string;
+  codenameZh: string | null;
   nameEn: string;
   nameZh: string;
-  classification: string | null;
   mode: AgentMode;
   status: AgentStatus;
   avatarUrl: string;
@@ -33,22 +32,14 @@ export interface AgentRow {
   deployedAt: string | null;
   skills: AgentSkill[] | null;
   availableAp: number;
-  enabled: boolean;
-  provider: AgentProvider;
-  model: string | null;
-  systemPrompt: string | null;
-  internalHandler: string | null;
-  inputSchemaJson: string | null;
-  outputSchemaJson: string | null;
-  maxTokens: number | null;
-  temperature: number | null;
-  rateLimitPerMin: number | null;
   createdAt: string;
   updatedAt: string;
   createdBy: { id: string; name: string } | null;
 }
 
 export type SkillLevel = AgentSkillLevel;
+
+export type SkillStatus = "ONLINE" | "OFFLINE";
 
 export interface SkillRow {
   id: string;
@@ -57,6 +48,7 @@ export interface SkillRow {
   nameEn: string;
   nameZh: string;
   kind: AgentSkillKind;
+  status: SkillStatus;
   costAp: number;
   descriptionEn: string;
   descriptionZh: string;

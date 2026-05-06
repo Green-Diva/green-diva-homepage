@@ -7,7 +7,7 @@
     "dev": "next dev",
     "dev:stable": "npm run build && npm run start",
     "build": "next build",
-    "start": "tsx prisma/migrate-token-hash.ts && tsx prisma/migrate-agent-loadout.ts && prisma db push --skip-generate --accept-data-loss && next start",
+    "start": "tsx prisma/migrate-token-hash.ts && tsx prisma/migrate-agent-loadout.ts && tsx prisma/migrate-remove-runtime-config.ts && tsx prisma/migrate-remove-classification.ts && prisma db push --skip-generate --accept-data-loss && next start",
     "start:stable": "npm run build && npm run start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
@@ -28,6 +28,7 @@
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-easy-crop": "^5.5.7",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.0",
     "zod": "^3.23.8"

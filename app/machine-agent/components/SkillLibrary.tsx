@@ -31,6 +31,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
   const router = useRouter();
   const [editor, setEditor] = useState<EditorState>({ open: false, mode: "create", initial: null });
   const [busyEquip, setBusyEquip] = useState<string | null>(null);
+  const [equipError, setEquipError] = useState<string | null>(null);
 
   const activeEquips = activeAgentId ? (equipsByAgentId[activeAgentId] ?? []) : [];
   const equippedIds = new Set(activeEquips.map((e) => e.skillId));
@@ -38,20 +39,26 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
   async function toggleEquip(skill: SkillRow) {
     if (!activeAgentId) return;
     setBusyEquip(skill.id);
+    setEquipError(null);
     const isEquipped = equippedIds.has(skill.id);
     try {
-      if (isEquipped) {
-        await fetch(`/api/agents/${activeAgentId}/skills/${skill.id}`, { method: "DELETE" });
-      } else {
-        await fetch(`/api/agents/${activeAgentId}/skills`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ skillId: skill.id, unlocked: false }),
-        });
+      const r = isEquipped
+        ? await fetch(`/api/agents/${activeAgentId}/skills/${skill.id}`, { method: "DELETE" })
+        : await fetch(`/api/agents/${activeAgentId}/skills`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ skillId: skill.id, unlocked: false }),
+          });
+      if (!r.ok) {
+        setEquipError(
+          r.status === 409 ? t.machineAgent.skillEquipCapacityFull : t.machineAgent.skillEquipFailed
+        );
+        return;
       }
       router.refresh();
     } catch (e) {
       console.error("[SkillLibrary] toggleEquip failed", e);
+      setEquipError(t.machineAgent.skillEquipFailed);
     } finally {
       setBusyEquip(null);
     }
@@ -79,6 +86,24 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
           </button>
         )}
       </div>
+
+      {equipError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 border border-error/40 bg-error/10 text-error rounded-sm px-3 py-2"
+        >
+          <span className="material-symbols-outlined text-[16px] mt-0.5">error</span>
+          <p className="flex-1 font-label text-[11px] tracking-[0.1em] uppercase">{equipError}</p>
+          <button
+            type="button"
+            onClick={() => setEquipError(null)}
+            className="min-w-[24px] min-h-[24px] flex items-center justify-center text-error/70 hover:text-error"
+            aria-label="dismiss"
+          >
+            <span className="material-symbols-outlined text-[14px]">close</span>
+          </button>
+        </div>
+      )}
 
       {skills.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">

@@ -23,7 +23,7 @@ export default function AutonomousDetailView({
   return (
     <div className="flex flex-col h-full gap-3 min-h-0">
       <div className="flex items-start justify-between gap-3 shrink-0">
-        <DetailHeader agent={agent} isAdmin={isAdmin} onEdit={onEdit} />
+        <DetailHeader agent={agent} equips={equips} isAdmin={isAdmin} onEdit={onEdit} />
         <DeployButton agent={agent} isAdmin={isAdmin} />
       </div>
       <BaseStatsBar agent={agent} />

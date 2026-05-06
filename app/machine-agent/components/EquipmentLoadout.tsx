@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n/client";
 import type { AgentRow, EquipRow, SkillRow } from "../types";
 import { getLoadoutLayout } from "@/lib/machineAgent/slotPositions";
 import SkillSlot from "./SkillSlot";
+import SkillConnections from "./SkillConnections";
 import CentralControlSlot from "./CentralControlSlot";
 import SkillPickerModal from "./SkillPickerModal";
 import SkillSlotDetailModal from "./SkillSlotDetailModal";
@@ -49,7 +50,8 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
           alt=""
           fill
           priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
+          quality={95}
+          sizes="(max-width: 1024px) 100vw, 60vw"
           className="object-contain opacity-85 pointer-events-none select-none"
           onError={() => setBgError(true)}
           unoptimized={bgError}
@@ -59,10 +61,17 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
         <div aria-hidden className={`absolute inset-0 pointer-events-none bg-gradient-to-t ${tintClass} via-transparent to-background/30 mix-blend-screen`} />
         <div aria-hidden className="absolute inset-0 pointer-events-none scanline-overlay opacity-40" />
 
-        {/* Slot label header */}
-        <div className="absolute top-2 left-2 right-2 flex items-center justify-between font-label text-[9px] tracking-[0.3em] uppercase opacity-80 pointer-events-none">
-          <span className={isMech ? "text-secondary" : "text-primary"}>{isMech ? "M-LOADOUT · 06" : "A-LOADOUT · 06"}</span>
-          <span className="text-on-surface-variant">{slotted.size}/{layout.slots.length}</span>
+        {/* PCB-style connection traces from each slot to the central node */}
+        <SkillConnections
+          mode={agent.mode}
+          slots={layout.slots}
+          central={layout.central}
+          equips={equips}
+        />
+
+        {/* Slot label footer */}
+        <div className="absolute bottom-2 left-2 right-2 text-center font-label text-[8px] tracking-[0.2em] uppercase whitespace-nowrap text-on-surface-variant/70 pointer-events-none">
+          Skill Loadout: {slotted.size}/{layout.slots.length} ｜ {isMech ? "Backbone" : "Orchestrator"} : {configured ? "Success" : "Pending"}
         </div>
 
         {/* 6 skill slots */}

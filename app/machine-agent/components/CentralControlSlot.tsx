@@ -30,7 +30,7 @@ export default function CentralControlSlot({ pos, mode, configured, onClick, dis
       title={isMech ? t.machineAgent.pipelineConfigTitle : t.machineAgent.dispatcherConfigTitle}
       className={[
         "absolute -translate-x-1/2 -translate-y-1/2 rounded-md flex flex-col items-center justify-center backdrop-blur-md transition-all hover:scale-110 disabled:cursor-not-allowed",
-        "w-[58px] h-[58px] border-2 bg-background/80",
+        "w-[72px] h-[72px] border-2 bg-background/80 px-1",
         accent,
         configured ? "" : "border-dashed",
       ].join(" ")}
@@ -44,7 +44,7 @@ export default function CentralControlSlot({ pos, mode, configured, onClick, dis
         {icon}
       </span>
       <span aria-hidden className="font-label text-[7px] tracking-[0.25em] uppercase mt-0.5">
-        {t.machineAgent.skillCentralSlotLabel}
+        {isMech ? "Backbone" : "Orchestrator"}
       </span>
     </button>
   );

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { AgentRow, AgentProvider, AgentStatus, AgentMode } from "../types";
+import type { AgentRow, AgentStatus, AgentMode } from "../types";
+import AvatarCropModal from "./AvatarCropModal";
 
 type Mode = "create" | "edit";
 
@@ -15,42 +16,110 @@ type Props = {
   onSaved: () => void;
 };
 
-const PROVIDERS: AgentProvider[] = ["ECHO", "INTERNAL", "ANTHROPIC", "OPENAI"];
 const STATUSES: AgentStatus[] = ["ONLINE", "STANDBY", "OFFLINE"];
-const MODES: AgentMode[] = ["MECHANICAL", "AUTONOMOUS"];
+const MODES: AgentMode[] = ["AUTONOMOUS", "MECHANICAL"];
 
-const inputCls =
-  "mt-1 w-full rounded-md border border-primary/20 bg-surface-container px-3 py-2 text-sm text-on-surface focus:border-primary/60 focus:outline-none";
-const labelCls = "text-[10px] font-label uppercase tracking-[0.25em] text-primary/60";
+type DropdownOption = { value: string; label: string };
+
+function ThemedDropdown({
+  value,
+  options,
+  onChange,
+  isMech,
+}: {
+  value: string;
+  options: DropdownOption[];
+  onChange: (v: string) => void;
+  isMech: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const current = options.find((o) => o.value === value);
+  const accent = isMech ? "secondary" : "primary";
+  const triggerCls = isMech
+    ? "mt-1 h-10 w-full rounded-md border border-secondary/20 bg-surface-container pl-3.5 pr-9 text-sm text-on-surface text-left flex items-center hover:border-secondary/40 focus:border-secondary/60 focus:outline-none transition-colors"
+    : "mt-1 h-10 w-full rounded-md border border-primary/20 bg-surface-container pl-3.5 pr-9 text-sm text-on-surface text-left flex items-center hover:border-primary/40 focus:border-primary/60 focus:outline-none transition-colors";
+  const chevronCls = isMech
+    ? "absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none material-symbols-outlined text-base text-secondary/60"
+    : "absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none material-symbols-outlined text-base text-primary/60";
+  const panelCls = isMech
+    ? "absolute z-50 mt-1 w-full rounded-md border border-secondary/30 bg-surface-container shadow-lg shadow-black/40 overflow-hidden"
+    : "absolute z-50 mt-1 w-full rounded-md border border-primary/30 bg-surface-container shadow-lg shadow-black/40 overflow-hidden";
+  const itemBase = "block w-full text-left px-3.5 h-10 text-sm flex items-center gap-2 transition-colors";
+  const itemActiveCls = isMech ? `${itemBase} bg-secondary/15 text-secondary` : `${itemBase} bg-primary/15 text-primary`;
+  const itemHoverCls = isMech ? `${itemBase} text-on-surface hover:bg-secondary/10 hover:text-secondary` : `${itemBase} text-on-surface hover:bg-primary/10 hover:text-primary`;
+  void accent;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        className={triggerCls}
+        onClick={() => setOpen((s) => !s)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {current?.label ?? value}
+      </button>
+      <span aria-hidden className={chevronCls}>{open ? "expand_less" : "expand_more"}</span>
+      {open ? (
+        <div className={panelCls} role="listbox">
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="option"
+              aria-selected={o.value === value}
+              className={o.value === value ? itemActiveCls : itemHoverCls}
+              onClick={() => {
+                onChange(o.value);
+                setOpen(false);
+              }}
+            >
+              {o.value === value ? (
+                <span className="material-symbols-outlined text-base" aria-hidden>check</span>
+              ) : (
+                <span className="w-4" aria-hidden />
+              )}
+              <span>{o.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function blankFromInitial(initial: AgentRow | null) {
   return {
     codename: initial?.codename ?? "",
+    codenameZh: initial?.codenameZh ?? "",
     nameEn: initial?.nameEn ?? "",
     nameZh: initial?.nameZh ?? "",
-    classification: initial?.classification ?? "",
-    mode: (initial?.mode ?? "MECHANICAL") as AgentMode,
+    // New agents default to AUTONOMOUS (primary green theme); existing ones
+    // keep whatever was on the row.
+    mode: (initial?.mode ?? "AUTONOMOUS") as AgentMode,
     status: (initial?.status ?? "STANDBY") as AgentStatus,
     avatarUrl: initial?.avatarUrl ?? "",
     descriptionEn: initial?.descriptionEn ?? "",
     descriptionZh: initial?.descriptionZh ?? "",
-    syncLevel: initial?.syncLevel ?? 0,
-    matrixLevel: initial?.matrixLevel ?? 1,
-    chaosLevel: initial?.chaosLevel ?? 0,
-    costTier: initial?.costTier ?? 0,
-    activityLevel: initial?.activityLevel ?? 0,
-    stabilityLevel: initial?.stabilityLevel ?? 0,
-    availableAp: initial?.availableAp ?? 0,
-    enabled: initial?.enabled ?? true,
-    provider: (initial?.provider ?? "ECHO") as AgentProvider,
-    model: initial?.model ?? "",
-    systemPrompt: initial?.systemPrompt ?? "",
-    internalHandler: initial?.internalHandler ?? "",
-    inputSchemaJson: initial?.inputSchemaJson ?? "",
-    outputSchemaJson: initial?.outputSchemaJson ?? "",
-    maxTokens: initial?.maxTokens ?? 1024,
-    temperature: initial?.temperature ?? 0.7,
-    rateLimitPerMin: initial?.rateLimitPerMin ?? 20,
   };
 }
 
@@ -78,8 +147,72 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
   const portal = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
   if (!portal) return null;
 
+  // Mode-driven accent: AUTONOMOUS = primary (green/cyan), MECHANICAL = secondary (gold).
+  const isMech = values.mode === "MECHANICAL";
+  const inputBase = isMech
+    ? "mt-1 w-full rounded-md border border-secondary/20 bg-surface-container text-sm text-on-surface focus:border-secondary/60 focus:outline-none transition-colors"
+    : "mt-1 w-full rounded-md border border-primary/20 bg-surface-container text-sm text-on-surface focus:border-primary/60 focus:outline-none transition-colors";
+  const inputCls = `${inputBase} h-10 px-3.5`;
+  const selectCls = `${inputCls} appearance-none pr-9 cursor-pointer`;
+  const textareaCls = `${inputBase} min-h-[96px] px-3.5 py-2.5 leading-relaxed`;
+  const labelCls = isMech
+    ? "text-[11px] font-label uppercase tracking-[0.25em] text-secondary/70"
+    : "text-[11px] font-label uppercase tracking-[0.25em] text-primary/60";
+  const chevronCls = isMech
+    ? "absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none material-symbols-outlined text-base text-secondary/60"
+    : "absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none material-symbols-outlined text-base text-primary/60";
+  const headingCls = isMech ? "text-secondary" : "text-primary";
+  const dashedCls = values.avatarUrl
+    ? (isMech ? "border-secondary/30 hover:border-secondary/60" : "border-primary/30 hover:border-primary/60")
+    : (isMech ? "border-secondary/40 hover:border-secondary/70 bg-surface-container/50" : "border-primary/40 hover:border-primary/70 bg-surface-container/50");
+  const submitCls = isMech
+    ? "min-h-[44px] px-6 py-2 bg-secondary/10 border border-secondary/40 text-secondary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-secondary/20 disabled:opacity-40 transition-colors"
+    : "min-h-[44px] px-6 py-2 bg-primary/10 border border-primary/40 text-primary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-primary/20 disabled:opacity-40 transition-colors";
+
   function update<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((s) => ({ ...s, [key]: v }));
+  }
+
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  function onAvatarPick(file: File) {
+    setErr(null);
+    // Read file → data URL → open crop modal. Upload happens after crop apply.
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setCropSrc(reader.result);
+    };
+    reader.onerror = () => setErr("could not read file");
+    reader.readAsDataURL(file);
+  }
+
+  async function uploadCroppedBlob(blob: Blob) {
+    setCropSrc(null);
+    setUploadBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", new File([blob], `portrait-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      const r = await fetch("/api/agents/avatar/upload", { method: "POST", body: fd });
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        let msg = `upload failed (${r.status})`;
+        try {
+          const j = JSON.parse(text);
+          if (typeof j.error === "string") msg = j.error;
+        } catch {
+          if (text) msg = `upload failed (${r.status}): ${text.slice(0, 120)}`;
+        }
+        setErr(msg);
+        return;
+      }
+      const j = (await r.json()) as { url?: string };
+      if (j.url) update("avatarUrl", j.url);
+    } catch (e) {
+      setErr(`network error: ${(e as Error).message}`);
+    } finally {
+      setUploadBusy(false);
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -95,31 +228,14 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
 
     const body: Record<string, unknown> = {
       codename: values.codename.trim(),
+      codenameZh: values.codenameZh.trim() || null,
       nameEn: values.nameEn.trim(),
       nameZh: values.nameZh.trim(),
-      classification: values.classification.trim() || null,
       mode: values.mode,
       status: values.status,
       avatarUrl: values.avatarUrl.trim(),
       descriptionEn: values.descriptionEn.trim() || null,
       descriptionZh: values.descriptionZh.trim() || null,
-      syncLevel: Number(values.syncLevel),
-      matrixLevel: Number(values.matrixLevel),
-      chaosLevel: Number(values.chaosLevel),
-      costTier: Number(values.costTier),
-      activityLevel: Number(values.activityLevel),
-      stabilityLevel: Number(values.stabilityLevel),
-      availableAp: Number(values.availableAp),
-      enabled: !!values.enabled,
-      provider: values.provider,
-      model: values.model.trim() || null,
-      systemPrompt: values.systemPrompt.trim() || null,
-      internalHandler: values.internalHandler.trim() || null,
-      inputSchemaJson: values.inputSchemaJson.trim() || null,
-      outputSchemaJson: values.outputSchemaJson.trim() || null,
-      maxTokens: Number(values.maxTokens) || null,
-      temperature: Number(values.temperature),
-      rateLimitPerMin: Number(values.rateLimitPerMin) || null,
     };
     if (mode === "create" && !body.codename) {
       setBusy(false);
@@ -175,14 +291,9 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
         <span aria-hidden className="tech-marker-br" />
 
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <span className="font-label text-[10px] tracking-[0.3em] text-secondary uppercase">
-              {mode === "create" ? t.machineAgent.editorNewLabel : t.machineAgent.editorEditLabel}
-            </span>
-            <h2 className="mt-1 font-headline text-3xl text-primary sacred-glow">
-              {mode === "create" ? t.machineAgent.editorNewTitle : t.machineAgent.editorEditTitle}
-            </h2>
-          </div>
+          <h2 className={`font-headline text-3xl sacred-glow ${headingCls}`}>
+            {mode === "create" ? t.machineAgent.editorNewTitle : t.machineAgent.editorEditTitle}
+          </h2>
           <button
             ref={closeBtnRef}
             type="button"
@@ -194,203 +305,165 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
           </button>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineAgent.fieldCodename}</span>
-            <input
-              className={inputCls}
-              value={values.codename}
-              onChange={(e) => update("codename", e.target.value.toUpperCase())}
-              required
-              maxLength={32}
-              pattern="[A-Z0-9-]+"
-              disabled={mode === "edit"}
-            />
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldNameEn}</span>
-            <input className={inputCls} value={values.nameEn} onChange={(e) => update("nameEn", e.target.value)} required />
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldNameZh}</span>
-            <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required />
-          </label>
-          <label className="block">
-            <span className={labelCls}>Mode</span>
-            <select className={inputCls} value={values.mode} onChange={(e) => update("mode", e.target.value as AgentMode)}>
-              {MODES.map((m) => (
-                <option key={m} value={m}>
-                  {m === "MECHANICAL" ? t.machineAgent.modeMechanical : t.machineAgent.modeAutonomous}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldClassification}</span>
-            <input className={inputCls} value={values.classification} onChange={(e) => update("classification", e.target.value)} />
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldStatus}</span>
-            <select className={inputCls} value={values.status} onChange={(e) => update("status", e.target.value as AgentStatus)}>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block sm:col-span-2">
+        <div className="flex flex-col sm:flex-row gap-5">
+          {/* Left: portrait upload — aspect 131:304 ≈ 0.4309 to match the outer
+              hero portrait CyberPanel container (262×608) including its border + padding. */}
+          <div className="sm:w-[200px] shrink-0">
             <span className={labelCls}>{t.machineAgent.fieldAvatar} *</span>
-            <input
-              className={inputCls}
-              type="url"
-              value={values.avatarUrl}
-              onChange={(e) => update("avatarUrl", e.target.value)}
-              placeholder="https://…"
-              required
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineAgent.fieldDescriptionZh}</span>
-            <textarea className={`${inputCls} min-h-[60px]`} value={values.descriptionZh} onChange={(e) => update("descriptionZh", e.target.value)} maxLength={4000} />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className={labelCls}>{t.machineAgent.fieldDescriptionEn}</span>
-            <textarea className={`${inputCls} min-h-[60px]`} value={values.descriptionEn} onChange={(e) => update("descriptionEn", e.target.value)} maxLength={4000} />
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldSyncLevel}</span>
-            <input className={inputCls} type="number" min={0} max={100} step={0.1} value={values.syncLevel} onChange={(e) => update("syncLevel", Number(e.target.value))} />
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldMatrixLevel}</span>
-            <input className={inputCls} type="number" min={1} max={99} value={values.matrixLevel} onChange={(e) => update("matrixLevel", Number(e.target.value))} />
-          </label>
-          <label className="block">
-            <span className={labelCls}>{t.machineAgent.fieldAvailableAp}</span>
-            <input className={inputCls} type="number" min={0} max={999} value={values.availableAp} onChange={(e) => update("availableAp", Number(e.target.value))} />
-          </label>
-        </div>
-
-        <fieldset className="border border-primary/15 rounded-md p-4 space-y-3">
-          <legend className="px-2 font-label text-[10px] tracking-[0.3em] text-secondary uppercase">
-            {t.machineAgent.fieldStatsHeading}
-          </legend>
-          <p className="text-[11px] text-on-surface-variant opacity-70">
-            {/* TODO: 4 derived stats — left editable for admin testing only. */}
-            ⏳ pending derivation algorithm
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {(
-              [
-                ["chaosLevel", t.machineAgent.statChaos],
-                ["costTier", t.machineAgent.statCost],
-                ["activityLevel", t.machineAgent.statActivity],
-                ["stabilityLevel", t.machineAgent.statStability],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="block">
-                <span className={labelCls}>{label}</span>
-                <input
-                  className={inputCls}
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={values[key] as number}
-                  onChange={(e) => update(key, Number(e.target.value) as never)}
-                />
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset className="border border-primary/15 rounded-md p-4 space-y-3">
-          <legend className="px-2 font-label text-[10px] tracking-[0.3em] text-secondary uppercase">
-            {t.machineAgent.fieldRuntimeHeading}
-          </legend>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="flex items-center gap-3 self-end pb-2">
+            <label
+              className={[
+                "mt-1 relative block w-full aspect-[131/304] rounded-md overflow-hidden cursor-pointer group",
+                "border border-dashed transition-colors",
+                dashedCls,
+              ].join(" ")}
+            >
               <input
-                type="checkbox"
-                checked={values.enabled}
-                onChange={(e) => update("enabled", e.target.checked)}
-                className="w-5 h-5 accent-primary"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onAvatarPick(f);
+                  e.target.value = "";
+                }}
               />
-              <span className={labelCls}>{t.machineAgent.fieldEnabled}</span>
-            </label>
-            <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldProvider}</span>
-              <select className={inputCls} value={values.provider} onChange={(e) => update("provider", e.target.value as AgentProvider)}>
-                {PROVIDERS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldModel}</span>
-              <input className={inputCls} value={values.model} onChange={(e) => update("model", e.target.value)} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldInternalHandler}</span>
-              <input className={inputCls} value={values.internalHandler} onChange={(e) => update("internalHandler", e.target.value)} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineAgent.fieldSystemPrompt}</span>
-              <textarea className={`${inputCls} min-h-[60px]`} value={values.systemPrompt} onChange={(e) => update("systemPrompt", e.target.value)} maxLength={8000} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineAgent.fieldInputSchema}</span>
-              <textarea className={`${inputCls} min-h-[60px] font-mono text-xs`} value={values.inputSchemaJson} onChange={(e) => update("inputSchemaJson", e.target.value)} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.machineAgent.fieldOutputSchema}</span>
-              <textarea className={`${inputCls} min-h-[60px] font-mono text-xs`} value={values.outputSchemaJson} onChange={(e) => update("outputSchemaJson", e.target.value)} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldMaxTokens}</span>
-              <input className={inputCls} type="number" min={1} max={32000} value={values.maxTokens} onChange={(e) => update("maxTokens", Number(e.target.value))} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldTemperature}</span>
-              <input className={inputCls} type="number" step={0.1} min={0} max={2} value={values.temperature} onChange={(e) => update("temperature", Number(e.target.value))} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>{t.machineAgent.fieldRateLimit}</span>
-              <input className={inputCls} type="number" min={1} max={600} value={values.rateLimitPerMin} onChange={(e) => update("rateLimitPerMin", Number(e.target.value))} />
+              {values.avatarUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={values.avatarUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <span className={`font-label text-[10px] tracking-[0.3em] uppercase ${headingCls}`}>
+                      {uploadBusy ? "…" : "REPLACE"}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-3xl opacity-70" aria-hidden>
+                    {uploadBusy ? "progress_activity" : "image"}
+                  </span>
+                  <span className={`font-label text-[9px] tracking-[0.3em] uppercase ${isMech ? "text-secondary/70" : "text-primary/70"}`}>
+                    {uploadBusy ? "uploading…" : "click to upload"}
+                  </span>
+                  <span className="text-[9px] text-on-surface-variant/60 px-2 text-center">
+                    JPG / PNG / WEBP · 5MB max
+                  </span>
+                </div>
+              )}
             </label>
           </div>
-        </fieldset>
+
+          {/* Right: short fields */}
+          <div className="flex-1 grid sm:grid-cols-2 gap-4">
+            {/* Row 1: Mode | Status */}
+            <div className="block">
+              <span className={labelCls}>Mode</span>
+              <ThemedDropdown
+                value={values.mode}
+                options={MODES.map((m) => ({
+                  value: m,
+                  label: m === "MECHANICAL" ? t.machineAgent.modeMechanical : t.machineAgent.modeAutonomous,
+                }))}
+                onChange={(v) => update("mode", v as AgentMode)}
+                isMech={isMech}
+              />
+            </div>
+            <div className="block">
+              <span className={labelCls}>{t.machineAgent.fieldStatus}</span>
+              <ThemedDropdown
+                value={values.status}
+                options={STATUSES.map((s) => ({ value: s, label: s }))}
+                onChange={(v) => update("status", v as AgentStatus)}
+                isMech={isMech}
+              />
+            </div>
+
+            {/* Row 2: Name (EN, slug-like codename) | Name (ZH, codenameZh) */}
+            <label className="block">
+              <span className={labelCls}>{t.machineAgent.fieldCodename}</span>
+              <input
+                className={inputCls}
+                value={values.codename}
+                onChange={(e) => update("codename", e.target.value.toUpperCase())}
+                required
+                maxLength={32}
+                pattern="[A-Z0-9-]+"
+                disabled={mode === "edit"}
+              />
+            </label>
+            <label className="block">
+              <span className={labelCls}>{t.machineAgent.fieldCodenameZh}</span>
+              <input
+                className={inputCls}
+                value={values.codenameZh}
+                onChange={(e) => update("codenameZh", e.target.value)}
+                maxLength={32}
+              />
+            </label>
+
+            {/* Row 3: Role (EN, nameEn) | Role (ZH, nameZh) */}
+            <label className="block">
+              <span className={labelCls}>{t.machineAgent.fieldNameEn}</span>
+              <input className={inputCls} value={values.nameEn} onChange={(e) => update("nameEn", e.target.value)} required />
+            </label>
+            <label className="block">
+              <span className={labelCls}>{t.machineAgent.fieldNameZh}</span>
+              <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required />
+            </label>
+
+            {/* Descriptions stack inside right column: EN on top, ZH below */}
+            <label className="block sm:col-span-2">
+              <span className={labelCls}>{t.machineAgent.fieldDescriptionEn}</span>
+              <textarea className={textareaCls} value={values.descriptionEn} onChange={(e) => update("descriptionEn", e.target.value)} maxLength={4000} />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className={labelCls}>{t.machineAgent.fieldDescriptionZh}</span>
+              <textarea className={textareaCls} value={values.descriptionZh} onChange={(e) => update("descriptionZh", e.target.value)} maxLength={4000} />
+            </label>
+
+            {/* Form actions inside right column, right-aligned */}
+            <div className="sm:col-span-2 flex flex-wrap gap-3 pt-2 border-t border-outline-variant/30 justify-end">
+              {mode === "edit" && initial ? (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="min-h-[44px] mr-auto px-6 py-2 border border-rose-400/40 text-rose-300 font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-rose-400/10 transition-colors"
+                >
+                  {t.machineAgent.remove}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[44px] px-6 py-2 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container transition-colors"
+              >
+                {t.machineAgent.cancel}
+              </button>
+              <button
+                type="submit"
+                disabled={busy}
+                className={submitCls}
+              >
+                {busy ? t.machineAgent.saving : t.machineAgent.save}
+              </button>
+            </div>
+          </div>
+        </div>
 
         {err ? <p className="text-sm text-rose-300">{err}</p> : null}
-
-        <div className="flex flex-wrap gap-3 pt-2 border-t border-outline-variant/30">
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-[44px] px-6 py-2 bg-primary/10 border border-primary/40 text-primary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-primary/20 disabled:opacity-40 transition-colors"
-          >
-            {busy ? t.machineAgent.saving : t.machineAgent.save}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[44px] px-6 py-2 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container transition-colors"
-          >
-            {t.machineAgent.cancel}
-          </button>
-          {mode === "edit" && initial ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="min-h-[44px] ml-auto px-6 py-2 border border-rose-400/40 text-rose-300 font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-rose-400/10 transition-colors"
-            >
-              {t.machineAgent.remove}
-            </button>
-          ) : null}
-        </div>
       </form>
+      {cropSrc ? (
+        <AvatarCropModal
+          src={cropSrc}
+          isMech={isMech}
+          onCancel={() => setCropSrc(null)}
+          onApply={(blob) => void uploadCroppedBlob(blob)}
+        />
+      ) : null}
     </div>,
     portal,
   );
