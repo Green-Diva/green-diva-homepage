@@ -406,7 +406,7 @@ export default async function Home() {
 
             {/* AI Clergy */}
             <Link
-              href="/machine-agent"
+              href="/agent-control"
               className="module-card group relative bg-background border border-primary/20 rounded-xl flex flex-col p-5 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             >
               <div className="absolute inset-0 pointer-events-none opacity-20 z-30">

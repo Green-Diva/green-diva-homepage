@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getDictionary } from "@/lib/i18n/server";
 import UserMenu from "@/components/UserMenu";
 import AgentClient from "./AgentClient";
 import type { AgentRow, SkillRow, EquipRow } from "./types";
@@ -11,8 +10,7 @@ import type { AgentSkill, PipelineConfig, DispatcherConfig } from "@/lib/agentTy
 
 export default async function MachineAgentPage() {
   const me = await getCurrentUser();
-  if (!me) redirect("/login?from=/machine-agent");
-  const t = await getDictionary();
+  if (!me) redirect("/login?from=/agent-control");
 
   const [agents, skillsRaw, equipRecords] = await Promise.all([
     prisma.agent.findMany({
@@ -107,23 +105,23 @@ export default async function MachineAgentPage() {
 
   return (
     <div className="flex flex-col flex-1 w-full">
-      <header className="w-full z-30 flex justify-between items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
+      <header className="w-full z-50 grid grid-cols-[1fr_auto_1fr] items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
           href="/"
-          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
+          className="text-xl font-headline italic text-primary drop-shadow-[0_0_8px_rgba(144,222,205,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm justify-self-start"
         >
           Green Diva
         </Link>
-        <div className="hidden md:flex items-center gap-4 font-label text-[11px] tracking-[0.3em] text-primary/70 uppercase">
-          <span className="hidden lg:inline text-secondary">{t.machineAgent.pageLabel}</span>
-          <Link
-            href="/"
-            className="hover:text-primary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
-          >
-            {t.machineAgent.backToSanctuary}
-          </Link>
+        <div className="hidden md:flex items-center gap-3 justify-self-center whitespace-nowrap" aria-label="The Agent Control">
+          <span aria-hidden className="block w-8 h-px bg-gradient-to-r from-transparent to-primary/50" />
+          <span aria-hidden className="text-secondary/80 text-[10px] leading-none">◆</span>
+          <span className="font-label text-[11px] tracking-[0.45em] uppercase text-primary sacred-glow">
+            The Agent Control
+          </span>
+          <span aria-hidden className="text-secondary/80 text-[10px] leading-none">◆</span>
+          <span aria-hidden className="block w-8 h-px bg-gradient-to-l from-transparent to-primary/50" />
         </div>
-        <div className="flex items-center gap-3 sm:gap-5 md:gap-7">
+        <div className="flex items-center gap-3 sm:gap-5 md:gap-7 justify-self-end">
           <UserMenu
             user={{
               name: me.name,
