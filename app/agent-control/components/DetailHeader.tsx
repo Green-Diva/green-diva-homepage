@@ -5,18 +5,20 @@ import { format } from "@/lib/i18n/format";
 import type { AgentRow, EquipRow } from "../types";
 
 // New header (post-redesign): no avatar — that's now the Hero portrait below.
-// One row of: codename + mode badge + deploy badge + EDIT button.
+// One row of: codename + mode badge + deploy badge + EDIT button + INVOCATIONS button.
 // Subtitle row: localized name · deployedAt.
 export default function DetailHeader({
   agent,
   equips,
   isAdmin,
   onEdit,
+  onShowJobs,
 }: {
   agent: AgentRow;
   equips: EquipRow[];
   isAdmin: boolean;
   onEdit: () => void;
+  onShowJobs?: () => void;
 }) {
   const t = useT();
   const { locale } = useI18n();
@@ -61,6 +63,18 @@ export default function DetailHeader({
           >
             <span className="material-symbols-outlined text-[14px]" aria-hidden>edit</span>
             {t.agentControl.edit}
+          </button>
+        ) : null}
+        {onShowJobs ? (
+          <button
+            type="button"
+            onClick={onShowJobs}
+            title="Invocations"
+            aria-label="Invocations"
+            className="min-h-[30px] px-2.5 border border-outline-variant text-on-surface-variant font-label text-[9px] tracking-[0.25em] uppercase rounded-md hover:bg-surface-container hover:text-on-surface transition-colors flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[14px]" aria-hidden>terminal</span>
+            JOBS
           </button>
         ) : null}
       </div>

@@ -11,6 +11,7 @@ import SkillLibrary from "./components/SkillLibrary";
 import AgentFilterChips, { type ModeFilter } from "./components/AgentFilterChips";
 import MechanicalDetailView from "./components/MechanicalDetailView";
 import AutonomousDetailView from "./components/AutonomousDetailView";
+import AgentJobDrawer from "./components/AgentJobDrawer";
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: AgentRow | null };
 type TabKey = "agents" | "skills";
@@ -33,6 +34,7 @@ export default function AgentClient({
   const [activeId, setActiveId] = useState<string | null>(agents[0]?.id ?? null);
   const [editor, setEditor] = useState<EditorState>({ open: false, mode: "create", initial: null });
   const [filter, setFilter] = useState<ModeFilter>("ALL");
+  const [jobsOpen, setJobsOpen] = useState(false);
 
   const activeTab: TabKey = searchParams.get("tab") === "skills" ? "skills" : "agents";
 
@@ -160,6 +162,7 @@ export default function AgentClient({
                   allSkills={skills}
                   isAdmin={isAdmin}
                   onEdit={openEdit}
+                  onShowJobs={() => setJobsOpen(true)}
                 />
               ) : (
                 <AutonomousDetailView
@@ -168,6 +171,7 @@ export default function AgentClient({
                   allSkills={skills}
                   isAdmin={isAdmin}
                   onEdit={openEdit}
+                  onShowJobs={() => setJobsOpen(true)}
                 />
               )
             ) : (
@@ -186,6 +190,16 @@ export default function AgentClient({
           initial={editor.initial}
           onClose={() => setEditor((s) => ({ ...s, open: false }))}
           onSaved={onSaved}
+        />
+      ) : null}
+
+      {jobsOpen && activeAgent ? (
+        <AgentJobDrawer
+          key={`jobs-${activeAgent.id}`}
+          agentId={activeAgent.id}
+          agentCodename={activeAgent.codename}
+          isAdmin={isAdmin}
+          onClose={() => setJobsOpen(false)}
         />
       ) : null}
     </main>

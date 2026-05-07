@@ -13,17 +13,19 @@ export default function AutonomousDetailView({
   allSkills,
   isAdmin,
   onEdit,
+  onShowJobs,
 }: {
   agent: AgentRow;
   equips: EquipRow[];
   allSkills: SkillRow[];
   isAdmin: boolean;
   onEdit: () => void;
+  onShowJobs?: () => void;
 }) {
   return (
     <div className="flex flex-col h-full gap-3 min-h-0">
       <div className="flex items-start justify-between gap-3 shrink-0">
-        <DetailHeader agent={agent} equips={equips} isAdmin={isAdmin} onEdit={onEdit} />
+        <DetailHeader agent={agent} equips={equips} isAdmin={isAdmin} onEdit={onEdit} onShowJobs={onShowJobs} />
         <DeployButton agent={agent} isAdmin={isAdmin} />
       </div>
       <BaseStatsBar agent={agent} />

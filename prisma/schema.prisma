@@ -300,6 +300,7 @@ model Agent {
   deployedAt       DateTime?
   skills           Json?
   skillEquips      AgentSkillEquip[]
+  agentJobs        AgentJob[]
   availableAp      Int                  @default(0)
   createdById      String?
   createdBy        User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
@@ -307,6 +308,46 @@ model Agent {
   updatedAt        DateTime             @updatedAt
 
   @@index([status, createdAt])
+}
+
+// AgentJob — async invocation record. Pattern mirrors RelicProcessingJob:
+// fire-and-forget creation, status transitions PENDING → RUNNING → SUCCESS|FAILED,
+// retries with exponential backoff for transient errors, and crash recovery
+// for jobs left RUNNING by a previous server process.
+//
+// Phase 2 ships the scaffolding; the actual per-step execution lands in
+// Phase 3 (Backbone, MECHANICAL) and Phase 4 (Orchestrator, AUTONOMOUS).
+enum AgentJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model AgentJob {
+  id           String          @id @default(cuid())
+  agentId      String
+  agent        Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  // Snapshot of the agent's mode at invocation time. Retries use this so
+  // re-runs don't drift if the agent is edited between attempts.
+  mode         AgentMode
+  input        Json
+  output       Json?
+  status       AgentJobStatus  @default(PENDING)
+  errorCode    String?
+  errorMessage String?
+  // Per-step execution log: array of { stepId, skillId, durationMs, ... }
+  // Phase 3/4 runtimes append to this; Phase 2 leaves it empty.
+  runLog       Json            @default(dbgenerated("'[]'::jsonb"))
+  attempts     Int             @default(0)
+  maxAttempts  Int             @default(3)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([agentId, createdAt])
 }
 
 enum SkillKind {
@@ -320,6 +361,18 @@ enum SkillStatus {
   OFFLINE
 }
 
+// HandlerKind routes a Skill to an executor in lib/skills/handlers/.
+// HTTP_API     → REST endpoint (e.g. Meshy, Stripe). handlerConfig: { method, url, authEnv, headers, bodyTemplate }
+// LLM_PROMPT   → LLM call with prompt template. handlerConfig: { provider, model, systemPrompt, userTemplate, ... }
+// MCP_SERVER   → remote MCP-protocol agent. handlerConfig: { serverUrl, toolName, authEnv } (Phase 5)
+// INTERNAL     → in-repo function, dispatched by slug. handlerConfig: { handler: "<slug>", ...args }
+enum HandlerKind {
+  HTTP_API
+  LLM_PROMPT
+  MCP_SERVER
+  INTERNAL
+}
+
 model Skill {
   id            String             @id @default(cuid())
   level         Int
@@ -331,6 +384,13 @@ model Skill {
   costAp        Int                @default(0)
   descriptionEn String             @db.VarChar(2000)
   descriptionZh String             @db.VarChar(2000)
+  // Runtime routing — see HandlerKind comment above.
+  handlerKind   HandlerKind        @default(INTERNAL)
+  handlerConfig Json               @default(dbgenerated("'{}'::jsonb"))
+  // JSON Schema describing input/output shapes. Used by invoke() for
+  // validation and by Orchestrator to expose skills as LLM tools.
+  inputSchema   Json?
+  outputSchema  Json?
   createdById   String?
   createdBy     User?              @relation("SkillCreator", fields: [createdById], references: [id], onDelete: SetNull)
   equips        AgentSkillEquip[]
@@ -340,6 +400,7 @@ model Skill {
   @@index([kind])
   @@index([level])
   @@index([status])
+  @@index([handlerKind])
 }
 
 model AgentSkillEquip {

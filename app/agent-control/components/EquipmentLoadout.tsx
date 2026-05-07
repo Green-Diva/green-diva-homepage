@@ -10,7 +10,8 @@ import SkillConnections from "./SkillConnections";
 import CentralControlSlot from "./CentralControlSlot";
 import SkillPickerModal from "./SkillPickerModal";
 import SkillSlotDetailModal from "./SkillSlotDetailModal";
-import ControlConfigModal from "./ControlConfigModal";
+import BackboneEditor from "./BackboneEditor";
+import OrchestratorEditor from "./OrchestratorEditor";
 
 type Props = {
   agent: AgentRow;
@@ -124,10 +125,11 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
       ) : null}
 
       {controlOpen ? (
-        <ControlConfigModal
-          agent={agent}
-          onClose={() => setControlOpen(false)}
-        />
+        isMech ? (
+          <BackboneEditor agent={agent} equips={equips} onClose={() => setControlOpen(false)} />
+        ) : (
+          <OrchestratorEditor agent={agent} equips={equips} onClose={() => setControlOpen(false)} />
+        )
       ) : null}
 
       {/* Suppress unused t warning when nothing else uses it (and gives skill panel a usable prop). */}

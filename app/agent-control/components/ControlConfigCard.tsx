@@ -3,12 +3,27 @@
 import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { AgentRow } from "../types";
-import ControlConfigModal from "./ControlConfigModal";
+import type { AgentRow, EquipRow } from "../types";
+import BackboneEditor from "./BackboneEditor";
+import OrchestratorEditor from "./OrchestratorEditor";
 
 // Replaces the old ControlConfigStrip — taller card that lives at the bottom
-// of the Skills column. Mode-aware accent + same modal handoff.
-export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow; isAdmin: boolean }) {
+// of the Skills column. Mode-aware accent.
+//
+// Edit dispatch:
+//   MECHANICAL → BackboneEditor (Phase 3 structured editor)
+//   AUTONOMOUS → OrchestratorEditor (Phase 4 LLM tool-use loop editor)
+//
+// Both editors need `equips` to render slot/tool previews.
+export default function ControlConfigCard({
+  agent,
+  isAdmin,
+  equips,
+}: {
+  agent: AgentRow;
+  isAdmin: boolean;
+  equips: EquipRow[];
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
 
@@ -67,7 +82,13 @@ export default function ControlConfigCard({ agent, isAdmin }: { agent: AgentRow;
         </button>
       </div>
 
-      {open ? <ControlConfigModal agent={agent} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        isMech ? (
+          <BackboneEditor agent={agent} equips={equips} onClose={() => setOpen(false)} />
+        ) : (
+          <OrchestratorEditor agent={agent} equips={equips} onClose={() => setOpen(false)} />
+        )
+      ) : null}
     </>
   );
 }

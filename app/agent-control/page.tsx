@@ -57,6 +57,14 @@ export default async function AgentControlPage() {
     createdBy: a.createdBy,
   }));
 
+  // Helpers cast Prisma's loose JsonValue to the concrete shape SkillRow expects.
+  // handlerConfig defaults to {} (DB has dbgenerated default), inputSchema/outputSchema
+  // are nullable.
+  const toCfg = (v: unknown): Record<string, unknown> =>
+    v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  const toSchema = (v: unknown): Record<string, unknown> | null =>
+    v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+
   const skills: SkillRow[] = skillsRaw.map((s) => ({
     id: s.id,
     level: s.level,
@@ -68,6 +76,10 @@ export default async function AgentControlPage() {
     costAp: s.costAp,
     descriptionEn: s.descriptionEn,
     descriptionZh: s.descriptionZh,
+    handlerKind: s.handlerKind as SkillRow["handlerKind"],
+    handlerConfig: toCfg(s.handlerConfig),
+    inputSchema: toSchema(s.inputSchema),
+    outputSchema: toSchema(s.outputSchema),
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
     createdBy: s.createdBy,
@@ -89,6 +101,10 @@ export default async function AgentControlPage() {
         costAp: r.skill.costAp,
         descriptionEn: r.skill.descriptionEn,
         descriptionZh: r.skill.descriptionZh,
+        handlerKind: r.skill.handlerKind as SkillRow["handlerKind"],
+        handlerConfig: toCfg(r.skill.handlerConfig),
+        inputSchema: toSchema(r.skill.inputSchema),
+        outputSchema: toSchema(r.skill.outputSchema),
         createdAt: r.skill.createdAt.toISOString(),
         updatedAt: r.skill.updatedAt.toISOString(),
         createdBy: r.skill.createdBy,

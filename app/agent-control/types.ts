@@ -41,6 +41,8 @@ export type SkillLevel = AgentSkillLevel;
 
 export type SkillStatus = "ONLINE" | "OFFLINE";
 
+export type HandlerKind = "HTTP_API" | "LLM_PROMPT" | "MCP_SERVER" | "INTERNAL";
+
 export interface SkillRow {
   id: string;
   level: number;
@@ -52,6 +54,10 @@ export interface SkillRow {
   costAp: number;
   descriptionEn: string;
   descriptionZh: string;
+  handlerKind: HandlerKind;
+  handlerConfig: Record<string, unknown>;
+  inputSchema: Record<string, unknown> | null;
+  outputSchema: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
   createdBy: { id: string; name: string } | null;

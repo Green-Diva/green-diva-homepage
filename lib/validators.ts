@@ -36,12 +36,41 @@ export const agentSkillSchema = z.object({
 
 const stat = z.number().int().min(0).max(100);
 
-// Json blob — both pipeline and dispatcher configs are opaque at the API layer.
-// Concrete shapes will be enforced by their respective editors.
-const jsonObject = z.record(z.unknown());
+const STEP_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const INPUT_FROM_RE = /^(agent\.input|[a-zA-Z0-9_-]+\.output)$/;
 
-export const pipelineConfigSchema = jsonObject.nullable();
-export const dispatcherConfigSchema = jsonObject.nullable();
+export const pipelineStepSchema = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "step id must match [a-zA-Z0-9_-]+"),
+  equipSlot: z.number().int().min(0).max(5),
+  inputMapping: z.object({
+    from: z.string().regex(INPUT_FROM_RE, 'must be "agent.input" or "<stepId>.output"'),
+  }),
+});
+
+// Strict shape backing Backbone (MECHANICAL) execution.
+//   - version pinned to 1; bumping it is an explicit migration event
+//   - steps capped at 20 to avoid pathological pipelines blocking on retries
+export const pipelineConfigSchema = z
+  .object({
+    version: z.literal(1),
+    steps: z.array(pipelineStepSchema).min(1).max(20),
+  })
+  .nullable();
+
+// Strict shape backing Orchestrator (AUTONOMOUS) execution.
+//   - version pinned to 1; bumping it is an explicit migration event
+//   - maxIterations capped at 50 to bound LLM spend
+export const dispatcherConfigSchema = z
+  .object({
+    version: z.literal(1),
+    provider: z.enum(["anthropic", "openai"]),
+    model: z.string().min(1).max(100),
+    systemPrompt: z.string().max(20000).optional(),
+    maxIterations: z.number().int().min(1).max(50).optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    authEnv: z.string().max(64).optional(),
+  })
+  .nullable();
 
 export const agentCreateSchema = z.object({
   codename: z.string().min(2).max(32).regex(/^[A-Z0-9-]+$/, "codename must be uppercase letters, digits, dashes"),
@@ -83,12 +112,15 @@ export const agentInvokeSchema = z.object({
   input: z.unknown(),
 });
 
+// PUT /api/agents/[id]/pipeline + /dispatcher body shapes — both enforce
+// the structured config so strict validation lives at the API boundary,
+// not just in the editor / runtime.
 export const agentPipelineSchema = z.object({
-  config: jsonObject.nullable(),
+  config: pipelineConfigSchema,
 });
 
 export const agentDispatcherSchema = z.object({
-  config: jsonObject.nullable(),
+  config: dispatcherConfigSchema,
 });
 
 export type AgentCreateInput = z.infer<typeof agentCreateSchema>;
@@ -96,6 +128,27 @@ export type AgentUpdateInput = z.infer<typeof agentUpdateSchema>;
 
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
+
+export const handlerKindSchema = z.enum(["HTTP_API", "LLM_PROMPT", "MCP_SERVER", "INTERNAL"]);
+
+// Reject handlerConfig keys that look like plaintext credentials.
+// Forces "secrets via env only" — admin should pass { authEnv: "MESHY_API_KEY" },
+// never { apiKey: "sk-..." }. The check is a heuristic, not bulletproof —
+// belt-and-suspenders alongside reviewer vigilance and audit logging.
+const PLAINTEXT_SECRET_RE = /^(apiKey|api_key|secret|token|password|bearer|access_key|accessKey)$/i;
+export const handlerConfigSchema = z
+  .record(z.unknown())
+  .refine(
+    (cfg) => !Object.keys(cfg).some((k) => PLAINTEXT_SECRET_RE.test(k)),
+    {
+      message:
+        'handlerConfig must not contain plaintext credentials (apiKey/secret/token/password/bearer/access_key). Use { authEnv: "MY_ENV_NAME" } instead.',
+    },
+  );
+
+// Permissive JSON Schema validator — accept any JSON object (or null).
+// Real JSON Schema spec compliance lives at runtime in lib/skills/invoke.ts.
+const jsonSchemaSchema = z.record(z.unknown()).nullable().optional();
 
 export const skillCreateSchema = z.object({
   level: z.number().int().min(1).max(6),
@@ -106,8 +159,20 @@ export const skillCreateSchema = z.object({
   costAp: z.number().int().min(0).max(99),
   descriptionEn: z.string().max(2000),
   descriptionZh: z.string().max(2000),
+  // Runtime routing — see prisma/schema.prisma HandlerKind enum.
+  handlerKind: handlerKindSchema.optional(),
+  handlerConfig: handlerConfigSchema.optional(),
+  inputSchema: jsonSchemaSchema,
+  outputSchema: jsonSchemaSchema,
+  // Admin toggle. Default OFFLINE for newly-created skills until admin
+  // tests the handler config, then flips to ONLINE.
+  status: z.enum(["ONLINE", "OFFLINE"]).optional(),
 });
 export const skillUpdateSchema = skillCreateSchema.partial();
+
+export const skillTestInvokeSchema = z.object({
+  input: z.unknown(),
+});
 
 export const agentSkillEquipSchema = z.object({
   skillId: z.string().cuid(),

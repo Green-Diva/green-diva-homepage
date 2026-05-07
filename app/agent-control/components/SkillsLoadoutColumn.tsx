@@ -59,7 +59,7 @@ export default function SkillsLoadoutColumn({
         })}
       </div>
 
-      <ControlConfigCard agent={agent} isAdmin={isAdmin} />
+      <ControlConfigCard agent={agent} isAdmin={isAdmin} equips={equips} />
 
       {pickerSlot !== null ? (
         <SkillPickerModal

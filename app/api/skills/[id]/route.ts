@@ -1,9 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { skillUpdateSchema } from "@/lib/validators";
 import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
+
+// Same Prisma.JsonNull handling as POST /api/skills (see route.ts).
+function buildJsonWrites(parsed: {
+  handlerConfig?: Record<string, unknown>;
+  inputSchema?: Record<string, unknown> | null;
+  outputSchema?: Record<string, unknown> | null;
+}) {
+  const writes: {
+    handlerConfig?: Prisma.InputJsonValue;
+    inputSchema?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+    outputSchema?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+  } = {};
+  if (parsed.handlerConfig !== undefined) {
+    writes.handlerConfig = parsed.handlerConfig as Prisma.InputJsonValue;
+  }
+  if (parsed.inputSchema !== undefined) {
+    writes.inputSchema = parsed.inputSchema === null
+      ? Prisma.JsonNull
+      : (parsed.inputSchema as Prisma.InputJsonValue);
+  }
+  if (parsed.outputSchema !== undefined) {
+    writes.outputSchema = parsed.outputSchema === null
+      ? Prisma.JsonNull
+      : (parsed.outputSchema as Prisma.InputJsonValue);
+  }
+  return writes;
+}
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
@@ -34,10 +62,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const { handlerConfig, inputSchema, outputSchema, ...rest } = parsed.data;
+  const jsonWrites = buildJsonWrites({ handlerConfig, inputSchema, outputSchema });
   try {
     const skill = await prisma.skill.update({
       where: { id },
-      data: parsed.data,
+      data: { ...rest, ...jsonWrites },
       include: { createdBy: { select: { id: true, name: true } } },
     });
     return NextResponse.json(skill);

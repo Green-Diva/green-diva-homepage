@@ -1,26 +1,76 @@
 import "server-only";
-import type { AgentInvokeResult, AgentInvokeSource } from "@/lib/agentTypes";
+import type { Agent, AgentMode } from "@prisma/client";
+import { runBackbone } from "@/lib/skills/runtime/backbone";
+import { runOrchestrator } from "@/lib/skills/runtime/orchestrator";
 
-// Placeholder. The runtime invocation layer for machines/agents is not yet
-// wired — the loadout UI saves equip + pipelineConfig + dispatcherConfig, but
-// nothing reads them at execution time. When implemented this should:
-//
-//   1. Load Agent + AgentSkillEquip + Skill rows
-//   2. For MECHANICAL: traverse pipelineConfig (workflow nodes/edges) and
-//      run each slotted skill in order, passing values along edges
-//   3. For AUTONOMOUS: hand control to an LLM described by dispatcherConfig
-//      and let it call slotted skills as tools
-//   4. Track latency/cost/failures, write to a future AgentInvocation table,
-//      and feed those numbers into the derived stats (chaos/cost/activity/stability)
-//
-// Until then this throws so we never silently no-op.
-export async function invokeAgent(
-  agentId: string,
-  input: unknown,
-  source: AgentInvokeSource,
-): Promise<AgentInvokeResult> {
-  void agentId;
-  void input;
-  void source;
-  throw new Error("invokeAgent: NOT_IMPLEMENTED");
+// Per-step record appended by Backbone (Phase 3) and Orchestrator (Phase 4)
+// runtimes. Phase 2 leaves runLog empty since the actual execution layer
+// returns failure before any step runs.
+export type AgentRunLogEntry = {
+  stepId: string;
+  skillId?: string;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  ok: boolean;
+  output?: unknown;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
+export type AgentRunSuccess = {
+  ok: true;
+  output: unknown;
+  runLog: AgentRunLogEntry[];
+};
+
+export type AgentRunFailure = {
+  ok: false;
+  errorCode: string;
+  errorMessage: string;
+  runLog: AgentRunLogEntry[];
+};
+
+// Discriminated union: failures still carry runLog so callers can show
+// the user "step 2 hit 503" instead of just "FAILED". Catastrophic errors
+// that prevent the runtime from starting at all (DB unreachable, agent
+// missing) are still thrown by upstream code.
+export type AgentRunResult = AgentRunSuccess | AgentRunFailure;
+
+export class AgentRuntimeError extends Error {
+  readonly code: string;
+  constructor(message: string, code: string) {
+    super(message);
+    this.name = "AgentRuntimeError";
+    this.code = code;
+  }
+}
+
+// Mode-dispatcher. Routes to mode-specific runtimes; never throws for
+// "execution failed" cases — those return AgentRunFailure so runLog
+// flows through to the AgentJob row. Only invalid mode throws.
+export async function invokeAgent(opts: {
+  agent: Agent;
+  mode: AgentMode;
+  input: unknown;
+  // Optional overrides for dry-run: editor's unsaved configs.
+  // When absent, runtime reads the corresponding column from DB.
+  pipelineConfigOverride?: unknown;
+  dispatcherConfigOverride?: unknown;
+}): Promise<AgentRunResult> {
+  if (opts.mode === "MECHANICAL") {
+    return runBackbone({
+      agentId: opts.agent.id,
+      input: opts.input,
+      pipelineConfig: opts.pipelineConfigOverride ?? opts.agent.pipelineConfig,
+    });
+  }
+  if (opts.mode === "AUTONOMOUS") {
+    return runOrchestrator({
+      agentId: opts.agent.id,
+      input: opts.input,
+      dispatcherConfig: opts.dispatcherConfigOverride ?? opts.agent.dispatcherConfig,
+    });
+  }
+  throw new AgentRuntimeError(`unknown agent mode: ${opts.mode}`, "INVALID_MODE");
 }
