@@ -214,15 +214,26 @@ async function runInner(jobId: string, opts?: { fromStep?: RelicJobStep }): Prom
     },
   });
   if (final?.relic) {
-    // First-time pipeline success → AWAITING_REVIEW so admin gets a
-    // confirm step. Re-runs (admin clicked retry on a relic already past
-    // review, e.g. status was READY/PARTIAL) keep their current status —
-    // we don't want to demote an already-stored relic back to "pending".
-    const target: "READY" | "AWAITING_REVIEW" =
-      final.relic.status === "PROCESSING" || final.relic.status === "DRAFT"
-        ? "AWAITING_REVIEW"
-        : final.relic.status === "READY"
-          ? "READY"
+    // Decide final status based on whether the metadata step degraded.
+    // Hard rule: a relic only enters AWAITING_REVIEW when first-time
+    // generation fully succeeded — admins should never see a "pending
+    // review" badge for a half-baked relic. Failed/degraded → PARTIAL,
+    // which non-admin viewers can't see at all.
+    const metadataResult = (final.stepResults as Record<string, unknown> | null)?.[
+      "GENERATE_METADATA"
+    ];
+    const degraded =
+      isObject(metadataResult) && metadataResult.degraded === true;
+    const wasMidPipeline =
+      final.relic.status === "PROCESSING" || final.relic.status === "DRAFT";
+    const target: "READY" | "AWAITING_REVIEW" | "PARTIAL" = wasMidPipeline
+      ? degraded
+        ? "PARTIAL"
+        : "AWAITING_REVIEW"
+      : final.relic.status === "READY"
+        ? "READY"
+        : degraded
+          ? "PARTIAL"
           : "AWAITING_REVIEW";
     await prisma.relic.update({
       where: { id: final.relic.id },
@@ -232,8 +243,13 @@ async function runInner(jobId: string, opts?: { fromStep?: RelicJobStep }): Prom
       action: "PROCESSING_SUCCEEDED",
       relic: relicSnapshot(final.relic),
       actor: null,
+      details: { finalStatus: target, degraded },
     });
   }
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 function relicSnapshot(relic: { id: string; slug: string; nameEn: string }) {

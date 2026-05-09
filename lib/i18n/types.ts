@@ -283,12 +283,26 @@ export interface Dictionary {
     processingBannerRetrying: string;
     cellProcessing: string;
     cellAwaitingReview: string;
+    cellGenerationFailed: string;
     reviewBannerTitle: string;
     reviewBannerSubtitle: string;
     reviewBannerEdit: string;
     reviewBannerStore: string;
     reviewBannerStoring: string;
     reviewBannerError: string;
+    // Asset tabs (detail page image area, top-right segmented control).
+    tabOriginal: string;
+    tab2dEnhance: string;
+    tab3dModel: string;
+    tab3dRequires2d: string;
+    enhanceEta: string;
+    enhanceStart: string;
+    enhanceRunning: string;
+    create3dEta: string;
+    create3dStart: string;
+    create3dRunning: string;
+    generateFailed: string;
+    generateRetry: string;
     viewerForging: string;
   };
   agentControl: {
@@ -523,5 +537,27 @@ export interface Dictionary {
     logPagePrev: string;
     logPageNext: string;
     logPageInfo: string; // {{page}} {{total}}
+    // RelicForm — CandidateImageGallery
+    candidateGalleryTitle: string; // {{n}}
+    candidateGalleryEmpty: string;
+    candidateGalleryDeletedTitle: string; // {{n}}
+    candidateGalleryRestore: string;
+    candidateGallerySourceUser: string;
+    candidateGallerySourceNet: string;
+    candidateGalleryPrimary: string;
+    candidateGalleryDelete: string;
+    // RelicForm — RegenMetadataPreview
+    regenTitle: string;
+    regenButton: string;
+    regenRunning: string;
+    regenFeedbackPlaceholder: string;
+    regenDiscard: string;
+    regenApply: string;
+    fieldTitleZh: string;
+    fieldTitleEn: string;
+    fieldSubtitleZh: string;
+    fieldSubtitleEn: string;
+    fieldIcon: string;
+    fieldRarity: string;
   };
 }

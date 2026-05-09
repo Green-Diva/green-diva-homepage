@@ -25,7 +25,10 @@
 //   }
 //
 // Input:
-//   { relicSlug: string, primaryImagePath: string } | { _dryRun: true }
+//   { relicSlug: string, imagePath: string } | { _dryRun: true }
+//   - imagePath is the slug-scoped relative path of the source image (we
+//     accept the legacy field name `primaryImagePath` too, for back-compat
+//     with older agent DAGs that haven't been re-seeded).
 //
 // Output:
 //   { modelPath: string, taskId: string, previewImageUrl?: string,
@@ -165,16 +168,20 @@ export const meshy3d: SkillHandler = async (input, config) => {
   if (!slug || !SAFE_SLUG_RE.test(slug)) {
     throw new HandlerError("meshy-3d: invalid relicSlug", "INVALID_CONFIG");
   }
-  const primaryImagePath =
-    typeof input.primaryImagePath === "string" ? input.primaryImagePath : null;
-  if (!primaryImagePath) {
-    throw new HandlerError("meshy-3d: input.primaryImagePath required", "INVALID_CONFIG");
+  const imagePath =
+    typeof input.imagePath === "string"
+      ? input.imagePath
+      : typeof input.primaryImagePath === "string"
+        ? input.primaryImagePath
+        : null;
+  if (!imagePath) {
+    throw new HandlerError("meshy-3d: input.imagePath required", "INVALID_CONFIG");
   }
 
   // Resolve image to absolute path + base64 data URI for the API.
-  const imageAbs = resolveRelicAsset(primaryImagePath);
+  const imageAbs = resolveRelicAsset(imagePath);
   if (!imageAbs) {
-    throw new HandlerError("meshy-3d: primaryImagePath did not resolve safely", "INVALID_CONFIG");
+    throw new HandlerError("meshy-3d: imagePath did not resolve safely", "INVALID_CONFIG");
   }
   const ext = path.extname(imageAbs).toLowerCase();
   const mime = IMAGE_MIME[ext];

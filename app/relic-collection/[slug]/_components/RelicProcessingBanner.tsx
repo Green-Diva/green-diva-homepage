@@ -116,8 +116,15 @@ export default function RelicProcessingBanner({ relicId, initialStatus, isAdmin 
   const job = payload?.job;
   const stepLabel = job ? t.relicCollection[STEP_KEY[job.step]] : t.relicCollection.jobStepEnqueued;
   const progress = job?.progress ?? 0;
-  const failed = status === "FAILED" || job?.status === "FAILED";
-  const succeeded = job?.status === "SUCCEEDED";
+  // PARTIAL = pipeline finished but degraded (e.g. agent threw mid-DAG).
+  // The job itself reads SUCCEEDED but the relic is in a half-baked state —
+  // surface as failed so admin sees the error + retry button instead of a
+  // "completed, refreshing" spinner that loops forever.
+  const failed =
+    status === "FAILED" ||
+    status === "PARTIAL" ||
+    job?.status === "FAILED";
+  const succeeded = !failed && job?.status === "SUCCEEDED";
 
   let title: string;
   if (succeeded) {

@@ -137,14 +137,22 @@ model Relic {
   rarity             Rarity
   iconKey            String?
   modelPath          String?
-  // 2D form: composite/picked image rendered as the relic's hero. Set by
-  // the Relic Image Pick skill (INTERNAL handler) on the 2D branch.
+  // 2D form: best-pick image (post-Smart Image Picker). Admin can change
+  // which candidate is the primary in the review UI.
   primaryImagePath   String?
-  // Set by the Form Classifier skill via the scribe agent. Drives the
-  // detail page renderer (2D <img> vs 3D <model-viewer>).
+  // 2D-enhanced (post-cutout, transparent PNG). Set by the Background
+  // Cutout skill via the "2dEnhance" agent path. Required input for the
+  // 3D create path.
+  enhancedImagePath  String?
+  // Smart Image Picker's full candidate set (user uploads + downloaded
+  // network images), with admin's per-item delete + primary toggle state.
+  // See lib/skills/handlers/internal/smartImagePicker.ts for shape.
+  candidateImages    Json?
+  // Recommended default tab on the detail page ("TWO_D" / "THREE_D").
+  // Set by Gemini Researcher; admin can override via direct edit.
   formKind           RelicFormKind?
-  // The classifier's plain-language reason ("It's a watercolor painting,
-  // best shown flat"), surfaced on the detail page for transparency.
+  // Plain-language reason for the form classification, surfaced as italic
+  // text under the title on the detail page.
   formReason         String?
   // The full DAG runLog from the most recent agent invocation, for the
   // admin trace viewer. Bounded by AgentJob limits upstream.

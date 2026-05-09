@@ -1,9 +1,7 @@
-// One-off seed: creates the RELIC-SCRIBE-001 agent, equips the two scribe
-// skills to slots 0 and 1, sets the Backbone (pipelineConfig), and deploys.
-// Idempotent — re-run safe.
+// One-off seed: configures the RELIC-SCRIBE-001 agent's slot loadout +
+// 4-mode DAG. Idempotent — re-run safe.
 //
-// Prereq: prisma/seed-relic-scribe-skills.ts must have been run first
-// (this script looks up skills by nameEn).
+// Prereq: prisma/seed-relic-scribe-skills.ts must have run first.
 //
 // Run: npx tsx prisma/seed-relic-scribe-agent.ts
 
@@ -12,11 +10,12 @@ import { PrismaClient, Prisma } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const CODENAME = "RELIC-SCRIBE-001";
+
 const SKILLS_BY_SLOT: Array<{ slot: number; nameEn: string }> = [
   { slot: 0, nameEn: "Relic Files Summary" },
-  { slot: 1, nameEn: "Relic Metadata Scribe" },
-  { slot: 2, nameEn: "Form Classifier" },
-  { slot: 3, nameEn: "Relic Image Pick" },
+  { slot: 1, nameEn: "Relic Gemini Researcher" },
+  { slot: 2, nameEn: "Relic Smart Image Picker" },
+  { slot: 3, nameEn: "Relic Background Cutout" },
   { slot: 4, nameEn: "Meshy 3D Generator" },
 ];
 
@@ -25,9 +24,7 @@ async function main() {
     throw new Error("Refusing to seed in production. Set ALLOW_PROD_SEED=1 to override.");
   }
 
-  // Resolve all 5 skills by nameEn. Bail loudly if any are missing — the
-  // agent's DAG references all 5 slots, partial seeds will leave empty
-  // slots that fail at runtime with SLOT_EMPTY.
+  // Resolve all 5 skills by nameEn.
   const skillIdBySlot = new Map<number, string>();
   for (const { slot, nameEn } of SKILLS_BY_SLOT) {
     const skill = await prisma.skill.findFirst({ where: { nameEn } });
@@ -39,95 +36,94 @@ async function main() {
     skillIdBySlot.set(slot, skill.id);
   }
 
-  // v2 DAG. Layout (left-to-right):
-  //
-  //   summary ─→ pick2d ────────────────────────→ metadata
-  //          ╲                                    ╱
-  //           ↓                                  ╱
-  //         classify ─→ branch ─── twoD ────────╱
-  //                          ╲      threeD                    ╲
-  //                           ────→ meshy ───────────────────→ metadata
-  //
-  // Why pick2d runs unconditionally: meshy needs the chosen image, and the
-  // 2D path needs it too. Meshy's input comes from pick2d via a merge.
-  // metadata is the final leaf — receives a merge of all upstream outputs;
-  // skipped nodes (meshy in the 2D case) contribute null. The pipeline step
-  // (lib/relics/pipeline/steps/generateMetadata.ts) reads each node's output
-  // out of the runLog by id to assemble the Relic writeback payload.
+  // 4-mode DAG. mode-router branches on agent.input.mode → routes to one of
+  // 4 leaf paths. See docs/relic-immutable-frog.md (or the original plan)
+  // for layout + reasoning. Key invariant: 3D path takes the *enhanced*
+  // image (transparent PNG), not the raw primary — meshy.imagePath is
+  // sourced from the trigger endpoint's input.imagePath, which the
+  // /create-3d endpoint sets to relic.enhancedImagePath.
   const pipelineConfig = {
     version: 2 as const,
     nodes: [
+      {
+        id: "mode",
+        type: "branch" as const,
+        inputFrom: "agent.input",
+        cases: [
+          { path: "mode", op: "eq" as const, value: "initial", label: "initial" },
+          { path: "mode", op: "eq" as const, value: "regenMetadata", label: "regen" },
+          { path: "mode", op: "eq" as const, value: "2dEnhance", label: "twoD" },
+          { path: "mode", op: "eq" as const, value: "3dCreate", label: "threeD" },
+        ],
+        defaultLabel: "initial",
+        position: { x: 60, y: 240 },
+      },
+      // Initial path: summary → research → pick.
       {
         id: "summary",
         type: "skill" as const,
         equipSlot: 0,
         inputFrom: "agent.input",
-        position: { x: 60, y: 120 },
+        position: { x: 320, y: 80 },
       },
       {
-        id: "pick2d",
+        id: "research",
         type: "skill" as const,
-        equipSlot: 3,
+        equipSlot: 1,
         inputFrom: "summary.output",
-        position: { x: 320, y: 30 },
+        position: { x: 600, y: 80 },
       },
       {
-        id: "classify",
+        id: "pick",
         type: "skill" as const,
         equipSlot: 2,
-        inputFrom: "summary.output",
-        position: { x: 320, y: 220 },
+        inputFrom: {
+          merge: {
+            relicSlug: "summary.output.relicSlug",
+            imageAbsPaths: "summary.output.imageAbsPaths",
+            useUserImage: "research.output.useUserImage",
+            networkImageQuery: "research.output.networkImageQuery",
+          },
+        },
+        position: { x: 880, y: 80 },
       },
+      // Regen path: same Researcher skill (slot 1), different node id so
+      // it can have a different inputFrom (agent.input directly, no summary).
       {
-        id: "branch",
-        type: "branch" as const,
-        inputFrom: "classify.output",
-        cases: [
-          { path: "kind", op: "eq", value: "TWO_D", label: "twoD" },
-          { path: "kind", op: "eq", value: "THREE_D", label: "threeD" },
-        ],
-        defaultLabel: "twoD",
-        position: { x: 600, y: 220 },
+        id: "research-regen",
+        type: "skill" as const,
+        equipSlot: 1,
+        inputFrom: "agent.input",
+        position: { x: 320, y: 240 },
       },
+      // 2D enhance leaf.
+      {
+        id: "cutout",
+        type: "skill" as const,
+        equipSlot: 3,
+        inputFrom: "agent.input",
+        position: { x: 320, y: 380 },
+      },
+      // 3D create leaf — directly from mode-router; gets agent.input.imagePath
+      // which the /create-3d endpoint sets to relic.enhancedImagePath.
       {
         id: "meshy",
         type: "skill" as const,
         equipSlot: 4,
-        inputFrom: {
-          merge: {
-            relicSlug: "summary.output.relicSlug",
-            primaryImagePath: "pick2d.output.primaryImagePath",
-          },
-        },
-        position: { x: 880, y: 220 },
-      },
-      {
-        id: "metadata",
-        type: "skill" as const,
-        equipSlot: 1,
-        inputFrom: {
-          merge: {
-            files: "summary.output",
-            classify: "classify.output",
-            twoD: "pick2d.output",
-            threeD: "meshy.output",
-          },
-        },
-        position: { x: 1160, y: 120 },
+        inputFrom: "agent.input",
+        position: { x: 320, y: 520 },
       },
     ],
     edges: [
-      { from: "summary", to: "pick2d" },
-      { from: "summary", to: "classify" },
-      { from: "pick2d", to: "metadata" },
-      { from: "classify", to: "branch" },
-      { from: "branch", to: "metadata", when: "twoD" },
-      { from: "branch", to: "meshy", when: "threeD" },
-      { from: "meshy", to: "metadata" },
+      { from: "mode", to: "summary", when: "initial" },
+      { from: "mode", to: "research-regen", when: "regen" },
+      { from: "mode", to: "cutout", when: "twoD" },
+      { from: "mode", to: "meshy", when: "threeD" },
+      { from: "summary", to: "research" },
+      { from: "research", to: "pick" },
     ],
   };
 
-  // Avatar must be NOT NULL. Reuse the placeholder under /public/images/.
   const avatarUrl = "/images/agent-control/avatars/default.svg";
 
   const agentData = {
@@ -138,16 +134,15 @@ async function main() {
     mode: "MECHANICAL" as const,
     avatarUrl,
     descriptionEn:
-      "Reads an uploaded relic's files + draft note and assigns the icon, title, subtitle, and rarity used in the vault UI.",
+      "Reads an uploaded relic, writes its lore via Gemini-grounded web research, picks a primary image (user or network), and orchestrates 2D enhance + 3D create on demand.",
     descriptionZh:
-      "读取用户上传的遗物文件与描述,产出 vault 界面所用的图标、标题、副标题与稀有度。",
-    pipelineConfig: pipelineConfig as Prisma.InputJsonValue,
+      "读取上传的遗物,用 Gemini 联网调研写圣记,挑选主图(用户的或网络高清版),并按需驱动 2D 增强与 3D 立体化。",
+    pipelineConfig: pipelineConfig as unknown as Prisma.InputJsonValue,
     dispatcherConfig: Prisma.JsonNull,
     deployedAt: new Date(),
   };
 
   const existing = await prisma.agent.findUnique({ where: { codename: CODENAME } });
-
   let agent;
   if (existing) {
     agent = await prisma.agent.update({ where: { id: existing.id }, data: agentData });
@@ -157,7 +152,7 @@ async function main() {
     console.log("✓ agent created:", agent.codename, agent.id);
   }
 
-  // Replace equips for all 5 slots atomically.
+  // Replace equips for slots 0-4 atomically.
   const slotsToReplace = SKILLS_BY_SLOT.map((s) => s.slot);
   await prisma.$transaction(async (tx) => {
     await tx.agentSkillEquip.deleteMany({
@@ -177,13 +172,11 @@ async function main() {
   for (const { slot, nameEn } of SKILLS_BY_SLOT) {
     console.log(`✓ slot ${slot} ← ${nameEn}`);
   }
-  console.log("✓ Backbone:", JSON.stringify(pipelineConfig));
   console.log("✓ Deployed at:", agent.deployedAt?.toISOString());
 
   console.log("\nVerify:");
   console.log("  /agent-control?tab=agents → select RELIC-SCRIBE-001");
-  console.log("  Test Run with input: {\"relicSlug\": \"<some-existing-relic-slug>\"}");
-  console.log("  Or upload a new relic at /relic-collection — pipeline auto-runs.");
+  console.log("  Test Run with input: {\"mode\":\"initial\",\"relicSlug\":\"<existing-slug>\"}");
 }
 
 main()

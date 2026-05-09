@@ -161,6 +161,15 @@ function CellInner({
         >
           pending
         </span>
+      ) : relic.status === "PARTIAL" || relic.status === "FAILED" ? (
+        <span
+          className="absolute bottom-1.5 right-1.5 z-20 material-symbols-outlined text-error text-[14px]"
+          style={{ fontVariationSettings: "'FILL' 1, 'wght' 400" }}
+          aria-label={t.relicCollection.cellGenerationFailed}
+          title={t.relicCollection.cellGenerationFailed}
+        >
+          error
+        </span>
       ) : null}
       {/* Four fixed-percentage tiers (icon / name / classif / badge) keep
           live + extracted cells perfectly aligned, and the hover sweep
@@ -284,10 +293,11 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
   }
 
   const isSpecial = relic.rarity === "SPECIAL";
-  // Cells awaiting admin confirmation get a yellow border + soft glow so
-  // they pop in the grid; only admins see them in the first place
-  // (filtered out for non-admin in the page query).
+  // Cells awaiting admin confirmation get a yellow border + soft glow.
+  // Failed pipeline runs get a RED border to differentiate — admins should
+  // never confuse a half-baked relic with a "ready to confirm" one.
   const awaitingReview = relic.status === "AWAITING_REVIEW";
+  const failed = relic.status === "PARTIAL" || relic.status === "FAILED";
   return (
     <Link
       href={`/relic-collection/${relic.slug}`}
@@ -295,9 +305,11 @@ export default function VaultCell({ slot, relic, access, locale, t, isAdmin, can
       className={
         baseClasses +
         " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 " +
-        (awaitingReview
-          ? "border border-secondary/70 shadow-[inset_0_0_18px_rgba(233,193,118,0.18)] hover:shadow-[inset_0_0_28px_rgba(233,193,118,0.28)] "
-          : "border border-primary/40 ") +
+        (failed
+          ? "border border-error/60 shadow-[inset_0_0_18px_rgba(255,77,77,0.16)] hover:shadow-[inset_0_0_28px_rgba(255,77,77,0.26)] "
+          : awaitingReview
+            ? "border border-secondary/70 shadow-[inset_0_0_18px_rgba(233,193,118,0.18)] hover:shadow-[inset_0_0_28px_rgba(233,193,118,0.28)] "
+            : "border border-primary/40 ") +
         rarityHoverClass(relic.rarity) +
         " " +
         rarityFocusClass(relic.rarity)

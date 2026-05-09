@@ -11,7 +11,7 @@ import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getSharedRelicIds } from "@/lib/relicShare";
 import { getGrantedRelicIds } from "@/lib/relicGrant";
 import UserMenu from "@/components/UserMenu";
-import RelicViewer from "./_components/RelicViewer";
+import AssetTabs from "./_components/AssetTabs";
 import PhotoCarousel from "./_components/PhotoCarousel";
 import AdminToolbar from "./_components/AdminToolbar";
 import LogPanel from "./_components/LogPanel";
@@ -208,47 +208,20 @@ export default async function RelicDetailPage({
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0">
-            {/* Left: viewer (3D model-viewer for THREE_D form, large image
-                otherwise — primaryImagePath if present, else first photo,
-                else placeholder). */}
+            {/* Left: 3-tab asset switcher (原图 / 2D 增强 / 3D 立体). The
+                latter two are admin-triggered and run async via AgentJob. */}
             <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col relative">
-              {relic.formKind === "THREE_D" && relic.modelPath ? (
-                <RelicViewer
-                  modelUrl={`/api/relics/${relic.id}/model`}
-                  alt={name}
-                  t={t}
-                />
-              ) : relic.primaryImagePath ? (
-                <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/relics/${relic.id}/primary`}
-                    alt={name}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ) : relic.modelPath ? (
-                <RelicViewer
-                  modelUrl={`/api/relics/${relic.id}/model`}
-                  alt={name}
-                  t={t}
-                />
-              ) : relic.photoPaths.length > 0 ? (
-                <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/relics/${relic.id}/photos/0`}
-                    alt={name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="aspect-square w-full bg-surface-container/40 border border-primary/20 flex items-center justify-center lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-                  <span className="font-label text-[11px] tracking-[0.2em] uppercase text-on-surface-variant/60">
-                    {t.relicCollection.noModel}
-                  </span>
-                </div>
-              )}
+              <AssetTabs
+                relicId={relic.id}
+                hasPrimary={!!relic.primaryImagePath}
+                hasEnhanced={!!relic.enhancedImagePath}
+                hasModel={!!relic.modelPath}
+                formKind={relic.formKind}
+                alt={name}
+                isAdmin={isAdmin}
+                t={t}
+              />
+
               {!isExtracted ? (
                 <div className="absolute top-3 left-3 right-3 z-10">
                   <AdminToolbar

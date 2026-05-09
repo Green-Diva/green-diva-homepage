@@ -95,6 +95,14 @@ export async function runAgentJob(jobId: string): Promise<void> {
           endedAt: new Date(),
         },
       });
+      // Per-mode writeback to Relic. Triggered for relic-bound agent calls
+      // ({ mode: "2dEnhance" | "3dCreate", _relicId, ... }) — pure agent
+      // invocations without `_relicId` are unaffected.
+      try {
+        await maybeWriteRelicAsset(job.input, result.output);
+      } catch (e) {
+        console.error(`[agent-job:run] ${jobId} relic writeback failed:`, e);
+      }
       return;
     }
 
@@ -153,4 +161,56 @@ export async function runAgentJob(jobId: string): Promise<void> {
       // give up — DB itself is unhappy
     }
   }
+}
+
+// — Relic writeback hook — — — — — — — — — — — — — — — — — — — — — — —
+//
+// Runner-level writeback: when a relic-bound agent invocation succeeds
+// (input contains `_relicId` + a known mode), copy the relevant fields
+// from the agent's leaf output into the Relic row. Unknown modes / inputs
+// without `_relicId` are no-ops, so general agent invocations are unaffected.
+//
+// Idempotent: re-running the same input writes the same fields. Safe to
+// trigger multiple times (e.g. via retry).
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+async function maybeWriteRelicAsset(
+  rawInput: unknown,
+  rawOutput: unknown,
+): Promise<void> {
+  if (!isObject(rawInput)) return;
+  const relicId = typeof rawInput._relicId === "string" ? rawInput._relicId : null;
+  const mode = typeof rawInput.mode === "string" ? rawInput.mode : null;
+  if (!relicId || !mode) return;
+
+  if (mode === "2dEnhance") {
+    if (!isObject(rawOutput)) return;
+    const enhancedImagePath =
+      typeof rawOutput.enhancedImagePath === "string" ? rawOutput.enhancedImagePath : null;
+    if (!enhancedImagePath) return;
+    await prisma.relic.update({
+      where: { id: relicId },
+      data: { enhancedImagePath },
+    });
+    return;
+  }
+
+  if (mode === "3dCreate") {
+    if (!isObject(rawOutput)) return;
+    const modelPath =
+      typeof rawOutput.modelPath === "string" ? rawOutput.modelPath : null;
+    if (!modelPath) return;
+    await prisma.relic.update({
+      where: { id: relicId },
+      data: { modelPath },
+    });
+    return;
+  }
+
+  // initial / regenMetadata don't go through this runner — they're called
+  // synchronously from the pipeline step / regen endpoint and write back
+  // from the caller's context.
 }

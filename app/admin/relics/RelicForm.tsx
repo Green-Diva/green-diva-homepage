@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
+import CandidateImageGallery, {
+  type CandidateImage,
+} from "./CandidateImageGallery";
+import RegenMetadataPreview from "./RegenMetadataPreview";
 
 const RARITIES = ["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"] as const;
 
@@ -34,6 +38,8 @@ type FormState = {
   photoPaths: string[];
   archivePath: string;
   derivedArchivePath: string;
+  primaryImagePath: string | null;
+  candidateImages: CandidateImage[] | null;
 };
 
 const EMPTY: FormState = {
@@ -54,6 +60,8 @@ const EMPTY: FormState = {
   photoPaths: [],
   archivePath: "",
   derivedArchivePath: "",
+  primaryImagePath: null,
+  candidateImages: null,
 };
 
 export default function RelicForm({
@@ -123,6 +131,10 @@ export default function RelicForm({
           photoPaths: Array.isArray(d.photoPaths) ? d.photoPaths : [],
           archivePath: d.archivePath ?? "",
           derivedArchivePath: d.derivedArchivePath ?? "",
+          primaryImagePath: typeof d.primaryImagePath === "string" ? d.primaryImagePath : null,
+          candidateImages: Array.isArray(d.candidateImages)
+            ? (d.candidateImages as CandidateImage[])
+            : null,
         });
       });
   }, [initial]);
@@ -181,6 +193,10 @@ export default function RelicForm({
       acquiredAt: state.acquiredAt ? new Date(state.acquiredAt).toISOString() : null,
       loreEn: state.loreEn || null,
       loreZh: state.loreZh || null,
+      // Phase 5+ multi-image curation. Only include when present so the
+      // PATCH stays a partial update for legacy edits.
+      ...(state.candidateImages !== null ? { candidateImages: state.candidateImages } : {}),
+      ...(state.primaryImagePath !== null ? { primaryImagePath: state.primaryImagePath } : {}),
       modelPath: state.modelPath || null,
       photoPaths: state.photoPaths,
       archivePath: state.archivePath || null,
@@ -291,6 +307,42 @@ export default function RelicForm({
             <input type="date" value={state.acquiredAt} onChange={(e) => set("acquiredAt", e.target.value)} className={inputClass} />
           </Field>
         </div>
+
+        {/* Multi-image curation + regen-metadata affordance — only meaningful
+            when editing an existing relic that has candidates from the agent. */}
+        {isEdit && initial && state.candidateImages !== null ? (
+          <div className="space-y-3 border-t border-primary/10 pt-4">
+            <RegenMetadataPreview
+              relicId={initial.id}
+              onApply={(r) => {
+                setState((s) => ({
+                  ...s,
+                  nameZh: r.titleZh || s.nameZh,
+                  nameEn: r.titleEn || s.nameEn,
+                  classifZh: r.subtitleZh || s.classifZh,
+                  classifEn: r.subtitleEn || s.classifEn,
+                  iconKey: r.icon || s.iconKey,
+                  rarity: (RARITIES as readonly string[]).includes(r.rarity)
+                    ? (r.rarity as FormState["rarity"])
+                    : s.rarity,
+                }));
+              }}
+            />
+            <CandidateImageGallery
+              relicId={initial.id}
+              candidates={state.candidateImages}
+              primaryPath={state.primaryImagePath}
+              onChange={(next) =>
+                setState((s) => ({
+                  ...s,
+                  candidateImages: next.candidates,
+                  primaryImagePath: next.primaryPath,
+                }))
+              }
+              disabled={pending}
+            />
+          </div>
+        ) : null}
 
         <Field label={t.adminRelics.fLoreEn}>
           <textarea rows={3} value={state.loreEn} onChange={(e) => set("loreEn", e.target.value)} className={inputClass} />

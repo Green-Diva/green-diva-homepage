@@ -80,12 +80,13 @@ export default async function RelicCollectionPage({
       ? t.relicCollection.statusInitiate
       : t.relicCollection.statusGuest;
 
-  // AWAITING_REVIEW relics are pipeline-finished but admin-pending. Hide
-  // them from non-admin viewers entirely so the vault stays a curated
-  // surface; admin sees them with a yellow border + "pending" icon.
+  // Non-admin sees ONLY READY. Pipeline-in-flight (DRAFT / PROCESSING),
+  // pending review (AWAITING_REVIEW), and failed (PARTIAL / FAILED) relics
+  // are admin-only — keeps the vault a curated surface and prevents a
+  // half-baked cell from masquerading as "pending review" to other viewers.
   const visibleRelics = isAdmin
     ? allRelics
-    : allRelics.filter((r) => r.status !== "AWAITING_REVIEW");
+    : allRelics.filter((r) => r.status === "READY");
 
   // Extracted relics turn into memorial cells visible to everyone, but only
   // admin / the extractor / grant-holders (whose grant survived extraction)
