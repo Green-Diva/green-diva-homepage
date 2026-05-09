@@ -289,6 +289,13 @@ export const en: Dictionary = {
     processingBannerRetry: "Retry this step",
     processingBannerRetrying: "Retrying…",
     cellProcessing: "Processing",
+    cellAwaitingReview: "Awaiting review",
+    reviewBannerTitle: "Awaiting your review",
+    reviewBannerSubtitle: "The agent has filled in titles, subtitles, icon, classification, and rendered the visual asset. Edit then store, or store directly.",
+    reviewBannerEdit: "Edit & store",
+    reviewBannerStore: "Store",
+    reviewBannerStoring: "Storing…",
+    reviewBannerError: "Confirm failed.",
     viewerForging: "Forging the 3D form…",
   },
   agentControl: {

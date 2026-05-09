@@ -282,6 +282,13 @@ export interface Dictionary {
     processingBannerRetry: string;
     processingBannerRetrying: string;
     cellProcessing: string;
+    cellAwaitingReview: string;
+    reviewBannerTitle: string;
+    reviewBannerSubtitle: string;
+    reviewBannerEdit: string;
+    reviewBannerStore: string;
+    reviewBannerStoring: string;
+    reviewBannerError: string;
     viewerForging: string;
   };
   agentControl: {

@@ -283,6 +283,13 @@ export const zh: Dictionary = {
     processingBannerRetry: "重跑该步",
     processingBannerRetrying: "重跑中…",
     cellProcessing: "处理中",
+    cellAwaitingReview: "待存入",
+    reviewBannerTitle: "等待你的确认",
+    reviewBannerSubtitle: "神职已为这件遗物填好名号、副标、图标、品阶,并生成了视觉资产。编修后存入,或直接存入。",
+    reviewBannerEdit: "编修存入",
+    reviewBannerStore: "直接存入",
+    reviewBannerStoring: "存入中…",
+    reviewBannerError: "确认失败。",
     viewerForging: "正在锻造 3D 形态…",
   },
   agentControl: {

@@ -17,6 +17,7 @@ import AdminToolbar from "./_components/AdminToolbar";
 import LogPanel from "./_components/LogPanel";
 import PipelineTracePanel from "./_components/PipelineTracePanel";
 import RelicProcessingBanner from "./_components/RelicProcessingBanner";
+import AwaitingReviewBanner from "./_components/AwaitingReviewBanner";
 import UnlockTrigger from "../_components/UnlockTrigger";
 
 export async function generateMetadata({
@@ -101,6 +102,13 @@ export default async function RelicDetailPage({
     notFound();
   }
 
+  // Pipeline-finished but admin hasn't confirmed yet → admin only. Hide
+  // even from grant-holders / shared / unlocked viewers, since the relic
+  // is still mid-curation.
+  if (relic.status === "AWAITING_REVIEW" && !isAdmin) {
+    notFound();
+  }
+
   const access = canAccessRelic(relic, user, unlockedIds, sharedIds, grantedIds);
   const isExtracted = !!relic.extractedAt;
 
@@ -151,7 +159,21 @@ export default async function RelicDetailPage({
           </Link>
         </div>
 
-        {relic.status !== "READY" && access.level !== "RED" ? (
+        {relic.status === "AWAITING_REVIEW" && isAdmin ? (
+          <AwaitingReviewBanner
+            relic={{
+              id: relic.id,
+              slot: relic.slot,
+              slug: relic.slug,
+              nameEn: relic.nameEn,
+              nameZh: relic.nameZh,
+              rarity: relic.rarity,
+              hasPassword: !!relic.passwordHash,
+            }}
+          />
+        ) : relic.status !== "READY" &&
+          relic.status !== "AWAITING_REVIEW" &&
+          access.level !== "RED" ? (
           <RelicProcessingBanner
             relicId={relic.id}
             initialStatus={relic.status}

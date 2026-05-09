@@ -6,7 +6,7 @@ import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 
 const POLL_MS = 3000;
-type RelicStatus = "DRAFT" | "PROCESSING" | "READY" | "PARTIAL" | "FAILED";
+type RelicStatus = "DRAFT" | "PROCESSING" | "AWAITING_REVIEW" | "READY" | "PARTIAL" | "FAILED";
 type JobStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 type JobStep = "ENQUEUED" | "EXTRACT_ZIP" | "GENERATE_METADATA" | "PACK_DERIVED" | "FINALIZE";
 
@@ -67,7 +67,7 @@ export default function RelicProcessingBanner({ relicId, initialStatus, isAdmin 
   };
 
   useEffect(() => {
-    if (initialStatus === "READY") return;
+    if (initialStatus === "READY" || initialStatus === "AWAITING_REVIEW") return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -80,6 +80,7 @@ export default function RelicProcessingBanner({ relicId, initialStatus, isAdmin 
         setPayload(j);
         const done =
           j.relicStatus === "READY" ||
+          j.relicStatus === "AWAITING_REVIEW" ||
           j.job?.status === "SUCCEEDED" ||
           j.job?.status === "FAILED" ||
           j.job?.status === "CANCELLED";
@@ -107,7 +108,10 @@ export default function RelicProcessingBanner({ relicId, initialStatus, isAdmin 
 
   // Settle on whichever status is freshest.
   const status = payload?.relicStatus ?? initialStatus;
-  if (status === "READY") return null;
+  // Hide once we've reached READY or the AWAITING_REVIEW handoff — the
+  // detail page swaps in AwaitingReviewBanner from server-side once the
+  // status flips, so this client-side banner gets out of the way.
+  if (status === "READY" || status === "AWAITING_REVIEW") return null;
 
   const job = payload?.job;
   const stepLabel = job ? t.relicCollection[STEP_KEY[job.step]] : t.relicCollection.jobStepEnqueued;

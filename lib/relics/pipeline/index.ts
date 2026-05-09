@@ -214,9 +214,19 @@ async function runInner(jobId: string, opts?: { fromStep?: RelicJobStep }): Prom
     },
   });
   if (final?.relic) {
+    // First-time pipeline success → AWAITING_REVIEW so admin gets a
+    // confirm step. Re-runs (admin clicked retry on a relic already past
+    // review, e.g. status was READY/PARTIAL) keep their current status —
+    // we don't want to demote an already-stored relic back to "pending".
+    const target: "READY" | "AWAITING_REVIEW" =
+      final.relic.status === "PROCESSING" || final.relic.status === "DRAFT"
+        ? "AWAITING_REVIEW"
+        : final.relic.status === "READY"
+          ? "READY"
+          : "AWAITING_REVIEW";
     await prisma.relic.update({
       where: { id: final.relic.id },
-      data: { status: "READY" },
+      data: { status: target },
     });
     await recordRelicLog({
       action: "PROCESSING_SUCCEEDED",

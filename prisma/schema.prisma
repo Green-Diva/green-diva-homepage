@@ -117,6 +117,10 @@ enum Rarity {
 enum RelicStatus {
   DRAFT
   PROCESSING
+  // Pipeline finished successfully but admin hasn't confirmed yet. Visible
+  // only to admin (yellow-tinted cell in vault grid + review banner on
+  // detail page). One-shot transition: confirming flips to READY.
+  AWAITING_REVIEW
   READY
   PARTIAL
   FAILED

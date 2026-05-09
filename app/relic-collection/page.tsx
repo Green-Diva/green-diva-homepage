@@ -80,17 +80,26 @@ export default async function RelicCollectionPage({
       ? t.relicCollection.statusInitiate
       : t.relicCollection.statusGuest;
 
+  // AWAITING_REVIEW relics are pipeline-finished but admin-pending. Hide
+  // them from non-admin viewers entirely so the vault stays a curated
+  // surface; admin sees them with a yellow border + "pending" icon.
+  const visibleRelics = isAdmin
+    ? allRelics
+    : allRelics.filter((r) => r.status !== "AWAITING_REVIEW");
+
   // Extracted relics turn into memorial cells visible to everyone, but only
   // admin / the extractor / grant-holders (whose grant survived extraction)
   // can click in for detail. Others see a static, non-interactive shell.
   const filtered = filter === "ALL"
-    ? allRelics
-    : allRelics.filter((r) => r.rarity === filter);
+    ? visibleRelics
+    : visibleRelics.filter((r) => r.rarity === filter);
 
   const slotMap = new Map<number, (typeof allRelics)[number]>();
   for (const r of filtered) slotMap.set(r.slot, r);
 
-  const filledCount = allRelics.length;
+  // Capacity counter reflects what the viewer can actually see. Non-admin
+  // shouldn't get a hint that there are pending relics behind the curtain.
+  const filledCount = visibleRelics.length;
 
   return (
     <div className="flex flex-col flex-1 w-full bg-background text-on-background">
