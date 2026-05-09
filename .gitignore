@@ -48,3 +48,7 @@ next-env.d.ts
 
 # relic asset storage (.glb / hi-res images served via auth-gated API only)
 /private/relics
+
+# Claude Code agent worktrees (`isolation: "worktree"` agents). Each is its
+# own checkout; they should never land in the main repo's history.
+/.claude/worktrees
