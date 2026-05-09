@@ -9,9 +9,13 @@
 
 import { HandlerError, type SkillHandler } from "../../types";
 import { relicFilesSummary } from "./relicFilesSummary";
+import { relicImagePick } from "./relicImagePick";
+import { meshy3d } from "./meshy3d";
 
 const internalHandlers: Record<string, SkillHandler> = {
   "relic-files-summary": relicFilesSummary,
+  "relic-image-pick": relicImagePick,
+  "meshy-3d": meshy3d,
 };
 
 export const internal: SkillHandler = async (input, config, ctx) => {

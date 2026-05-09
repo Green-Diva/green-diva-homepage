@@ -41,8 +41,10 @@ const DEFAULT_MAX_TEXT_BYTES = 8192;
 
 type FilesSummaryInput = {
   userBrief: string;
+  relicSlug: string;
   files: Array<{
     relPath: string;
+    absPath?: string; // populated for real reads, absent for dry-runs
     sizeBytes: number;
     kind: "text" | "image" | "other";
     textExcerpt?: string;
@@ -51,10 +53,15 @@ type FilesSummaryInput = {
 
 type FilesSummaryOutput = {
   userBrief: string;
+  relicSlug: string;
   fileSummary: string;
   fileCount: number;
   imageCount: number;
   otherCount: number;
+  // Server-side absolute paths to image files. Consumed by downstream vision
+  // skills (Form Classifier) and the 2D Image Pick handler. Capped at 8 so
+  // the JSON blob in AgentJob.runLog stays bounded.
+  imageAbsPaths: string[];
 };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -102,9 +109,9 @@ async function readVaultRelicFiles(opts: {
       kind = "text";
       textExcerpt = await readTextHead(e.absPath, opts.maxTextBytes);
     }
-    files.push({ relPath: e.relPath, sizeBytes: e.sizeBytes, kind, textExcerpt });
+    files.push({ relPath: e.relPath, absPath: e.absPath, sizeBytes: e.sizeBytes, kind, textExcerpt });
   }
-  return { userBrief, files };
+  return { userBrief, relicSlug: opts.relicSlug, files };
 }
 
 async function listFilesRecursive(
@@ -161,10 +168,14 @@ async function readTextHead(abs: string, maxBytes: number): Promise<string> {
 // Hoist this when a second module needs the same flattening logic.
 // — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — —
 function buildSummary(input: FilesSummaryInput): FilesSummaryOutput {
-  const { userBrief, files } = input;
+  const { userBrief, files, relicSlug } = input;
   const imageCount = files.filter((f) => f.kind === "image").length;
   const otherCount = files.filter((f) => f.kind === "other").length;
   const textFiles = files.filter((f) => f.kind === "text");
+  const imageAbsPaths = files
+    .filter((f) => f.kind === "image" && f.absPath)
+    .slice(0, 8)
+    .map((f) => f.absPath!);
 
   const lines: string[] = [];
   lines.push(`Total files: ${files.length} (images: ${imageCount}, text: ${textFiles.length}, other: ${otherCount})`);
@@ -193,10 +204,12 @@ function buildSummary(input: FilesSummaryInput): FilesSummaryOutput {
 
   return {
     userBrief,
+    relicSlug,
     fileSummary: lines.join("\n"),
     fileCount: files.length,
     imageCount,
     otherCount,
+    imageAbsPaths,
   };
 }
 
@@ -231,6 +244,7 @@ export const relicFilesSummary: SkillHandler = async (input, config) => {
     }
     return buildSummary({
       userBrief: "示例:外婆 1962 年的家书,蓝色钢笔,半褪色字迹,谈到那年她种的玉米地。",
+      relicSlug: "_dryrun",
       files: [
         { relPath: "letter-page-1.jpg", sizeBytes: 2_400_000, kind: "image" },
         { relPath: "letter-page-2.jpg", sizeBytes: 2_100_000, kind: "image" },

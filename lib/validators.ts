@@ -47,14 +47,91 @@ export const pipelineStepSchema = z.object({
   }),
 });
 
-// Strict shape backing Backbone (MECHANICAL) execution.
-//   - version pinned to 1; bumping it is an explicit migration event
-//   - steps capped at 20 to avoid pathological pipelines blocking on retries
+// — — DAG (v2) schemas — —
+//
+// v2 generalizes the linear v1 pipeline into a DAG with conditional branching
+// so a single agent can fan out to "2D path" vs "3D path" etc. The runtime
+// internally upconverts v1 → v2 (a linear chain of skill nodes) so all
+// execution lives in one codepath. Cycle / branch-label / forward-ref
+// validation lives in the runtime, not here, because they require the
+// materialized graph.
+
+// Source ref grammar:
+//   agent.input                   → whole agent invocation input
+//   agent.input.<a>.<b>           → drill into the input object
+//   <nodeId>.output               → that node's output
+//   <nodeId>.output.<a>.<b>       → drill into the output object
+// The dot-path tail is optional; runtime walks it via the same logic as
+// branch case `path` evaluation.
+const SOURCE_REF_RE = /^(agent\.input|[a-zA-Z0-9_-]+\.output)(\.[a-zA-Z0-9_]+)*$/;
+const sourceRefString = z
+  .string()
+  .regex(SOURCE_REF_RE, 'must be "agent.input[.path]" or "<nodeId>.output[.path]"');
+const sourceRef = z.union([
+  sourceRefString,
+  z.object({ merge: z.record(sourceRefString) }),
+]);
+
+const branchCaseSchema = z.object({
+  // Dot-path into the input object. Empty string = root (i.e., compare the
+  // input itself). Useful when the upstream skill returns a primitive.
+  path: z.string().max(120),
+  op: z.enum(["eq", "ne", "in", "exists"]),
+  value: z.unknown().optional(),
+  // Must match the `when` field of one of this branch's outgoing edges.
+  label: z.string().min(1).max(64),
+});
+
+// Editor-only metadata. Stored on the config so the canvas redraws in the
+// same layout next session. The runtime ignores `position`.
+const positionSchema = z.object({ x: z.number(), y: z.number() }).optional();
+
+const dagSkillNodeSchema = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
+  type: z.literal("skill"),
+  equipSlot: z.number().int().min(0).max(5),
+  inputFrom: sourceRef,
+  position: positionSchema,
+});
+
+const dagBranchNodeSchema = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
+  type: z.literal("branch"),
+  inputFrom: sourceRef,
+  cases: z.array(branchCaseSchema).min(1).max(10),
+  // Edge label to follow when no case matches. If unset, "no match" = abort.
+  defaultLabel: z.string().min(1).max(64).optional(),
+  position: positionSchema,
+});
+
+const dagNodeSchema = z.discriminatedUnion("type", [
+  dagSkillNodeSchema,
+  dagBranchNodeSchema,
+]);
+
+const dagEdgeSchema = z.object({
+  from: z.string().min(1).max(64),
+  to: z.string().min(1).max(64),
+  // Required iff source node is a branch — must match a case label or defaultLabel.
+  when: z.string().min(1).max(64).optional(),
+});
+
+export const pipelineConfigV2Schema = z.object({
+  version: z.literal(2),
+  nodes: z.array(dagNodeSchema).min(1).max(40),
+  edges: z.array(dagEdgeSchema).max(80),
+});
+
+// Strict shape backing Backbone (MECHANICAL) execution. Accepts either v1
+// (legacy linear) or v2 (DAG). Steps/nodes capped to bound runtime.
 export const pipelineConfigSchema = z
-  .object({
-    version: z.literal(1),
-    steps: z.array(pipelineStepSchema).min(1).max(20),
-  })
+  .union([
+    z.object({
+      version: z.literal(1),
+      steps: z.array(pipelineStepSchema).min(1).max(20),
+    }),
+    pipelineConfigV2Schema,
+  ])
   .nullable();
 
 // Strict shape backing Orchestrator (AUTONOMOUS) execution.

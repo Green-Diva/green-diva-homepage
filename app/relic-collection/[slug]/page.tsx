@@ -15,6 +15,7 @@ import RelicViewer from "./_components/RelicViewer";
 import PhotoCarousel from "./_components/PhotoCarousel";
 import AdminToolbar from "./_components/AdminToolbar";
 import LogPanel from "./_components/LogPanel";
+import PipelineTracePanel from "./_components/PipelineTracePanel";
 import RelicProcessingBanner from "./_components/RelicProcessingBanner";
 import UnlockTrigger from "../_components/UnlockTrigger";
 
@@ -185,9 +186,26 @@ export default async function RelicDetailPage({
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0">
-            {/* Left: 3D viewer */}
+            {/* Left: viewer (3D model-viewer for THREE_D form, large image
+                otherwise — primaryImagePath if present, else first photo,
+                else placeholder). */}
             <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col relative">
-              {relic.modelPath ? (
+              {relic.formKind === "THREE_D" && relic.modelPath ? (
+                <RelicViewer
+                  modelUrl={`/api/relics/${relic.id}/model`}
+                  alt={name}
+                  t={t}
+                />
+              ) : relic.primaryImagePath ? (
+                <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/relics/${relic.id}/primary`}
+                    alt={name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : relic.modelPath ? (
                 <RelicViewer
                   modelUrl={`/api/relics/${relic.id}/model`}
                   alt={name}
@@ -293,6 +311,20 @@ export default async function RelicDetailPage({
                 <h1 className="font-headline text-3xl md:text-4xl text-primary sacred-glow leading-[1.15]">
                   {name}
                 </h1>
+                {relic.formKind && relic.formReason ? (
+                  <p className="mt-3 font-body text-[12px] text-on-surface-variant/75 leading-[1.6] italic">
+                    <span className="font-label text-[9px] tracking-[0.25em] uppercase text-on-surface-variant/60 mr-2 not-italic">
+                      {relic.formKind === "TWO_D"
+                        ? locale === "zh"
+                          ? "判定 · 平面"
+                          : "Classified · 2D"
+                        : locale === "zh"
+                          ? "判定 · 立体"
+                          : "Classified · 3D"}
+                    </span>
+                    {relic.formReason}
+                  </p>
+                ) : null}
               </div>
 
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-primary/10 py-5">
@@ -342,7 +374,12 @@ export default async function RelicDetailPage({
 
               </section>
               {isAdmin ? (
-                <div className="mt-4 lg:mt-auto lg:pt-4">
+                <div className="mt-4 lg:mt-auto lg:pt-4 space-y-3">
+                  <PipelineTracePanel
+                    trace={relic.pipelineTrace}
+                    locale={locale}
+                    t={t}
+                  />
                   <LogPanel relicId={relic.id} />
                 </div>
               ) : null}

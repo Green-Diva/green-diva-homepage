@@ -16,6 +16,13 @@ export type AgentRunLogEntry = {
   output?: unknown;
   errorCode?: string;
   errorMessage?: string;
+  // DAG (v2) extras:
+  // - `skipped`: node was unreachable (no live incoming edge) on this run,
+  //   e.g. the 3D path on a 2D-classified item. Skipped entries are `ok:true`.
+  // - `branchLabel`: the case label a branch node chose; in the trace UI this
+  //   identifies which outgoing edge became live.
+  skipped?: boolean;
+  branchLabel?: string;
 };
 
 export type AgentRunSuccess = {

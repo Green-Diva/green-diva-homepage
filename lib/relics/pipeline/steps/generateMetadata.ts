@@ -13,9 +13,9 @@
 // state (corrupt ZIP, disk write failure).
 
 import "server-only";
-import type { Rarity } from "@prisma/client";
+import type { Rarity, RelicFormKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { invokeAgent } from "@/lib/agents/invoke";
+import { invokeAgent, type AgentRunLogEntry } from "@/lib/agents/invoke";
 import { recordRelicLog } from "@/lib/relicLog";
 import type { PipelineContext, StepResult } from "../context";
 
@@ -38,6 +38,18 @@ const FALLBACK = {
   rarity: "COMMON" as Rarity,
 };
 
+// DAG node IDs the scribe agent's Backbone is expected to use. The pipeline
+// step pulls each node's output from the runLog to assemble the writeback
+// payload. If the user rebuilds the DAG with different IDs, fields go
+// untouched (degrade gracefully) — the agent still succeeds, but formKind
+// / primaryImagePath / modelPath stay null until the IDs are restored.
+const DAG_NODE_IDS = {
+  metadata: "metadata",
+  classify: "classify",
+  pick2d: "pick2d",
+  meshy: "meshy",
+} as const;
+
 export type GenerateMetadataResult = {
   agentInvoked: boolean;
   degraded: boolean;
@@ -49,6 +61,10 @@ export type GenerateMetadataResult = {
     classifZh: string;
     classifEn: string;
     rarity: Rarity;
+    formKind: RelicFormKind | null;
+    formReason: string | null;
+    primaryImagePath: string | null;
+    modelPath: string | null;
   };
 };
 
@@ -71,33 +87,94 @@ function pickRarity(v: unknown): Rarity {
   return FALLBACK.rarity;
 }
 
-// Maps the LLM's loose output object onto the Relic columns. Accepts both
-// `subtitleZh` (the prompt's user-facing name) and `classifZh` (the DB
-// column name) — whichever the model returns. classif* takes precedence
-// when both are present.
-function shapeMetadata(output: unknown): GenerateMetadataResult["applied"] {
-  if (!isObject(output)) {
-    return { ...FALLBACK };
+function pickFormKind(v: unknown): RelicFormKind | null {
+  if (v === "TWO_D" || v === "THREE_D") return v;
+  // Accept loose strings for prompt friendliness ("2D" / "3D" / "two-d").
+  if (typeof v === "string") {
+    const norm = v.trim().toUpperCase().replace(/[-_\s]/g, "");
+    if (norm === "2D" || norm === "TWOD" || norm === "TWO" || norm === "TWOD2D") return "TWO_D";
+    if (norm === "3D" || norm === "THREED" || norm === "THREE") return "THREE_D";
   }
+  return null;
+}
+
+function findNodeOutput(runLog: AgentRunLogEntry[], stepId: string): unknown | undefined {
+  // Last successful entry for this step id wins (covers retries).
+  for (let i = runLog.length - 1; i >= 0; i -= 1) {
+    const e = runLog[i];
+    if (e.stepId === stepId && e.ok && !e.skipped) return e.output;
+  }
+  return undefined;
+}
+
+// Builds the writeback payload by merging the agent's final output (metadata
+// node, naming/icon/rarity) with per-node outputs picked out of the runLog
+// (classify, pick2d, meshy). If a node id is missing the corresponding
+// fields stay null and the column isn't touched.
+function shapeMetadata(
+  finalOutput: unknown,
+  runLog: AgentRunLogEntry[],
+): GenerateMetadataResult["applied"] {
+  // Metadata fields come from the agent's final output (last leaf — usually
+  // the metadata skill itself), or the dedicated "metadata" node, whichever
+  // produced naming fields.
+  const metaSource = (() => {
+    if (isObject(finalOutput)) return finalOutput;
+    const fromMetadataNode = findNodeOutput(runLog, DAG_NODE_IDS.metadata);
+    return isObject(fromMetadataNode) ? fromMetadataNode : null;
+  })();
+  const meta = metaSource ?? {};
   const classifZh = pickString(
-    output.classifZh ?? output.subtitleZh,
+    meta.classifZh ?? meta.subtitleZh,
     FALLBACK.classifZh,
     64,
   );
   const classifEn = pickString(
-    output.classifEn ?? output.subtitleEn,
+    meta.classifEn ?? meta.subtitleEn,
     FALLBACK.classifEn,
     80,
   );
+
+  // Visual / classification fields come from the dedicated nodes.
+  const classifyOut = findNodeOutput(runLog, DAG_NODE_IDS.classify);
+  const formKind = isObject(classifyOut) ? pickFormKind(classifyOut.kind) : null;
+  const formReason = isObject(classifyOut)
+    ? pickString(classifyOut.reason, "", 500) || null
+    : null;
+
+  const pickOut = findNodeOutput(runLog, DAG_NODE_IDS.pick2d);
+  const primaryImagePath =
+    isObject(pickOut) && typeof pickOut.primaryImagePath === "string"
+      ? pickOut.primaryImagePath
+      : null;
+
+  const meshyOut = findNodeOutput(runLog, DAG_NODE_IDS.meshy);
+  const modelPath =
+    isObject(meshyOut) && typeof meshyOut.modelPath === "string"
+      ? meshyOut.modelPath
+      : null;
+
   return {
-    iconKey: pickString(output.icon ?? output.iconKey, FALLBACK.iconKey, 64),
-    nameZh: pickString(output.titleZh ?? output.nameZh, FALLBACK.nameZh, 48),
-    nameEn: pickString(output.titleEn ?? output.nameEn, FALLBACK.nameEn, 80),
+    iconKey: pickString(meta.icon ?? meta.iconKey, FALLBACK.iconKey, 64),
+    nameZh: pickString(meta.titleZh ?? meta.nameZh, FALLBACK.nameZh, 48),
+    nameEn: pickString(meta.titleEn ?? meta.nameEn, FALLBACK.nameEn, 80),
     classifZh,
     classifEn,
-    rarity: pickRarity(output.rarity),
+    rarity: pickRarity(meta.rarity),
+    formKind,
+    formReason,
+    primaryImagePath,
+    modelPath,
   };
 }
+
+const FALLBACK_APPLIED: GenerateMetadataResult["applied"] = {
+  ...FALLBACK,
+  formKind: null,
+  formReason: null,
+  primaryImagePath: null,
+  modelPath: null,
+};
 
 export async function stepGenerateMetadata(
   ctx: PipelineContext,
@@ -119,7 +196,8 @@ export async function stepGenerateMetadata(
       relicSnapshot,
       degraded: true,
       degradeReason: `agent "${SCRIBE_CODENAME}" not configured`,
-      applied: { ...FALLBACK },
+      applied: { ...FALLBACK_APPLIED },
+      runLog: [],
       agentInvoked: false,
     });
   }
@@ -129,7 +207,8 @@ export async function stepGenerateMetadata(
       relicSnapshot,
       degraded: true,
       degradeReason: `agent "${SCRIBE_CODENAME}" exists but is not deployed`,
-      applied: { ...FALLBACK },
+      applied: { ...FALLBACK_APPLIED },
+      runLog: [],
       agentInvoked: false,
     });
   }
@@ -149,30 +228,45 @@ export async function stepGenerateMetadata(
       relicSnapshot,
       degraded: true,
       degradeReason: `invokeAgent threw: ${e instanceof Error ? e.message : String(e)}`,
-      applied: { ...FALLBACK },
+      applied: { ...FALLBACK_APPLIED },
+      runLog: [],
       agentInvoked: true,
     });
   }
 
   if (!runResult.ok) {
+    // Partial salvage: even if a downstream node crashed (e.g. meshy 404'd),
+    // earlier nodes (classify, pick2d) may have produced usable output. Keep
+    // their fields so the relic still gets a form judgment + 2D hero image
+    // instead of falling back to a placeholder. Naming fields stay fallback —
+    // those come from the metadata node which by definition didn't run.
+    const salvaged = shapeMetadata(undefined, runResult.runLog);
     return await applyAndReturn({
       ctx,
       relicSnapshot,
       degraded: true,
       degradeReason: `agent run failed (${runResult.errorCode}): ${runResult.errorMessage}`,
-      applied: { ...FALLBACK },
+      applied: {
+        ...FALLBACK_APPLIED,
+        formKind: salvaged.formKind,
+        formReason: salvaged.formReason,
+        primaryImagePath: salvaged.primaryImagePath,
+        modelPath: salvaged.modelPath,
+      },
+      runLog: runResult.runLog,
       agentInvoked: true,
     });
   }
 
   // 3. Shape + write.
-  const applied = shapeMetadata(runResult.output);
+  const applied = shapeMetadata(runResult.output, runResult.runLog);
   return await applyAndReturn({
     ctx,
     relicSnapshot,
     degraded: false,
     applied,
     agentInvoked: true,
+    runLog: runResult.runLog,
   });
 }
 
@@ -183,20 +277,30 @@ async function applyAndReturn(args: {
   degradeReason?: string;
   applied: GenerateMetadataResult["applied"];
   agentInvoked: boolean;
+  runLog: AgentRunLogEntry[];
 }): Promise<StepResult<GenerateMetadataResult>> {
-  const { ctx, relicSnapshot, degraded, degradeReason, applied, agentInvoked } = args;
+  const { ctx, relicSnapshot, degraded, degradeReason, applied, agentInvoked, runLog } = args;
 
   try {
+    const updateData: Prisma.RelicUpdateInput = {
+      iconKey: applied.iconKey,
+      nameZh: applied.nameZh,
+      nameEn: applied.nameEn,
+      classifZh: applied.classifZh,
+      classifEn: applied.classifEn,
+      rarity: applied.rarity,
+      // Visual / classification fields. Only write if the agent set them
+      // (preserve any prior admin edit when the DAG misses a node).
+      ...(applied.formKind !== null ? { formKind: applied.formKind } : {}),
+      ...(applied.formReason !== null ? { formReason: applied.formReason } : {}),
+      ...(applied.primaryImagePath !== null ? { primaryImagePath: applied.primaryImagePath } : {}),
+      ...(applied.modelPath !== null ? { modelPath: applied.modelPath } : {}),
+      // Always store the most recent trace so admin can debug.
+      pipelineTrace: runLog as unknown as Prisma.InputJsonValue,
+    };
     await prisma.relic.update({
       where: { id: ctx.relic.id },
-      data: {
-        iconKey: applied.iconKey,
-        nameZh: applied.nameZh,
-        nameEn: applied.nameEn,
-        classifZh: applied.classifZh,
-        classifEn: applied.classifEn,
-        rarity: applied.rarity,
-      },
+      data: updateData,
     });
   } catch (e) {
     // DB write failure IS a real pipeline failure — surface it.

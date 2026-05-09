@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { AgentRow, EquipRow } from "../types";
-import BackboneEditor from "./BackboneEditor";
+import BackboneFlowEditor from "./BackboneFlowEditor";
 import OrchestratorEditor from "./OrchestratorEditor";
 
 // Replaces the old ControlConfigStrip — taller card that lives at the bottom
@@ -84,7 +84,7 @@ export default function ControlConfigCard({
 
       {open ? (
         isMech ? (
-          <BackboneEditor agent={agent} equips={equips} onClose={() => setOpen(false)} />
+          <BackboneFlowEditor agent={agent} equips={equips} onClose={() => setOpen(false)} />
         ) : (
           <OrchestratorEditor agent={agent} equips={equips} onClose={() => setOpen(false)} />
         )

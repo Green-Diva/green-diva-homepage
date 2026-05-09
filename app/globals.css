@@ -12,6 +12,10 @@
   --color-primary: #90decd;
   --color-background: #121414;
   --color-secondary: #e9c176;
+  /* Tertiary: coral. Used by Backbone DAG branch nodes (BackboneFlowEditor)
+     to visually distinguish them from skill nodes (secondary/yellow) and
+     primary accents (cyan). */
+  --color-tertiary: #ff9c7a;
   --color-outline: #88938f;
   --color-primary-container: #74c2b2;
   --color-on-surface: #e2e2e2;

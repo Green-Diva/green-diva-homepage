@@ -98,6 +98,14 @@ model Session {
   @@index([userId])
 }
 
+// Drives detail-page rendering. Set by the Form Classifier skill in the
+// relic scribe agent's DAG. Null = legacy / not yet classified — frontend
+// falls back to the old "show all photos" treatment.
+enum RelicFormKind {
+  TWO_D
+  THREE_D
+}
+
 enum Rarity {
   COMMON
   RARE
@@ -125,6 +133,18 @@ model Relic {
   rarity             Rarity
   iconKey            String?
   modelPath          String?
+  // 2D form: composite/picked image rendered as the relic's hero. Set by
+  // the Relic Image Pick skill (INTERNAL handler) on the 2D branch.
+  primaryImagePath   String?
+  // Set by the Form Classifier skill via the scribe agent. Drives the
+  // detail page renderer (2D <img> vs 3D <model-viewer>).
+  formKind           RelicFormKind?
+  // The classifier's plain-language reason ("It's a watercolor painting,
+  // best shown flat"), surfaced on the detail page for transparency.
+  formReason         String?
+  // The full DAG runLog from the most recent agent invocation, for the
+  // admin trace viewer. Bounded by AgentJob limits upstream.
+  pipelineTrace      Json?
   photoPaths         String[]
   archivePath        String?
   derivedArchivePath String?

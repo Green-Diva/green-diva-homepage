@@ -10,7 +10,7 @@ import SkillConnections from "./SkillConnections";
 import CentralControlSlot from "./CentralControlSlot";
 import SkillPickerModal from "./SkillPickerModal";
 import SkillSlotDetailModal from "./SkillSlotDetailModal";
-import BackboneEditor from "./BackboneEditor";
+import BackboneFlowEditor from "./BackboneFlowEditor";
 import OrchestratorEditor from "./OrchestratorEditor";
 
 type Props = {
@@ -126,7 +126,7 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
 
       {controlOpen ? (
         isMech ? (
-          <BackboneEditor agent={agent} equips={equips} onClose={() => setControlOpen(false)} />
+          <BackboneFlowEditor agent={agent} equips={equips} onClose={() => setControlOpen(false)} />
         ) : (
           <OrchestratorEditor agent={agent} equips={equips} onClose={() => setControlOpen(false)} />
         )
