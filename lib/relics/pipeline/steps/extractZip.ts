@@ -15,8 +15,10 @@ export type ExtractZipResult = {
 };
 
 export async function stepExtractZip(ctx: PipelineContext): Promise<StepResult<ExtractZipResult>> {
+  // Multimodal-upload mode: files were staged directly into extracted/ at
+  // upload time (no ZIP). Skip extraction; just classify what's already there.
   if (!ctx.relic.archivePath) {
-    return { ok: false, error: "no archive path on relic" };
+    return classifyStaged(ctx);
   }
   const archiveAbs = resolveRelicAsset(ctx.relic.archivePath);
   if (!archiveAbs) {
@@ -56,6 +58,37 @@ export async function stepExtractZip(ctx: PipelineContext): Promise<StepResult<E
 
   const imagePaths = allImages.slice(0, MAX_IMAGES_TO_PROCESS);
 
+  return {
+    ok: true,
+    data: { imagePaths, archivedImagePaths: allImages, otherFiles },
+  };
+}
+
+async function classifyStaged(ctx: PipelineContext): Promise<StepResult<ExtractZipResult>> {
+  const allImages: string[] = [];
+  const otherFiles: string[] = [];
+  async function walk(dir: string, prefix: string): Promise<void> {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const ent of entries) {
+      const abs = path.join(dir, ent.name);
+      const rel = prefix ? `${prefix}/${ent.name}` : ent.name;
+      if (ent.isDirectory()) {
+        await walk(abs, rel);
+      } else if (ent.isFile()) {
+        const ext = path.extname(ent.name).toLowerCase();
+        if (IMAGE_EXTS.has(ext)) allImages.push(rel);
+        else otherFiles.push(rel);
+      }
+    }
+  }
+  await walk(ctx.dirs.extracted, "");
+  const imagePaths = allImages.slice(0, MAX_IMAGES_TO_PROCESS);
   return {
     ok: true,
     data: { imagePaths, archivedImagePaths: allImages, otherFiles },

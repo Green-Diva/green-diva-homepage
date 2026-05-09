@@ -8,9 +8,10 @@
 // There is no runtime injection path on purpose.
 
 import { HandlerError, type SkillHandler } from "../../types";
+import { relicFilesSummary } from "./relicFilesSummary";
 
 const internalHandlers: Record<string, SkillHandler> = {
-  // Phase 1 ships with no entries. Add slugs here as needed.
+  "relic-files-summary": relicFilesSummary,
 };
 
 export const internal: SkillHandler = async (input, config, ctx) => {

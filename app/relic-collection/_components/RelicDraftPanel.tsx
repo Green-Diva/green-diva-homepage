@@ -5,7 +5,23 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 
-const MAX_BYTES = 200 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
+const MAX_PER_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_FILES = 30;
+const ACCEPT_ATTR = [
+  ".zip",
+  "image/*",
+  ".pdf",
+  ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+  ".txt", ".md", ".rtf", ".csv", ".json",
+  "audio/*", "video/*",
+].join(",");
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
 
 type Props = {
   slot: number;
@@ -16,10 +32,12 @@ export default function RelicDraftPanel({ slot, onClose }: Props) {
   const t = useT();
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const totalBytes = files.reduce((s, f) => s + f.size, 0);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -37,11 +55,15 @@ export default function RelicDraftPanel({ slot, onClose }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!file) {
+    if (files.length === 0) {
       setError(t.relicCollection.draftPanelMissingFile);
       return;
     }
-    if (file.size > MAX_BYTES) {
+    if (files.length > MAX_FILES || totalBytes > MAX_TOTAL_BYTES) {
+      setError(t.relicCollection.draftPanelSubmitFailed);
+      return;
+    }
+    if (files.some((f) => f.size > MAX_PER_FILE_BYTES)) {
       setError(t.relicCollection.draftPanelSubmitFailed);
       return;
     }
@@ -50,7 +72,7 @@ export default function RelicDraftPanel({ slot, onClose }: Props) {
       const fd = new FormData();
       fd.append("slot", String(slot));
       fd.append("description", description);
-      fd.append("archive", file, file.name);
+      for (const f of files) fd.append("files", f, f.name);
       const r = await fetch("/api/relics/draft", {
         method: "POST",
         credentials: "include",
@@ -118,14 +140,58 @@ export default function RelicDraftPanel({ slot, onClose }: Props) {
           <input
             ref={fileInput}
             type="file"
-            accept=".zip,application/zip"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            multiple
+            accept={ACCEPT_ATTR}
+            onChange={(e) => {
+              const picked = Array.from(e.target.files ?? []);
+              setFiles((prev) => {
+                // Merge with prior selection so the user can pick from
+                // multiple folders without losing earlier picks.
+                const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
+                const merged = [...prev];
+                for (const f of picked) {
+                  const key = `${f.name}:${f.size}`;
+                  if (!seen.has(key)) {
+                    merged.push(f);
+                    seen.add(key);
+                  }
+                }
+                return merged.slice(0, MAX_FILES);
+              });
+              if (fileInput.current) fileInput.current.value = "";
+            }}
             disabled={submitting}
             className="w-full text-sm text-on-surface file:mr-4 file:py-2 file:px-4 file:border file:border-primary/50 file:bg-transparent file:text-primary file:font-label file:text-[10px] file:tracking-[0.25em] file:uppercase file:cursor-pointer hover:file:bg-primary/10"
           />
           <p className="text-[11px] text-on-surface-variant/70">
             {t.relicCollection.draftPanelArchiveHint}
           </p>
+          {files.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-[12px] text-on-surface-variant max-h-40 overflow-y-auto border border-primary/10 px-3 py-2">
+              {files.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-3">
+                  <span className="truncate">
+                    {f.name}{" "}
+                    <span className="text-on-surface-variant/60">({formatSize(f.size)})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFiles((prev) => prev.filter((_, idx) => idx !== i))
+                    }
+                    disabled={submitting}
+                    className="text-error/80 hover:text-error font-label text-[10px] tracking-[0.2em] uppercase shrink-0"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+              <li className="pt-1 border-t border-primary/10 text-on-surface-variant/60">
+                {files.length} / {MAX_FILES} · {formatSize(totalBytes)} /{" "}
+                {formatSize(MAX_TOTAL_BYTES)}
+              </li>
+            </ul>
+          ) : null}
         </div>
 
         <div className="space-y-2">
@@ -160,7 +226,7 @@ export default function RelicDraftPanel({ slot, onClose }: Props) {
           </button>
           <button
             type="submit"
-            disabled={submitting || !file}
+            disabled={submitting || files.length === 0}
             className="px-6 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-background bg-secondary hover:bg-secondary/90 disabled:bg-on-surface-variant/30 disabled:text-on-surface-variant disabled:cursor-not-allowed"
           >
             {submitting ? t.relicCollection.draftPanelSubmitting : t.relicCollection.draftPanelSubmit}

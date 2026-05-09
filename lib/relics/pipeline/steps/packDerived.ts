@@ -32,7 +32,10 @@ export async function stepPackDerived(
     zip.file(`derived/${name}`, await fs.readFile(abs));
   }
 
-  // 2. original archive
+  // 2. originals
+  //   - ZIP-mode: include the uploaded archive verbatim under source/
+  //   - multimodal-mode: walk source/extracted/ (files were staged there at
+  //     upload time) and include each under source/
   if (ctx.relic.archivePath) {
     const origAbs = resolveRelicAsset(ctx.relic.archivePath);
     if (origAbs) {
@@ -42,6 +45,8 @@ export async function stepPackDerived(
         console.warn("[packDerived] could not read original archive", e);
       }
     }
+  } else {
+    await packDirRecursive(zip, ctx.dirs.extracted, "source");
   }
 
   // 3. metadata snapshot
@@ -90,5 +95,27 @@ async function safeReaddir(dir: string): Promise<string[]> {
     return await fs.readdir(dir);
   } catch {
     return [];
+  }
+}
+
+async function packDirRecursive(zip: JSZip, rootAbs: string, zipPrefix: string): Promise<void> {
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await fs.readdir(rootAbs, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const ent of entries) {
+    const abs = path.join(rootAbs, ent.name);
+    const rel = `${zipPrefix}/${ent.name}`;
+    if (ent.isDirectory()) {
+      await packDirRecursive(zip, abs, rel);
+    } else if (ent.isFile()) {
+      try {
+        zip.file(rel, await fs.readFile(abs));
+      } catch (e) {
+        console.warn("[packDerived] could not read", abs, e);
+      }
+    }
   }
 }

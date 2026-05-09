@@ -10,6 +10,7 @@ import {
 } from "./context";
 import { stepExtractZip } from "./steps/extractZip";
 import { stepPackDerived } from "./steps/packDerived";
+import { stepGenerateMetadata } from "./steps/generateMetadata";
 
 const ERROR_MESSAGE_MAX_LEN = 500;
 
@@ -20,8 +21,13 @@ type StepDef = {
 };
 
 const STEPS: StepDef[] = [
-  { id: "EXTRACT_ZIP", weight: 50, run: stepExtractZip as StepDef["run"] },
-  { id: "PACK_DERIVED", weight: 50, run: stepPackDerived as StepDef["run"] },
+  { id: "EXTRACT_ZIP", weight: 30, run: stepExtractZip as StepDef["run"] },
+  // GENERATE_METADATA runs BEFORE PACK_DERIVED so the metadata snapshot baked
+  // into derived/metadata.json reflects the AI-generated name/classif/rarity,
+  // not the placeholder. The step never fails the pipeline (degrades to a
+  // "needs curator" placeholder) — see steps/generateMetadata.ts.
+  { id: "GENERATE_METADATA", weight: 40, run: stepGenerateMetadata as StepDef["run"] },
+  { id: "PACK_DERIVED", weight: 30, run: stepPackDerived as StepDef["run"] },
 ];
 
 const TOTAL_WEIGHT = STEPS.reduce((s, x) => s + x.weight, 0);

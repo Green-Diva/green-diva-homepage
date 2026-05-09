@@ -262,6 +262,7 @@ export interface Dictionary {
     jobStatusCancelled: string;
     jobStepEnqueued: string;
     jobStepExtractZip: string;
+    jobStepGenerateMetadata: string;
     jobStepPackDerived: string;
     jobStepFinalize: string;
     draftPanelTitle: string;

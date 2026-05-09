@@ -45,7 +45,7 @@ async function callAnthropic(opts: {
   systemText: string | undefined;
   userText: string;
   maxTokens: number;
-  temperature: number;
+  temperature: number | undefined;
 }): Promise<string> {
   const client = new Anthropic({ apiKey: opts.apiKey });
   let response;
@@ -53,7 +53,7 @@ async function callAnthropic(opts: {
     response = await client.messages.create({
       model: opts.model,
       max_tokens: opts.maxTokens,
-      temperature: opts.temperature,
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       system: opts.systemText,
       messages: [{ role: "user", content: opts.userText }],
     });
@@ -75,7 +75,7 @@ async function callOpenAI(opts: {
   systemText: string | undefined;
   userText: string;
   maxTokens: number;
-  temperature: number;
+  temperature: number | undefined;
 }): Promise<string> {
   const client = new OpenAI({ apiKey: opts.apiKey });
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
@@ -88,7 +88,7 @@ async function callOpenAI(opts: {
       model: opts.model,
       messages,
       max_tokens: opts.maxTokens,
-      temperature: opts.temperature,
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
     });
   } catch (e) {
     throw new HandlerError(
@@ -126,7 +126,7 @@ export const llmPrompt: SkillHandler = async (input, config) => {
     : undefined;
 
   const maxTokens = typeof config.maxTokens === "number" ? config.maxTokens : 1024;
-  const temperature = typeof config.temperature === "number" ? config.temperature : 1.0;
+  const temperature = typeof config.temperature === "number" ? config.temperature : undefined;
 
   const text =
     provider === "anthropic"

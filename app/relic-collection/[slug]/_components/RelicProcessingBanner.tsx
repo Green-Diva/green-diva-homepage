@@ -8,7 +8,7 @@ import { format } from "@/lib/i18n/format";
 const POLL_MS = 3000;
 type RelicStatus = "DRAFT" | "PROCESSING" | "READY" | "PARTIAL" | "FAILED";
 type JobStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
-type JobStep = "ENQUEUED" | "EXTRACT_ZIP" | "PACK_DERIVED" | "FINALIZE";
+type JobStep = "ENQUEUED" | "EXTRACT_ZIP" | "GENERATE_METADATA" | "PACK_DERIVED" | "FINALIZE";
 
 type JobPayload = {
   hasJob: boolean;
@@ -25,6 +25,7 @@ type JobPayload = {
 const STEP_KEY: Record<JobStep, keyof ReturnType<typeof useT>["relicCollection"]> = {
   ENQUEUED: "jobStepEnqueued",
   EXTRACT_ZIP: "jobStepExtractZip",
+  GENERATE_METADATA: "jobStepGenerateMetadata",
   PACK_DERIVED: "jobStepPackDerived",
   FINALIZE: "jobStepFinalize",
 };
