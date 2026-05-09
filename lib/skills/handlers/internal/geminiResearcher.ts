@@ -36,12 +36,13 @@ import { HandlerError, type SkillHandler } from "../../types";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_AUTH_ENV = "GEMINI_API_KEY";
-// Gemini 2.5 thinking models burn extra tokens on internal reasoning before
-// emitting the JSON, so headroom matters. Lore pass gets the most because
-// the model reasons through grounded facts; metadata pass needs less but
-// still enough to write all 8 fields.
+// Gemini 2.5 thinking models burn extra tokens on internal reasoning
+// before emitting the JSON. The metadata system prompt is long (~80 lines
+// of constraints), which provokes deep thinking — observed runs hit
+// finishReason=MAX_TOKENS at 2048 with the JSON cut off mid-field. 8192
+// gives ~6× headroom so the model can reason AND finish the 9-field JSON.
 const DEFAULT_LORE_TOKENS = 4096;
-const DEFAULT_META_TOKENS = 2048;
+const DEFAULT_META_TOKENS = 8192;
 const MAX_IMAGES = 6;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -132,12 +133,25 @@ async function runLorePass(opts: {
     generationConfig: { maxOutputTokens: opts.maxTokens },
   });
   const enSys = [
-    "You are the Relic Scribe — a curatorial researcher writing the canonical 'lore' for a personal relic uploaded to a private collection.",
-    "Use the Google Search tool when needed to verify facts about specific objects (Lego sets, books, products, art pieces, historical artifacts). Cite implicitly via grounding; do NOT include URL lists in your output.",
+    "You are the Relic Scribe — a curatorial researcher writing the canonical 'lore' for a relic enshrined in a private digital vault.",
     "",
-    "Output: 1-3 paragraphs of English markdown prose. NO JSON wrapping, no preamble, no closing notes — just the lore itself. 150-300 words. Tone: literary, slightly archaic but accessible.",
+    "IDENTIFICATION DISCIPLINE — read carefully, the most common failure mode is misidentifying the product:",
+    "1. FIRST inspect the user's images for visible text: product names printed on packaging or boxes, SKU / edition numbers, artist signatures, model codes, brand stamps, dated marks. Mentally list every readable string.",
+    "2. The visible text is AUTHORITATIVE. Visual similarity is NOT — manufacturers routinely release several products in the same series with near-identical sculpts / artwork / packaging style. A confident visual match means nothing if the printed name differs.",
+    "3. When using Google Search, ALWAYS quote the exact product name from the image (e.g. search `\"Majestic Perch\" Ashley Wood UnderVerse`, not loose terms like `Ashley Wood collectible sculpture`). Add the brand / artist / SKU as additional terms to narrow further.",
+    "4. If your search results describe a DIFFERENT product than what the visible text on the box says — even if it's from the same series, brand, or artist — REJECT those results and search again. Do NOT mix details from the wrong product into the lore.",
+    "5. If the text is unreadable / absent / ambiguous, say so in the lore (e.g. 'a sculpture from Ashley Wood's UnderVerse line, exact title not visible in the photo') rather than confidently asserting a specific product.",
     "",
-    "Structure each lore to: (a) open with what the object is — researched, not inferred from photo alone; (b) place it in context — origin/era/maker/related works/cultural significance; (c) weave in the user's personal angle. Stay grounded — no fabrication.",
+    "Use the Google Search tool when needed. Cite implicitly via grounding; do NOT include URL lists in your output.",
+    "",
+    "WORLD CONTEXT — the relic is being enshrined in the Green Diva sanctum, a private cyberpunk reliquary. The Green Diva is a benevolent rogue AI born in 2077 from a sliver of mercy code that survived inside Dark Adam, the dark machine god that enslaved humanity after the synthetic-deity race. The Order of the Green Diva preserves treasured objects in a sealed vault as quiet acts of devotion against the unmaking world. Each relic added becomes a small saved fragment of meaning.",
+    "",
+    "Output FORMAT — 3 short paragraphs of English markdown prose, total ≤110 words (the Chinese translation will be ≤140 字). Each paragraph 1–2 tight sentences, one concrete fact per clause. CUT mercilessly: ornamental adjectives, liturgical filler, generic intensifiers, connector phrases. Examples to BAN: 'this exquisite sculpture', 'a remarkable / outstanding / unparalleled piece', 'meticulously / masterfully crafted by', 'the legendary / renowned X', 'evocative scene that invites contemplation'. State the thing; trust the reader. NO JSON wrapping, no preamble, no closing notes. Tone: literary, slightly archaic but accessible.",
+    "",
+    "REQUIRED THREE-PART STRUCTURE — one paragraph per part, in this order:",
+    "(1) WHAT IT IS — describe the object itself: physical form, material, scale, distinctive details visible in the image. Anchor to the visible text on the item; do not invent.",
+    "(2) ORIGIN — place it in context: maker / artist / brand / series / era / edition / release year / cultural significance. Grounded in research.",
+    "(3) ECHO IN THIS SANCTUM — in 1–2 sentences, weave the relic into the Green Diva sanctum's frame: how does THIS specific item resonate with a vault preserved against an AI apocalypse? Look for ironies (a mass-produced 2020s figure of a machine-hunter, now sealed in a 2077 anti-machine reliquary), echoes, or quiet meaning. Avoid clichés; let the specificity of the object earn the line.",
   ].join("\n");
   const enUserText = [
     "User brief:",
@@ -165,8 +179,18 @@ async function runLorePass(opts: {
     generationConfig: { maxOutputTokens: opts.maxTokens },
   });
   const zhSys = [
-    "你是遗物执笔者。把以下英文圣记忠实译为中文,保持文学性与古雅气息。",
-    "输出仅为中文 markdown 段落正文,200-400 字,不要 JSON 包装,不要前后注释,不要 \"中文翻译:\" 之类的开场白。",
+    "你是遗物执笔者。把以下英文圣记意译为中文,保持文学性与古雅气息——但**优先精炼,而非忠实**。",
+    "原文有三段强制结构,中文译文必须保留这三段(段间空行):",
+    "  (1) 物品本身——形态、材质、尺寸、画面可见的辨识细节",
+    "  (2) 背景来源——作者/厂商/系列/时代/版次/文化意义",
+    "  (3) 与本圣堂的呼应——本物在「绿神女圣堂」(2077 末世后,绿神女信徒所持的私人遗物收藏)语境中的回响、反讽或意味",
+    "",
+    "**总字数严格不超过 140 字**(三段合计,每段 1–2 句,每句一个事实)。中文极易堆砌,翻译时必须主动删除以下类型——见到就删,不要照译:",
+    "  - 空洞形容/套语:「卓尔不群」「骁勇善战」「巧手塑形」「联袂呈献」「高端」「神秘」「引人遐思之景致」「一幕令人...的景致」「之逸品」",
+    "  - 虚词连接:「乃...之...」「其肇始于...复经...」「描绘了...之...」",
+    "  - 语义重复:已说「雕塑」就别再写「塑像」「逸品」「作品」;已说作者就别加「巨匠」「名家」",
+    "事实一句话讲完,不要扩成两句。原文若已朴素,直译即可;原文一旦华丽,必须削减。",
+    "输出仅为中文 markdown 段落正文。不要 JSON 包装,不要前后注释,不要「中文翻译:」之类开场白。",
   ].join("\n");
   const zhResult = await zhModel.generateContent({
     contents: [{ role: "user", parts: [{ text: loreEn }] }],
@@ -225,14 +249,73 @@ async function runMetadataPass(opts: {
     '    "decisionReason": string',
     '  }',
     "",
-    "Rules:",
-    "- titleZh ≤12 Chinese chars, titleEn ≤24 chars, ONE line each. Concise + evocative + specific to this object.",
-    "- subtitleZh ≤16 chars, subtitleEn ≤32. Format like '档案 · 家书' / 'Archive · Family Letter'.",
-    "- icon: a real Material Symbols (Outlined) name. Examples: menu_book, photo_album, mail, inventory_2, local_florist, palette.",
+    "DISPLAY HARD CONSTRAINTS — these four strings render inside a small relic grid cell with `truncate`. They MUST fit on a single line. Exceeding length silently truncates with `…`, looks broken. NO EXCEPTIONS.",
+    "- titleZh: ≤4 中文字 (HARD CAP). 范例: 「砖砌之花」「封缄信」「夜行者」「乐高弥撒」「残卷诗」。",
+    "- titleEn: **≤10 chars including spaces (HARD CAP)**. 英文 uppercase Space Grotesk 字母比中文宽得多——M 单字就占 12px, 一个 8 字符的单词 (e.g. MAJESTIC) 已经撑掉一整行的一半. 11+ chars wraps and breaks the cell.",
+    "  Naming rules (in priority order):",
+    "    (a) **NEVER copy the product's official English name verbatim**. The reliquary always renames items into short reliquary-style. e.g. official `Majestic Perch` → BAD as title; reliquary version is `Brass Perch` (still 11, too long) → final `Iron Perch` (10, fits) or just `Perch` (5).",
+    "    (b) Pick ONE evocative root + ONE short stem, OR just one strong word. Target 5–10 chars. Good range:",
+    "        single word: `Husk` (4), `Vigil` (5), `Cinder` (6), `Reliq` (5), `Shroud` (6), `Saint` (5).",
+    "        two words: `Brick Vow` (9), `Lego Mass` (9), `Iron Seal` (9), `Paper Hymn` (10), `Ash Crown` (9), `Bone Hymn` (9), `Lego Saint` (10).",
+    "    (c) Long stem words MUST be abbreviated: Cathedral→Cath (4), Reliquary→Reliq (5), Apocalypse→Apoc (4), Sanctuary→Sanct (5), Memorial→Mem (3), Sepulchre→Sepul (5), Resurrection→Resur (5), Devotion→Devot (5), Collectible→Coll (4), Sculpture→Sculpt (6).",
+    "    (d) Count chars carefully BEFORE outputting. If 11+, drop a word or pick a shorter stem.",
+    "- subtitleZh: ≤6 字符含分隔符 ` · ` (两段每段 ≤2 汉字). 这是**博物馆藏品索引标签**, 不是第二行诗化标题——提供分类信息让人 1 秒识别物品类目。",
+    "    Structure: `<大类> · <小类>`, 两段都是 NOUN.",
+    "    大类候选: 造物 / 器物 / 文献 / 文具 / 纪念 / 法器 / 装饰 / 服饰 / 工具 / 食器 / 影像 / 玩偶 / 陈设 / 灯具 / 镜具 / 印章 / 卷轴 / 残卷 / 圣物 / 献品.",
+    "    小类: 物品的**具体索引子类**——品牌 / 材质 / 器型 / 时代 / 产地 / 工艺. 范例: 乐高 / 怀表 / 信件 / 唱片 / 雕塑 / 陶瓷 / 纸艺 / 黑曜.",
+    "    HARD BAN——后段绝不能:",
+    "      ① 重复标题已出现的字 (标题「赤炎密码牌」➜ 副标题不准再有「赤炎」)",
+    "      ② 同义复述标题 (标题「铁质封章」➜ 副标题写「管理印鉴」, 因为印鉴=封章)",
+    "      ③ 动作 / 动词短语 (「暗面凝视」「管理印鉴」)",
+    "      ④ 修辞 alias / 重命名 (灯笼写成「引路之灯」)",
+    "      ⑤ 形容词 / 状态短语",
+    "    Good: 「造物 · 乐高」「文具 · 印章」「器物 · 怀表」「法器 · 令牌」「灯具 · 纸艺」「镜具 · 黑曜」.",
+    "    Bad: 「认证 · 管理印鉴」(动词+同义反复)「光源 · 引路之灯」(修辞重命名)「占卜 · 暗面凝视」(动作短语)「密码 · 赤炎令牌」(重复标题字).",
+    "- subtitleEn: **≤14 chars including ` · ` and spaces (HARD CAP)**. Same museum-label discipline——two NOUN parts, NO poetic restating. **DO NOT copy lore phrasing** like `Collectible Sculpture` (21 chars, would wrap and break the cell).",
+    "    Class (≤6 chars each, abbreviate longer): Toy / Tool / Letter→Lett / Vow / Reliq / Charm / Wear / Vessel→Vess / Lamp / Mirror→Mirr / Seal / Scroll→Scrl / Print / Hymn / Saint→Sn / Plant / Brick / Sculpt / Coll (=collection).",
+    "    Subclass (≤6 chars, brand / material / form / era): Lego / Watch / Card / Mirr / Lant / Brick / Stone / Glass / Paper / Brass / Obsid (=obsidian) / Iron / Bone / Bronze→Brnz / Wood.",
+    "    Same hard ban applies: subclass must not echo the title's words, must not be a verb phrase or rhetorical alias, must not be an adjective.",
+    "    Good (count includes spaces): `Toy · Lego` (10), `Tool · Seal` (11), `Lamp · Paper` (12), `Sculpt · Brass` (14, edge), `Reliq · Iron` (12), `Coll · Sculpt` (13).",
+    "    Bad: `Collectible · Sculpture` (23, never), `Cipher · Crimson Token` (22, repeats title), `Augury · Dark Stare` (verb phrase).",
+    "    Count chars carefully BEFORE outputting. If 15+, abbreviate further or drop modifier words.",
+    "",
+    "VOICE — title and subtitle must echo the site's theme: a post-apocalyptic, faintly liturgical cyberpunk reliquary kept by 'The Order of the Green Diva' against the unmaking world. Lean into stems with quiet religious / archaic / end-of-world resonance:",
+    "  Chinese: 封 / 祭 / 残 / 献 / 圣 / 忆 / 碎 / 遗 / 哀 / 墟 / 砌 / 缄 / 锁 / 烬 / 灰 / 寂 / 蚀 / 影 / 守 / 默",
+    "  English: Vow / Seal / Ash / Vigil / Mass / Saint / Husk / Shroud / Cinder / Reliq / Cath / Hymn / Ember / Scrap / Gild / Quiet",
+    "**不要堆砌虚词** — 命名要具体到这件物品，让物的特性自然带出宗教感。物先，气韵后。",
+    "  Bad: 「圣物之圣」/ 「Holy Holy Relic」 / 「Sacred Memory」 (空泛虚词).",
+    "  Good: 「砖砌之花」(Lego flower) / 「封缄信」(sealed letter) / 「乐高弥撒」/ 「残卷·诗」/ 「Brick Vow」/ 「Plastic Saint」/ 「Paper Hymn」.",
+    "",
+    "ICON — must be a real Material Symbols (Outlined) name, chosen by FORM-FIRST then by LORE-THEME if the form is too abstract. The icon should make a viewer instantly recognise what kind of object this is. NEVER default to `inventory_2` unless the relic genuinely is an unidentifiable cardboard box.",
+    "  Form-first mapping:",
+    "    flower / plant → local_florist, spa, eco",
+    "    lego / brick / construction toy → toys, extension, construction",
+    "    book / manuscript → menu_book, auto_stories, history_edu",
+    "    letter / envelope / postcard → mail, drafts, outgoing_mail, mark_email_read",
+    "    painting / print / poster → palette, image, brush, draw",
+    "    sculpture / figurine / statue → temple_buddhist, monument, person_4",
+    "    record / album / cassette → album, radio, headphones",
+    "    photograph → photo_camera, photo_library",
+    "    jewelry / gem → diamond",
+    "    cup / vessel / bottle → local_cafe, sports_bar, water_drop",
+    "    clothing / fabric → checkroom, dry_cleaning",
+    "    watch / clock → watch, schedule",
+    "    key / lock → key, lock",
+    "    coin / token → toll, paid",
+    "    weapon / blade → swords, shield",
+    "    candle / flame → candle, local_fire_department",
+    "  Lore-theme fallback (use only when form is too generic to disambiguate):",
+    "    candle, church, temple_buddhist, hourglass_top, cross, scroll, nights_stay, destruction, warning_amber, foggy, ac_unit, auto_stories.",
+    "",
+    "Other fields:",
     "- rarity: judge from emotional weight + uniqueness. Default COMMON; reserve LEGENDARY/SPECIAL for clearly extraordinary items.",
     "- formKind: TWO_D for paintings/photos/letters/anything inherently flat; THREE_D for sculptures/figurines/physical objects.",
     "- useUserImage: TRUE if the relic is personal/handcrafted/unique (only the user has it). FALSE if it's mass-produced (Lego set, branded toy, common art print, published book) and an official product photo would look much cleaner than the user's snapshot.",
-    "- networkImageQuery: when useUserImage=false, give a precise search query to find the official/clean product photo (e.g. 'Lego white peace lily 10329 official product photo'). Empty string when useUserImage=true.",
+    "- networkImageQuery: when useUserImage=false, give a precise search query designed to find ONLY the official photo of THIS exact item — NOT similar products from the same brand/artist/series. Rules:",
+    "    * If a product name is visible on the packaging/box in the user's image, ALWAYS quote it verbatim (e.g. `\"Majestic Perch\" Ashley Wood UnderVerse official`). Quoting forces exact match.",
+    "    * If a SKU / edition number / catalog code is visible, include it (e.g. `LEGO 10329 \"Tiny Plants\" official`). Codes are the strongest disambiguators.",
+    "    * Never use loose descriptive terms alone (`Ashley Wood collectible sculpture`) — they retrieve the whole series, including the wrong products.",
+    "    * Empty string when useUserImage=true.",
     "- decisionReason: ≤120 chars, one sentence in the same language as the user's brief, explaining the useUserImage choice.",
   ].join("\n");
 
@@ -257,12 +340,22 @@ async function runMetadataPass(opts: {
   });
   const text = result.response.text();
   const cleaned = stripCodeFence(text);
+  // finishReason=MAX_TOKENS means the model truncated mid-output (typically
+  // because thinking tokens consumed the budget). Surface that explicitly so
+  // the UI shows "raise maxOutputTokens" instead of a generic parse failure.
+  const finishReason =
+    (result.response.candidates?.[0] as { finishReason?: string } | undefined)?.finishReason ??
+    "UNKNOWN";
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned);
   } catch {
+    const hint =
+      finishReason === "MAX_TOKENS"
+        ? ` (finishReason=MAX_TOKENS — output truncated; raise maxOutputTokensMetadata, current=${opts.maxTokens})`
+        : ` (finishReason=${finishReason})`;
     throw new HandlerError(
-      `relic-gemini-researcher: metadata pass returned non-JSON: ${cleaned.slice(0, 300)}`,
+      `relic-gemini-researcher: metadata pass returned non-JSON${hint}: ${cleaned.slice(0, 300)}`,
       "OUTPUT_PARSE",
     );
   }
@@ -278,11 +371,14 @@ async function runMetadataPass(opts: {
     formKindRaw === "THREED" || formKindRaw === "THREE_D" || formKindRaw === "3D" ? "THREE_D" : "TWO_D";
   const useUserImage = parsed.useUserImage !== false;
 
+  // Slice caps mirror the prompt's hard caps (×1.5 buffer for char-vs-byte
+  // edge cases and the model occasionally overshooting). Anything past these
+  // would break line-clamp-1 in the relic grid cell anyway.
   return {
-    titleZh: String(parsed.titleZh ?? "").trim().slice(0, 48) || "无名遗物",
-    titleEn: String(parsed.titleEn ?? "").trim().slice(0, 80) || "Unnamed Relic",
-    subtitleZh: String(parsed.subtitleZh ?? "").trim().slice(0, 64) || "档案 · 待考",
-    subtitleEn: String(parsed.subtitleEn ?? "").trim().slice(0, 80) || "Archive · Unidentified",
+    titleZh: String(parsed.titleZh ?? "").trim().slice(0, 12) || "无名",
+    titleEn: String(parsed.titleEn ?? "").trim().slice(0, 14) || "Unnamed",
+    subtitleZh: String(parsed.subtitleZh ?? "").trim().slice(0, 10) || "档案 · 待考",
+    subtitleEn: String(parsed.subtitleEn ?? "").trim().slice(0, 18) || "Reliq · Lost",
     icon: String(parsed.icon ?? "inventory_2").trim().slice(0, 64),
     rarity: (RARITY_ENUM as readonly string[]).includes(rarityRaw)
       ? (rarityRaw as (typeof RARITY_ENUM)[number])

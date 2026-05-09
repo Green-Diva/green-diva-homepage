@@ -45,6 +45,7 @@ export type HandlerKind = "HTTP_API" | "LLM_PROMPT" | "MCP_SERVER" | "INTERNAL";
 
 export interface SkillRow {
   id: string;
+  slug: string | null;
   level: number;
   icon: string;
   nameEn: string;

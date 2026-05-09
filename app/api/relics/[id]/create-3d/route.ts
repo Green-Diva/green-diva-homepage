@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { recordRelicLog } from "@/lib/relicLog";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
 
 const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
@@ -19,8 +20,9 @@ const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
+  let me;
   try {
-    await requireAdmin();
+    me = await requireAdmin();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -29,7 +31,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const relic = await prisma.relic.findUnique({
     where: { id },
-    select: { id: true, slug: true, enhancedImagePath: true, modelPath: true },
+    select: { id: true, slug: true, nameEn: true, enhancedImagePath: true, modelPath: true },
   });
   if (!relic) return NextResponse.json({ error: "relic not found" }, { status: 404 });
   if (!relic.enhancedImagePath) {
@@ -70,6 +72,13 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     console.error("[api/relics/create-3d] create job failed", e);
     return NextResponse.json({ error: "enqueue failed" }, { status: 500 });
   }
+
+  await recordRelicLog({
+    action: "PROCESSING_STARTED",
+    relic: { id: relic.id, slug: relic.slug, name: relic.nameEn || relic.slug },
+    actor: { id: me.id, name: me.name },
+    details: { phase: "3d", jobId: job.id },
+  });
 
   void runAgentJob(job.id);
 

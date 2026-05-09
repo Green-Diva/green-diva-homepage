@@ -334,12 +334,26 @@ export async function runBackbone(opts: {
   agentId: string;
   input: unknown;
   pipelineConfig: unknown;
+  // Streaming hook: invoked after each node settles (success / fail / skip)
+  // with the current cumulative runLog. Lets the caller persist intermediate
+  // progress (e.g. RelicDraft.progress + pipelineTrace) so UIs don't sit at
+  // the same percentage for the duration of a long step. Errors thrown by
+  // the callback are swallowed — progress reporting must never break a run.
+  onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
 }): Promise<AgentRunResult> {
   const v = validateAndNormalize(opts.pipelineConfig);
   if (!v.ok) {
     return { ok: false, errorCode: v.code, errorMessage: v.message, runLog: [] };
   }
   const config = v.config;
+  const emitProgress = async () => {
+    if (!opts.onProgress) return;
+    try {
+      await opts.onProgress({ runLog });
+    } catch (e) {
+      console.warn("[backbone] onProgress threw, swallowing", e);
+    }
+  };
 
   const equips = await prisma.agentSkillEquip.findMany({
     where: { agentId: opts.agentId, slotIndex: { not: null } },
@@ -449,6 +463,7 @@ export async function runBackbone(opts: {
         ok: true,
         skipped: true,
       });
+      await emitProgress();
       continue;
     }
 
@@ -502,6 +517,7 @@ export async function runBackbone(opts: {
         output: invokeResult.output,
       });
       for (const e of config.edges) if (e.from === id) liveEdges.add(edgeKey(e));
+      await emitProgress();
     } else {
       const branchInput = resolveRef(node.inputFrom);
       let chosenLabel: string | undefined;
@@ -543,6 +559,7 @@ export async function runBackbone(opts: {
       for (const e of config.edges) {
         if (e.from === id && e.when === chosenLabel) liveEdges.add(edgeKey(e));
       }
+      await emitProgress();
     }
   }
 

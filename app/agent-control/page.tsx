@@ -67,6 +67,7 @@ export default async function AgentControlPage() {
 
   const skills: SkillRow[] = skillsRaw.map((s) => ({
     id: s.id,
+    slug: s.slug,
     level: s.level,
     icon: s.icon,
     nameEn: s.nameEn,
@@ -92,6 +93,7 @@ export default async function AgentControlPage() {
       skillId: r.skillId,
       skill: {
         id: r.skill.id,
+        slug: r.skill.slug,
         level: r.skill.level,
         icon: r.skill.icon,
         nameEn: r.skill.nameEn,

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { SkillRow, HandlerKind } from "../types";
-import type { AgentSkillKind } from "@/lib/agentTypes";
 
 type Props = {
   mode: "create" | "edit";
@@ -15,68 +14,27 @@ type Props = {
   onSaved: () => void;
 };
 
-const KIND_OPTIONS: AgentSkillKind[] = ["PASSIVE", "ACTIVE", "ULTIMATE"];
-const LEVEL_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
-const HANDLER_KIND_OPTIONS: HandlerKind[] = ["HTTP_API", "LLM_PROMPT", "MCP_SERVER", "INTERNAL"];
+const HANDLER_KIND_OPTIONS: HandlerKind[] = ["INTERNAL", "HTTP_API", "LLM_PROMPT", "MCP_SERVER"];
 const STATUS_OPTIONS = ["ONLINE", "OFFLINE"] as const;
 
-// Templates seeded into handlerConfig when admin first picks a handlerKind.
-// Documents the expected shape better than a blank object.
-const HANDLER_CONFIG_TEMPLATE: Record<HandlerKind, string> = {
-  HTTP_API: JSON.stringify(
-    {
-      method: "POST",
-      url: "https://api.example.com/v1/endpoint",
-      authEnv: "EXAMPLE_API_KEY",
-      headers: {},
-      bodyTemplate: { prompt: "{{prompt}}" },
-    },
-    null,
-    2,
-  ),
-  LLM_PROMPT: JSON.stringify(
-    {
-      provider: "anthropic",
-      model: "claude-opus-4-7",
-      systemPrompt: "You are a helpful assistant.",
-      userTemplate: "{{prompt}}",
-      maxTokens: 1024,
-      temperature: 1.0,
-    },
-    null,
-    2,
-  ),
-  MCP_SERVER: JSON.stringify(
-    {
-      serverUrl: "https://mcp.example.com",
-      toolName: "tool-name",
-      authEnv: "MCP_API_KEY",
-    },
-    null,
-    2,
-  ),
-  INTERNAL: JSON.stringify(
-    {
-      handler: "<slug-registered-in-internalHandlers>",
-    },
-    null,
-    2,
-  ),
-};
+// Internal handler slugs registered in lib/skills/handlers/internal/index.ts.
+// Hardcoded here on purpose — adding a new internal handler is a code commit
+// (CLAUDE.md "no ZIP plugins"), so the dropdown stays in lockstep manually.
+const INTERNAL_HANDLER_SLUGS = [
+  "relic-files-summary",
+  "relic-gemini-researcher",
+  "relic-smart-image-pick",
+  "relic-cutout",
+  "meshy-3d",
+  "relic-image-pick",
+] as const;
 
-const SCHEMA_TEMPLATE = JSON.stringify(
-  {
-    type: "object",
-    required: ["prompt"],
-    properties: {
-      prompt: { type: "string" },
-    },
-  },
-  null,
-  2,
-);
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+const LLM_PROVIDERS = ["anthropic", "openai"] as const;
 
-const SAMPLE_INPUT_TEMPLATE = JSON.stringify({ prompt: "Hello world" }, null, 2);
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
 
 function jsonOrNull(s: string): { ok: true; value: unknown } | { ok: false; error: string } {
   const trimmed = s.trim();
@@ -90,36 +48,46 @@ function jsonOrNull(s: string): { ok: true; value: unknown } | { ok: false; erro
 
 function blank(initial?: SkillRow | null) {
   return {
+    slug: initial?.slug ?? "",
     level: String(initial?.level ?? 1),
     icon: initial?.icon ?? "",
     nameEn: initial?.nameEn ?? "",
     nameZh: initial?.nameZh ?? "",
-    kind: (initial?.kind ?? "PASSIVE") as AgentSkillKind,
     status: (initial?.status ?? "OFFLINE") as "ONLINE" | "OFFLINE",
-    costAp: String(initial?.costAp ?? 0),
     descriptionEn: initial?.descriptionEn ?? "",
     descriptionZh: initial?.descriptionZh ?? "",
     handlerKind: (initial?.handlerKind ?? "INTERNAL") as HandlerKind,
-    handlerConfig: initial?.handlerConfig
-      ? JSON.stringify(initial.handlerConfig, null, 2)
-      : HANDLER_CONFIG_TEMPLATE[initial?.handlerKind ?? "INTERNAL"],
     inputSchema: initial?.inputSchema ? JSON.stringify(initial.inputSchema, null, 2) : "",
     outputSchema: initial?.outputSchema ? JSON.stringify(initial.outputSchema, null, 2) : "",
   };
 }
 
-type TestResult =
-  | { kind: "idle" }
-  | { kind: "running" }
-  | { kind: "ok"; output: unknown; durationMs: number }
-  | {
-      kind: "err";
-      errorCode: string;
-      errors: string[];
-      output?: unknown;
-      schemaErrors?: { input?: string[]; output?: string[] };
-      durationMs?: number;
-    };
+const SCHEMA_TEMPLATE = JSON.stringify(
+  {
+    type: "object",
+    required: ["prompt"],
+    properties: {
+      prompt: { type: "string" },
+    },
+  },
+  null,
+  2,
+);
+
+// Pull a string value from a config object, defaulting to "" so it slots
+// straight into a controlled <input>.
+function s(cfg: Record<string, unknown>, key: string): string {
+  const v = cfg[key];
+  return typeof v === "string" ? v : "";
+}
+function n(cfg: Record<string, unknown>, key: string): string {
+  const v = cfg[key];
+  return typeof v === "number" ? String(v) : "";
+}
+function pretty(v: unknown): string {
+  if (v === undefined || v === null) return "";
+  return JSON.stringify(v, null, 2);
+}
 
 export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) {
   const t = useT();
@@ -127,8 +95,16 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
   const [v, setV] = useState(() => blank(initial));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [sampleInput, setSampleInput] = useState(SAMPLE_INPUT_TEMPLATE);
-  const [test, setTest] = useState<TestResult>({ kind: "idle" });
+
+  // handlerConfig is stored as a single source-of-truth Record. Structured
+  // fields and the "Advanced (raw JSON)" textarea both edit the same object;
+  // toggling between them serializes / parses on demand.
+  const [config, setConfig] = useState<Record<string, unknown>>(
+    isObject(initial?.handlerConfig) ? (initial!.handlerConfig as Record<string, unknown>) : {},
+  );
+  const [advanced, setAdvanced] = useState(false);
+  const [advDraft, setAdvDraft] = useState("");
+
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -152,16 +128,71 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
     setV((s) => ({ ...s, [key]: val }));
   }
 
+  function setCfgField(key: string, value: unknown) {
+    setConfig((c) => {
+      const next = { ...c };
+      // Empty string / undefined / NaN drops the key entirely so we don't
+      // emit garbage like {"systemPrompt": ""} into handlerConfig.
+      if (value === "" || value === undefined || (typeof value === "number" && Number.isNaN(value))) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+      return next;
+    });
+  }
+
+  function setCfgJsonField(key: string, jsonStr: string) {
+    if (!jsonStr.trim()) {
+      setCfgField(key, undefined);
+      return;
+    }
+    const parsed = jsonOrNull(jsonStr);
+    if (parsed.ok) setCfgField(key, parsed.value);
+    // If invalid we still update local input via separate state below; keep
+    // config intact so we don't lose previous valid value.
+  }
+
+  function toggleAdvanced() {
+    if (!advanced) {
+      setAdvDraft(JSON.stringify(config, null, 2));
+      setAdvanced(true);
+    } else {
+      const parsed = jsonOrNull(advDraft);
+      if (!parsed.ok) {
+        setErr(`Advanced JSON: ${parsed.error}`);
+        return;
+      }
+      if (parsed.value !== null && !isObject(parsed.value)) {
+        setErr("Advanced JSON must be an object");
+        return;
+      }
+      setConfig((parsed.value as Record<string, unknown>) ?? {});
+      setErr(null);
+      setAdvanced(false);
+    }
+  }
+
+  // When admin switches handlerKind, clear config of fields that no longer
+  // apply. Keep admin-edited "_notes" / unknown keys so advanced state isn't
+  // accidentally wiped.
   function onHandlerKindChange(next: HandlerKind) {
-    setV((s) => {
-      // Replace handlerConfig with the template when user switches kinds *and*
-      // the previous handlerConfig is empty or matches a template (heuristic:
-      // user hasn't customized it yet). Otherwise preserve their edits.
-      const cur = s.handlerConfig.trim();
-      const isTemplate = Object.values(HANDLER_CONFIG_TEMPLATE).some((t) => t.trim() === cur);
-      const isEmpty = cur === "" || cur === "{}";
-      const handlerConfig = isTemplate || isEmpty ? HANDLER_CONFIG_TEMPLATE[next] : s.handlerConfig;
-      return { ...s, handlerKind: next, handlerConfig };
+    setV((s) => ({ ...s, handlerKind: next }));
+    // Wipe known kind-specific keys so the form starts clean. Other keys
+    // (custom user additions) survive.
+    const stripKeys = new Set([
+      "handler", "method", "url", "authEnv", "authScheme", "authHeader",
+      "headers", "bodyTemplate", "queryTemplate", "responseType", "timeoutMs",
+      "provider", "model", "systemPrompt", "userTemplate", "maxTokens",
+      "temperature", "responseFormat", "imagePathsField",
+      "serverUrl", "toolName",
+    ]);
+    setConfig((c) => {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(c)) {
+        if (!stripKeys.has(k)) out[k] = val;
+      }
+      return out;
     });
   }
 
@@ -170,12 +201,22 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
     setBusy(true);
     setErr(null);
 
-    const cfg = jsonOrNull(v.handlerConfig);
-    if (!cfg.ok) {
-      setErr(`handlerConfig: ${cfg.error}`);
-      setBusy(false);
-      return;
+    let finalConfig: Record<string, unknown> = config;
+    if (advanced) {
+      const parsed = jsonOrNull(advDraft);
+      if (!parsed.ok) {
+        setErr(`Advanced JSON: ${parsed.error}`);
+        setBusy(false);
+        return;
+      }
+      if (parsed.value !== null && !isObject(parsed.value)) {
+        setErr("Advanced JSON must be an object");
+        setBusy(false);
+        return;
+      }
+      finalConfig = (parsed.value as Record<string, unknown>) ?? {};
     }
+
     const inSchema = jsonOrNull(v.inputSchema);
     if (!inSchema.ok) {
       setErr(`inputSchema: ${inSchema.error}`);
@@ -189,21 +230,22 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
       return;
     }
 
-    const body = {
+    const slugTrimmed = v.slug.trim();
+    const body: Record<string, unknown> = {
       level: Number(v.level),
       icon: v.icon.trim(),
       nameEn: v.nameEn.trim(),
       nameZh: v.nameZh.trim(),
-      kind: v.kind,
       status: v.status,
-      costAp: Number(v.costAp),
       descriptionEn: v.descriptionEn.trim(),
       descriptionZh: v.descriptionZh.trim(),
       handlerKind: v.handlerKind,
-      handlerConfig: cfg.value ?? {},
+      handlerConfig: finalConfig,
       inputSchema: inSchema.value,
       outputSchema: outSchema.value,
     };
+    if (slugTrimmed) body.slug = slugTrimmed;
+
     const url = mode === "create" ? "/api/skills" : `/api/skills/${initial?.id}`;
     const method = mode === "create" ? "POST" : "PATCH";
     const r = await fetch(url, {
@@ -235,55 +277,13 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
     onClose();
   }
 
-  async function onTestInvoke() {
-    if (!initial) {
-      setTest({ kind: "err", errorCode: "NOT_SAVED", errors: ["Save the skill first, then test."] });
-      return;
-    }
-    const inp = jsonOrNull(sampleInput);
-    if (!inp.ok) {
-      setTest({ kind: "err", errorCode: "INVALID_INPUT_JSON", errors: [`sample input: ${inp.error}`] });
-      return;
-    }
-    setTest({ kind: "running" });
-    try {
-      const r = await fetch(`/api/skills/${initial.id}/test-invoke`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: inp.value }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setTest({
-          kind: "err",
-          errorCode: "HTTP_" + r.status,
-          errors: [typeof data.error === "string" ? data.error : "request failed"],
-        });
-        return;
-      }
-      if (data.ok) {
-        setTest({ kind: "ok", output: data.output, durationMs: data.durationMs ?? 0 });
-      } else {
-        setTest({
-          kind: "err",
-          errorCode: data.errorCode ?? "UNKNOWN",
-          errors: data.errors ?? [],
-          output: data.output,
-          schemaErrors: data.schemaErrors,
-          durationMs: data.durationMs,
-        });
-      }
-    } catch (e) {
-      setTest({ kind: "err", errorCode: "CLIENT_ERROR", errors: [e instanceof Error ? e.message : "fetch threw"] });
-    }
-  }
-
   const inputCls =
     "w-full bg-surface-variant/30 border border-primary/20 rounded px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/60 focus:bg-surface-variant/50 transition-colors";
   const codeCls = inputCls + " font-mono text-[11px] resize-y";
   const labelCls = "font-label text-[10px] tracking-[0.25em] text-primary/70 uppercase mb-1 block";
   const sectionCls = "border-t border-primary/15 pt-4";
   const sectionTitleCls = "font-label text-[11px] tracking-[0.3em] text-secondary/80 uppercase mb-3";
+  const helpCls = "font-label text-[9px] tracking-[0.15em] text-on-surface-variant/60 mt-1";
 
   return createPortal(
     <div
@@ -323,29 +323,14 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                   className={inputCls}
                   required
                 >
-                  {LEVEL_OPTIONS.map((n) => (
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>
                       LV.{n}
                     </option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className={labelCls}>Kind (badge)</label>
-                <select
-                  value={v.kind}
-                  onChange={(e) => upd("kind", e.target.value as AgentSkillKind)}
-                  className={inputCls}
-                  required
-                >
-                  {KIND_OPTIONS.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
+              <div className="col-span-2">
                 <label className={labelCls}>Status</label>
                 <select
                   value={v.status}
@@ -362,29 +347,32 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelCls}>Icon (Material Symbol)</label>
-                <input
-                  type="text"
-                  value={v.icon}
-                  onChange={(e) => upd("icon", e.target.value)}
-                  className={inputCls}
-                  placeholder="psychology"
-                  required
-                />
-              </div>
-              <div>
-                <label className={labelCls}>AP Cost</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={99}
-                  value={v.costAp}
-                  onChange={(e) => upd("costAp", e.target.value)}
-                  className={inputCls}
-                />
-              </div>
+            <div>
+              <label className={labelCls}>Slug (machine ID)</label>
+              <input
+                type="text"
+                value={v.slug}
+                onChange={(e) => upd("slug", e.target.value)}
+                className={inputCls + " font-mono text-[12px]"}
+                placeholder={mode === "create" ? "(auto-derived from Name EN)" : ""}
+                pattern="[a-z0-9][a-z0-9-]*[a-z0-9]"
+              />
+              <p className={helpCls}>
+                Stable kebab-case ID — used as LLM tool name. Don&apos;t rename casually; old
+                tool_use history breaks. Leave blank on create to derive from Name EN.
+              </p>
+            </div>
+
+            <div>
+              <label className={labelCls}>Icon (Material Symbol)</label>
+              <input
+                type="text"
+                value={v.icon}
+                onChange={(e) => upd("icon", e.target.value)}
+                className={inputCls}
+                placeholder="psychology"
+                required
+              />
             </div>
 
             <div>
@@ -428,9 +416,21 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
 
             {/* ── Runtime: Handler ─────────────────────────────────────── */}
             <div className={sectionCls}>
-              <h3 className={sectionTitleCls}>Runtime — Handler</h3>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className={sectionTitleCls + " mb-0"}>Runtime — Handler</h3>
+                <button
+                  type="button"
+                  onClick={toggleAdvanced}
+                  className="font-label text-[9px] tracking-[0.2em] uppercase text-on-surface-variant/70 hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {advanced ? "view_list" : "code"}
+                  </span>
+                  {advanced ? "Form view" : "Advanced (raw JSON)"}
+                </button>
+              </div>
               <div className="mb-3">
-                <label className={labelCls}>Handler Kind</label>
+                <label className={labelCls}>Handler Type</label>
                 <select
                   value={v.handlerKind}
                   onChange={(e) => onHandlerKindChange(e.target.value as HandlerKind)}
@@ -443,23 +443,43 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                     </option>
                   ))}
                 </select>
-                <p className="font-label text-[9px] tracking-[0.15em] text-on-surface-variant/60 mt-1">
+                <p className={helpCls}>
                   {v.handlerKind === "HTTP_API" && "REST endpoint. authEnv stays as env name; never paste keys."}
-                  {v.handlerKind === "LLM_PROMPT" && "LLM call. Phase 1: Anthropic only. OpenAI lands Phase 4."}
+                  {v.handlerKind === "LLM_PROMPT" && "LLM call. Anthropic + OpenAI supported."}
                   {v.handlerKind === "MCP_SERVER" && "Remote MCP agent. Placeholder until Phase 5."}
-                  {v.handlerKind === "INTERNAL" && "In-repo function dispatched by slug. Must be committed first."}
+                  {v.handlerKind === "INTERNAL" && "In-repo function dispatched by slug. Add new ones via PR."}
                 </p>
               </div>
-              <div>
-                <label className={labelCls}>Handler Config (JSON)</label>
-                <textarea
-                  rows={9}
-                  value={v.handlerConfig}
-                  onChange={(e) => upd("handlerConfig", e.target.value)}
-                  className={codeCls}
-                  spellCheck={false}
+
+              {advanced ? (
+                <div>
+                  <label className={labelCls}>Handler Config (raw JSON)</label>
+                  <textarea
+                    rows={10}
+                    value={advDraft}
+                    onChange={(e) => setAdvDraft(e.target.value)}
+                    className={codeCls}
+                    spellCheck={false}
+                  />
+                  <p className={helpCls}>
+                    Use this for fields not exposed by the form (e.g. <code>imagePathsField</code>,{" "}
+                    <code>queryTemplate</code>, <code>timeoutMs</code>). Keys named{" "}
+                    <code>apiKey</code>/<code>secret</code>/<code>token</code>/<code>password</code>{" "}
+                    are rejected — use <code>authEnv</code> instead.
+                  </p>
+                </div>
+              ) : (
+                <StructuredHandlerFields
+                  kind={v.handlerKind}
+                  config={config}
+                  setField={setCfgField}
+                  setJsonField={setCfgJsonField}
+                  inputCls={inputCls}
+                  codeCls={codeCls}
+                  labelCls={labelCls}
+                  helpCls={helpCls}
                 />
-              </div>
+              )}
             </div>
 
             {/* ── Schemas ───────────────────────────────────────────── */}
@@ -487,95 +507,13 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                   spellCheck={false}
                 />
               </div>
-            </div>
-
-            {/* ── Test Invoke ──────────────────────────────────────── */}
-            {mode === "edit" && (
-              <div className={sectionCls}>
-                <h3 className={sectionTitleCls}>Test Invoke</h3>
-                <p className="font-label text-[9px] tracking-[0.15em] text-on-surface-variant/60 mb-2">
-                  Save changes first, then run this against current saved config.
+              {mode === "edit" && (
+                <p className={helpCls + " mt-3"}>
+                  Use the <span className="text-primary/80">Test</span> button on the skill card to
+                  invoke against current saved config.
                 </p>
-                <label className={labelCls}>Sample Input (JSON)</label>
-                <textarea
-                  rows={4}
-                  value={sampleInput}
-                  onChange={(e) => setSampleInput(e.target.value)}
-                  className={codeCls}
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  onClick={onTestInvoke}
-                  disabled={test.kind === "running"}
-                  className="cyber-btn font-label text-[10px] tracking-[0.2em] uppercase min-h-[36px] px-4 mt-3 flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[14px]">play_arrow</span>
-                  {test.kind === "running" ? "Invoking…" : "Test Invoke"}
-                </button>
-
-                {test.kind !== "idle" && test.kind !== "running" && (
-                  <div className="mt-3 border border-primary/20 rounded p-3 bg-surface-variant/20 text-[11px]">
-                    {test.kind === "ok" ? (
-                      <>
-                        <p className="font-label text-[10px] tracking-[0.25em] text-primary uppercase">
-                          ✓ OK · {test.durationMs}ms
-                        </p>
-                        <pre className="mt-2 font-mono text-[11px] text-on-surface whitespace-pre-wrap break-all max-h-48 overflow-auto">
-                          {JSON.stringify(test.output, null, 2)}
-                        </pre>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-label text-[10px] tracking-[0.25em] text-error uppercase">
-                          ✗ {test.errorCode}
-                          {test.durationMs !== undefined ? ` · ${test.durationMs}ms` : ""}
-                        </p>
-                        <ul className="mt-2 list-disc list-inside text-error/80 text-[11px]">
-                          {test.errors.map((m, i) => (
-                            <li key={i}>{m}</li>
-                          ))}
-                        </ul>
-                        {test.schemaErrors?.input && test.schemaErrors.input.length > 0 && (
-                          <details className="mt-2">
-                            <summary className="font-label text-[9px] uppercase tracking-[0.2em] cursor-pointer">
-                              input schema violations
-                            </summary>
-                            <ul className="mt-1 list-disc list-inside text-on-surface-variant/80">
-                              {test.schemaErrors.input.map((m, i) => (
-                                <li key={i}>{m}</li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                        {test.schemaErrors?.output && test.schemaErrors.output.length > 0 && (
-                          <details className="mt-2">
-                            <summary className="font-label text-[9px] uppercase tracking-[0.2em] cursor-pointer">
-                              output schema violations
-                            </summary>
-                            <ul className="mt-1 list-disc list-inside text-on-surface-variant/80">
-                              {test.schemaErrors.output.map((m, i) => (
-                                <li key={i}>{m}</li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                        {test.output !== undefined && (
-                          <details className="mt-2">
-                            <summary className="font-label text-[9px] uppercase tracking-[0.2em] cursor-pointer">
-                              raw output
-                            </summary>
-                            <pre className="mt-1 font-mono text-[10px] whitespace-pre-wrap break-all max-h-32 overflow-auto">
-                              {JSON.stringify(test.output, null, 2)}
-                            </pre>
-                          </details>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
 
             {err && <p className="text-error text-sm">{err}</p>}
 
@@ -616,4 +554,249 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
     </div>,
     portal,
   );
+}
+
+// Structured handler config form — one section per HandlerKind. Anything
+// not covered here lives in the "Advanced (raw JSON)" view.
+function StructuredHandlerFields({
+  kind,
+  config,
+  setField,
+  setJsonField,
+  inputCls,
+  codeCls,
+  labelCls,
+  helpCls,
+}: {
+  kind: HandlerKind;
+  config: Record<string, unknown>;
+  setField: (key: string, value: unknown) => void;
+  setJsonField: (key: string, jsonStr: string) => void;
+  inputCls: string;
+  codeCls: string;
+  labelCls: string;
+  helpCls: string;
+}) {
+  if (kind === "INTERNAL") {
+    return (
+      <div>
+        <label className={labelCls}>Internal Handler</label>
+        <select
+          value={s(config, "handler")}
+          onChange={(e) => setField("handler", e.target.value)}
+          className={inputCls}
+          required
+        >
+          <option value="">— select —</option>
+          {INTERNAL_HANDLER_SLUGS.map((slug) => (
+            <option key={slug} value={slug}>
+              {slug}
+            </option>
+          ))}
+        </select>
+        <p className={helpCls}>Handler must be registered in lib/skills/handlers/internal/index.ts.</p>
+      </div>
+    );
+  }
+
+  if (kind === "HTTP_API") {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-[120px_1fr] gap-3">
+          <div>
+            <label className={labelCls}>Method</label>
+            <select
+              value={s(config, "method") || "POST"}
+              onChange={(e) => setField("method", e.target.value)}
+              className={inputCls}
+            >
+              {HTTP_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Endpoint URL</label>
+            <input
+              type="text"
+              value={s(config, "url")}
+              onChange={(e) => setField("url", e.target.value)}
+              className={inputCls + " font-mono text-[12px]"}
+              placeholder="https://api.example.com/v1/endpoint"
+              required
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Auth Env Name</label>
+          <input
+            type="text"
+            value={s(config, "authEnv")}
+            onChange={(e) => setField("authEnv", e.target.value)}
+            className={inputCls + " font-mono text-[12px]"}
+            placeholder="EXAMPLE_API_KEY"
+          />
+          <p className={helpCls}>Server-side env name only. Never paste the key here.</p>
+        </div>
+        <div>
+          <label className={labelCls}>Headers (JSON, optional)</label>
+          <textarea
+            rows={3}
+            defaultValue={pretty(config.headers)}
+            onChange={(e) => setJsonField("headers", e.target.value)}
+            className={codeCls}
+            placeholder={`{\n  "Accept": "application/json"\n}`}
+            spellCheck={false}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Body Template (JSON, optional)</label>
+          <textarea
+            rows={4}
+            defaultValue={pretty(config.bodyTemplate)}
+            onChange={(e) => setJsonField("bodyTemplate", e.target.value)}
+            className={codeCls}
+            placeholder={`{\n  "prompt": "{{prompt}}"\n}`}
+            spellCheck={false}
+          />
+          <p className={helpCls}>{`Supports {{var.path}} substitution from input.`}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "LLM_PROMPT") {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Provider</label>
+            <select
+              value={s(config, "provider") || "anthropic"}
+              onChange={(e) => setField("provider", e.target.value)}
+              className={inputCls}
+            >
+              {LLM_PROVIDERS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Model</label>
+            <input
+              type="text"
+              value={s(config, "model")}
+              onChange={(e) => setField("model", e.target.value)}
+              className={inputCls + " font-mono text-[12px]"}
+              placeholder="claude-opus-4-7"
+              required
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>System Prompt</label>
+          <textarea
+            rows={3}
+            value={s(config, "systemPrompt")}
+            onChange={(e) => setField("systemPrompt", e.target.value)}
+            className={inputCls + " resize-y"}
+            placeholder="You are a helpful assistant."
+          />
+        </div>
+        <div>
+          <label className={labelCls}>User Template</label>
+          <textarea
+            rows={3}
+            value={s(config, "userTemplate")}
+            onChange={(e) => setField("userTemplate", e.target.value)}
+            className={inputCls + " resize-y"}
+            placeholder="{{prompt}}"
+          />
+          <p className={helpCls}>{`{{var.path}} pulls fields from skill input. Omit to JSON-stringify whole input.`}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={labelCls}>Max Tokens</label>
+            <input
+              type="number"
+              min={1}
+              max={32000}
+              value={n(config, "maxTokens")}
+              onChange={(e) => setField("maxTokens", e.target.value === "" ? undefined : Number(e.target.value))}
+              className={inputCls}
+              placeholder="1024"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Temperature</label>
+            <input
+              type="number"
+              step={0.1}
+              min={0}
+              max={2}
+              value={n(config, "temperature")}
+              onChange={(e) => setField("temperature", e.target.value === "" ? undefined : Number(e.target.value))}
+              className={inputCls}
+              placeholder="(default)"
+            />
+            <p className={helpCls}>Opus 4.7+ rejects temperature — leave blank.</p>
+          </div>
+          <div>
+            <label className={labelCls}>Auth Env Name</label>
+            <input
+              type="text"
+              value={s(config, "authEnv")}
+              onChange={(e) => setField("authEnv", e.target.value)}
+              className={inputCls + " font-mono text-[12px]"}
+              placeholder="(per-provider default)"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "MCP_SERVER") {
+    return (
+      <div className="flex flex-col gap-3">
+        <div>
+          <label className={labelCls}>Server URL</label>
+          <input
+            type="text"
+            value={s(config, "serverUrl")}
+            onChange={(e) => setField("serverUrl", e.target.value)}
+            className={inputCls + " font-mono text-[12px]"}
+            placeholder="https://mcp.example.com"
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Tool Name</label>
+          <input
+            type="text"
+            value={s(config, "toolName")}
+            onChange={(e) => setField("toolName", e.target.value)}
+            className={inputCls + " font-mono text-[12px]"}
+            placeholder="tool-name"
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Auth Env Name</label>
+          <input
+            type="text"
+            value={s(config, "authEnv")}
+            onChange={(e) => setField("authEnv", e.target.value)}
+            className={inputCls + " font-mono text-[12px]"}
+            placeholder="MCP_API_KEY"
+          />
+        </div>
+        <p className={helpCls}>MCP_SERVER handler is a Phase 5 placeholder — config saved but not yet routed.</p>
+      </div>
+    );
+  }
+
+  return null;
 }

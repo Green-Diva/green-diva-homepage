@@ -21,9 +21,18 @@ export interface CellRelic {
   extractedByName?: string | null;
 }
 
+export type CellDraft = {
+  id: string;
+  status: "PENDING" | "RUNNING" | "READY_TO_REVIEW" | "FAILED" | "CANCELLED";
+  ownedByMe: boolean;
+};
+
 type Props = {
   slot: number;
   relic: CellRelic | null;
+  // Same-slot draft (RelicDraft row). Mutually exclusive with `relic` —
+  // either the slot is taken by a real relic or staged by a draft, never both.
+  draft: CellDraft | null;
   access: AccessResult | null;
   locale: Locale;
   t: Dictionary;
@@ -180,13 +189,17 @@ function CellInner({
       >
         {relic.iconKey || "inventory_2"}
       </span>
+      {/* truncate (overflow-hidden + ellipsis + whitespace-nowrap) — line-clamp-1
+          combined with absolute + translate occasionally lets a wrapped 2nd
+          line show through as visual overlap. truncate enforces single-line
+          hard, with `…` clipping if the prompt's char cap is breached. */}
       <span
-        className={"absolute left-2 right-2 top-[55%] -translate-y-1/2 block font-label text-[10px] tracking-[0.2em] uppercase line-clamp-1 leading-[1.35] text-center " + accentClass}
+        className={"absolute left-2 right-2 top-[55%] -translate-y-1/2 font-label text-[10px] tracking-[0.2em] uppercase truncate leading-[1.35] text-center " + accentClass}
       >
         {name}
       </span>
       <span
-        className={"absolute left-2 right-2 top-[70%] -translate-y-1/2 block font-label text-[9px] tracking-[0.2em] uppercase opacity-75 line-clamp-1 text-center " + accentClass}
+        className={"absolute left-2 right-2 top-[70%] -translate-y-1/2 font-label text-[9px] tracking-[0.2em] uppercase opacity-75 truncate text-center " + accentClass}
       >
         {classif}
       </span>
@@ -199,9 +212,91 @@ function CellInner({
   );
 }
 
-export default function VaultCell({ slot, relic, access, locale, t, isAdmin, canViewExtracted }: Props) {
+export default function VaultCell({ slot, relic, draft, access, locale, t, isAdmin, canViewExtracted }: Props) {
   const baseClasses =
     "relative bg-background/80 aspect-square min-h-[88px] lg:aspect-auto lg:min-h-0 flex items-center justify-center transition-all duration-300 group overflow-hidden";
+
+  // Draft branch — RelicDraft staged on this slot, no Relic yet. Visible to
+  // any admin (so other admins know the slot is taken), but only the
+  // originator can click in to continue the wizard.
+  if (!relic && draft) {
+    if (isAdmin && draft.ownedByMe) {
+      // Purple "draft cell". Status drives the icon + label + accent class.
+      const accent =
+        draft.status === "FAILED"
+          ? "border-error/60 text-error hover:shadow-[inset_0_0_18px_rgba(255,77,77,0.18)]"
+          : draft.status === "READY_TO_REVIEW"
+            ? "border-[#c79bff]/70 text-[#c79bff] hover:shadow-[inset_0_0_22px_rgba(199,155,255,0.30)]"
+            : "border-[#b59cff]/40 text-[#b59cff]/85 hover:shadow-[inset_0_0_18px_rgba(181,156,255,0.18)]";
+      const iconName =
+        draft.status === "FAILED"
+          ? "error"
+          : draft.status === "READY_TO_REVIEW"
+            ? "edit_note"
+            : "progress_activity";
+      const label =
+        draft.status === "FAILED"
+          ? t.relicCollection.cellDraftFailed
+          : draft.status === "READY_TO_REVIEW"
+            ? t.relicCollection.cellDraftReady
+            : t.relicCollection.cellDraftRunning;
+      return (
+        <EmptyCellAdminTrigger
+          slot={slot}
+          existingDraftId={draft.id}
+          ariaLabel={label}
+          className={
+            baseClasses +
+            " border " +
+            accent +
+            " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#c79bff]"
+          }
+        >
+          <CellOrnaments />
+          <span className="absolute top-1.5 left-2 font-label text-[10px] tracking-[0.2em] text-on-surface-variant/55">
+            {String(slot).padStart(3, "0")}
+          </span>
+          <span
+            className={
+              "material-symbols-outlined text-[26px] " +
+              (draft.status === "RUNNING" || draft.status === "PENDING"
+                ? "animate-spin"
+                : "")
+            }
+            style={
+              draft.status === "RUNNING" || draft.status === "PENDING"
+                ? { animationDuration: "2s" }
+                : undefined
+            }
+          >
+            {iconName}
+          </span>
+          <span className="absolute left-2 right-2 top-[70%] -translate-y-1/2 block font-label text-[9px] tracking-[0.2em] uppercase opacity-85 line-clamp-1 text-center">
+            {label}
+          </span>
+        </EmptyCellAdminTrigger>
+      );
+    }
+    // Other admins / non-admins: read-only "occupied" placeholder.
+    return (
+      <div
+        className={
+          baseClasses +
+          " border border-on-surface-variant/30 cursor-not-allowed select-none opacity-60"
+        }
+        aria-label={t.relicCollection.cellDraftRunning}
+        aria-disabled
+      >
+        <CellOrnaments />
+        <span className="absolute top-1.5 left-2 font-label text-[10px] tracking-[0.2em] text-on-surface-variant/55">
+          {String(slot).padStart(3, "0")}
+        </span>
+        <span className="font-label text-[10px] tracking-[0.3em] uppercase text-on-surface-variant/55 leading-tight text-center px-2">
+          {t.relicCollection.cellDraftRunning}
+        </span>
+      </div>
+    );
+  }
 
   if (!relic) {
     if (isAdmin) {

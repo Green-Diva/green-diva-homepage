@@ -64,12 +64,17 @@ export async function invokeAgent(opts: {
   // When absent, runtime reads the corresponding column from DB.
   pipelineConfigOverride?: unknown;
   dispatcherConfigOverride?: unknown;
+  // Streaming hook (MECHANICAL only): fires after each backbone node
+  // settles, lets the caller persist intermediate progress so long-running
+  // skills (e.g. 30s Gemini call) don't keep the UI stuck on one number.
+  onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
 }): Promise<AgentRunResult> {
   if (opts.mode === "MECHANICAL") {
     return runBackbone({
       agentId: opts.agent.id,
       input: opts.input,
       pipelineConfig: opts.pipelineConfigOverride ?? opts.agent.pipelineConfig,
+      onProgress: opts.onProgress,
     });
   }
   if (opts.mode === "AUTONOMOUS") {

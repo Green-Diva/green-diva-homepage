@@ -52,17 +52,20 @@ function validateDispatcherConfig(
   return { ok: true, config: cfg as unknown as DispatcherConfig };
 }
 
-// Stable, descriptive tool name from skill nameEn + cuid suffix.
-// Both providers require [a-zA-Z0-9_-] (Anthropic <=64, OpenAI <=64),
-// so snake_case + 6-char id suffix stays well under the cap.
+// Stable LLM tool name. Prefers the explicit Skill.slug column (kebab-case,
+// admin-controlled) so renaming nameEn doesn't invalidate prompt caches or
+// break tool_use history. Falls back to a derived snake_case from nameEn +
+// cuid suffix for legacy rows that haven't been backfilled yet. Both
+// Anthropic and OpenAI accept [a-zA-Z0-9_-]{1,64}.
 function toolNameFor(skill: Skill): string {
-  const slug = skill.nameEn
+  if (skill.slug) return skill.slug.slice(0, 64);
+  const derived = skill.nameEn
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 50);
   const suffix = skill.id.slice(-6);
-  return `${slug || "skill"}_${suffix}`;
+  return `${derived || "skill"}_${suffix}`;
 }
 
 function inputSchemaFor(skill: Skill): Record<string, unknown> {

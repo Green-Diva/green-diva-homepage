@@ -194,8 +194,20 @@ export default function AssetTabs({
   const model3dDisabled = !hasEnhanced && !hasModel;
 
   return (
-    <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-      {/* Tab strip — top-right */}
+    <div
+      className="aspect-square w-full border border-primary/25 relative overflow-hidden lg:aspect-auto lg:flex-1 lg:min-h-0 lg:h-full"
+      style={{
+        background:
+          "radial-gradient(ellipse at center, #1c2020 0%, #0c0e0e 65%, #060808 100%)",
+      }}
+    >
+      {/* Cyber corner ornaments — echo VaultCell aesthetic. */}
+      <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-l border-t border-primary/70 z-20" />
+      <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-r border-t border-primary/70 z-20" />
+      <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-l border-b border-primary/70 z-20" />
+      <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-r border-b border-primary/70 z-20" />
+
+      {/* Tab strip — overlays the top-right of the image area. */}
       <div className="absolute top-2 right-2 z-30 flex gap-1 bg-background/70 backdrop-blur-sm border border-primary/30 px-1 py-0.5">
         <TabBtn
           active={active === "original"}
@@ -216,8 +228,10 @@ export default function AssetTabs({
         />
       </div>
 
-      {/* Tab content */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      {/* Tab content — symmetric padding so content (image / 3D model) is
+          truly centered. Tab strip overlays absolutely on top-right and does
+          not consume layout space. */}
+      <div className="absolute inset-0 p-6 flex items-center justify-center">
         {active === "original" ? (
           hasPrimary ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -225,6 +239,16 @@ export default function AssetTabs({
               src={`/api/relics/${relicId}/primary`}
               alt={alt}
               className="w-full h-full object-contain"
+              style={{
+                // Soft radial mask fades the photo's edges into the spotlight
+                // backdrop, visually unifying with the 2D enhanced (transparent
+                // edges) and 3D (no edges) tabs — original feels embedded in
+                // the gallery stage rather than pasted on top of it.
+                maskImage:
+                  "radial-gradient(ellipse at center, black 55%, transparent 98%)",
+                WebkitMaskImage:
+                  "radial-gradient(ellipse at center, black 55%, transparent 98%)",
+              }}
             />
           ) : (
             <PlaceholderText text={t.relicCollection.noModel} />
@@ -236,9 +260,6 @@ export default function AssetTabs({
               src={`/api/relics/${relicId}/enhanced`}
               alt={alt}
               className="w-full h-full object-contain"
-              style={{
-                background: "repeating-conic-gradient(#1a1c1c 0% 25%, #0d0f0f 25% 50%) 50% / 16px 16px",
-              }}
             />
           ) : (
             <GenerateBlock

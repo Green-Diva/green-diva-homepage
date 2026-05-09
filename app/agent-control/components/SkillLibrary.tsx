@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { SkillRow, EquipRow } from "../types";
+import type { SkillRow, EquipRow, HandlerKind } from "../types";
 import CyberPanel from "./CyberPanel";
 import SkillEditor from "./SkillEditor";
+import TestInvokeDialog from "./TestInvokeDialog";
 
 type Props = {
   skills: SkillRow[];
@@ -17,13 +18,17 @@ type Props = {
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: SkillRow | null };
 
-const KIND_COLOR: Record<string, string> = {
-  PASSIVE: "text-on-surface-variant border-on-surface-variant/30",
-  ACTIVE: "text-primary border-primary/40",
-  ULTIMATE: "text-secondary border-secondary/40",
-};
-
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
+
+// Compact label per HandlerKind — chip in the card header. Same neutral
+// palette across all four; the textual difference is enough to scan and
+// avoids fighting the MECHANICAL/AUTONOMOUS mode colors.
+const HANDLER_CHIP_LABEL: Record<HandlerKind, string> = {
+  INTERNAL: "INTERNAL",
+  HTTP_API: "HTTP",
+  LLM_PROMPT: "LLM",
+  MCP_SERVER: "MCP",
+};
 
 export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, isAdmin }: Props) {
   const t = useT();
@@ -32,6 +37,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
   const [editor, setEditor] = useState<EditorState>({ open: false, mode: "create", initial: null });
   const [busyEquip, setBusyEquip] = useState<string | null>(null);
   const [equipError, setEquipError] = useState<string | null>(null);
+  const [testTarget, setTestTarget] = useState<SkillRow | null>(null);
 
   const activeEquips = activeAgentId ? (equipsByAgentId[activeAgentId] ?? []) : [];
   const equippedIds = new Set(activeEquips.map((e) => e.skillId));
@@ -127,45 +133,80 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
                     const name = locale === "zh" ? skill.nameZh : skill.nameEn;
                     const desc = locale === "zh" ? skill.descriptionZh : skill.descriptionEn;
                     const isEquipped = equippedIds.has(skill.id);
+                    const isOffline = skill.status === "OFFLINE";
                     return (
                       <CyberPanel
                         key={skill.id}
-                        className="p-4 flex flex-col gap-3"
+                        className={[
+                          "p-4 flex flex-col gap-3 transition-opacity",
+                          isOffline ? "opacity-55" : "",
+                        ].join(" ")}
                         markers={["tl"]}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <span
-                            className="material-symbols-outlined text-[32px] text-primary/70"
+                            className={[
+                              "material-symbols-outlined text-[32px]",
+                              isOffline ? "text-on-surface-variant/50" : "text-primary/70",
+                            ].join(" ")}
                             style={{ fontVariationSettings: "'FILL' 1" }}
                           >
                             {skill.icon}
                           </span>
-                          {isAdmin && (
-                            <div className="flex gap-0.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => setEditor({ open: true, mode: "edit", initial: skill })}
-                                className="min-w-[32px] min-h-[32px] flex items-center justify-center text-on-surface-variant/50 hover:text-primary transition-colors"
-                                title={t.agentControl.skillEdit}
-                              >
-                                <span className="material-symbols-outlined text-[16px]">edit</span>
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex gap-0.5 shrink-0">
+                            {isAdmin && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setTestTarget(skill)}
+                                  className="min-w-[32px] min-h-[32px] flex items-center justify-center text-on-surface-variant/50 hover:text-primary transition-colors"
+                                  title={t.agentControl.skillTestInvokeTitle}
+                                  aria-label={t.agentControl.skillTestInvokeTitle}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">play_arrow</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditor({ open: true, mode: "edit", initial: skill })}
+                                  className="min-w-[32px] min-h-[32px] flex items-center justify-center text-on-surface-variant/50 hover:text-primary transition-colors"
+                                  title={t.agentControl.skillEdit}
+                                  aria-label={t.agentControl.skillEdit}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span
-                            className={`font-label text-[8px] tracking-[0.15em] uppercase border rounded-sm px-1.5 py-0.5 ${KIND_COLOR[skill.kind] ?? ""}`}
+                            className={[
+                              "font-label text-[8px] tracking-[0.15em] uppercase border rounded-sm px-1.5 py-0.5 font-mono",
+                              "text-on-surface-variant/80 border-on-surface-variant/30",
+                            ].join(" ")}
+                            title="Handler type"
                           >
-                            {skill.kind === "PASSIVE"
-                              ? t.agentControl.skillKindPassive
-                              : skill.kind === "ACTIVE"
-                                ? t.agentControl.skillKindActive
-                                : t.agentControl.skillKindUltimate}
+                            {HANDLER_CHIP_LABEL[skill.handlerKind]}
                           </span>
-                          <span className="font-label text-[8px] tracking-[0.12em] text-on-surface-variant/50 uppercase">
-                            {format(t.agentControl.skillCostAp, { n: skill.costAp })}
+                          <span
+                            className={[
+                              "font-label text-[8px] tracking-[0.15em] uppercase border rounded-sm px-1.5 py-0.5 inline-flex items-center gap-1",
+                              isOffline
+                                ? "border-error/40 text-error/80"
+                                : "border-primary/40 text-primary/80",
+                            ].join(" ")}
+                          >
+                            <span
+                              aria-hidden
+                              className={[
+                                "inline-block w-1.5 h-1.5 rounded-full",
+                                isOffline ? "bg-error/70" : "bg-primary/80 shadow-[0_0_4px_rgba(144,222,205,0.6)]",
+                              ].join(" ")}
+                            />
+                            {isOffline
+                              ? t.agentControl.skillStatusOffline
+                              : t.agentControl.skillStatusOnline}
                           </span>
                           {isEquipped && (
                             <span className="font-label text-[8px] tracking-[0.12em] uppercase border border-primary/40 text-primary rounded-sm px-1 py-0.5">
@@ -176,6 +217,11 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
 
                         <div>
                           <p className="text-sm font-medium text-on-surface">{name}</p>
+                          {skill.slug && (
+                            <p className="font-mono text-[10px] text-on-surface-variant/50 mt-0.5 truncate">
+                              {skill.slug}
+                            </p>
+                          )}
                           {desc && (
                             <p className="text-[11px] text-on-surface-variant/70 mt-1 line-clamp-2">{desc}</p>
                           )}
@@ -219,6 +265,10 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
           onClose={() => setEditor({ open: false, mode: "create", initial: null })}
           onSaved={() => setEditor({ open: false, mode: "create", initial: null })}
         />
+      )}
+
+      {testTarget && (
+        <TestInvokeDialog skill={testTarget} onClose={() => setTestTarget(null)} />
       )}
     </div>
   );

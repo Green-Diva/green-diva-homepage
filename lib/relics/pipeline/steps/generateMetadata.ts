@@ -30,12 +30,15 @@ const RARITY_VALUES: ReadonlyArray<Rarity> = [
   "SPECIAL",
 ];
 
+// Fallback strings honour the cell's truncate hard caps (≤4 中文字 title,
+// ≤6 字符 subtitle Zh, ≤10 char title En, ≤14 char subtitle En —— English
+// uppercase letters are ~2x the visual width of CJK at 10px tracking-[0.2em]).
 const FALLBACK = {
   iconKey: "help_outline",
-  nameZh: "待编修档案",
-  nameEn: "Pending Review",
-  classifZh: "档案 · 等待编修",
-  classifEn: "Archive · Awaiting Curator",
+  nameZh: "待编修",
+  nameEn: "Unnamed",
+  classifZh: "档案 · 待考",
+  classifEn: "Reliq · Lost",
   rarity: "COMMON" as Rarity,
 };
 
@@ -144,8 +147,9 @@ function shapeCandidates(raw: unknown): CandidateImage[] | null {
 function shapeMetadata(runLog: AgentRunLogEntry[]): GenerateMetadataResult["applied"] {
   const research = findNodeOutput(runLog, DAG_NODE_IDS.research);
   const meta = isObject(research) ? research : {};
-  const classifZh = pickString(meta.subtitleZh ?? meta.classifZh, FALLBACK.classifZh, 64);
-  const classifEn = pickString(meta.subtitleEn ?? meta.classifEn, FALLBACK.classifEn, 80);
+  // Slice caps match cell truncate width budget (with small overshoot buffer).
+  const classifZh = pickString(meta.subtitleZh ?? meta.classifZh, FALLBACK.classifZh, 10);
+  const classifEn = pickString(meta.subtitleEn ?? meta.classifEn, FALLBACK.classifEn, 18);
   const formKind = pickFormKind(meta.formKind);
   const formReason = isObject(meta) && typeof meta.decisionReason === "string"
     ? pickString(meta.decisionReason, "", 500) || null
@@ -166,8 +170,8 @@ function shapeMetadata(runLog: AgentRunLogEntry[]): GenerateMetadataResult["appl
 
   return {
     iconKey: pickString(meta.icon ?? meta.iconKey, FALLBACK.iconKey, 64),
-    nameZh: pickString(meta.titleZh ?? meta.nameZh, FALLBACK.nameZh, 48),
-    nameEn: pickString(meta.titleEn ?? meta.nameEn, FALLBACK.nameEn, 80),
+    nameZh: pickString(meta.titleZh ?? meta.nameZh, FALLBACK.nameZh, 12),
+    nameEn: pickString(meta.titleEn ?? meta.nameEn, FALLBACK.nameEn, 14),
     classifZh,
     classifEn,
     rarity: pickRarity(meta.rarity),
@@ -200,6 +204,89 @@ function lookSuccess(applied: GenerateMetadataResult["applied"]): boolean {
   );
 }
 
+// Workspace-agnostic core: runs the scribe agent against a workspace slug and
+// shapes its runLog into the Relic-shaped writeback payload. Used by both
+// the legacy Relic pipeline (workspace = relic.slug) and the new draft
+// pipeline (workspace = "_drafts/<draftId>").
+export type ScribeRunOutcome = {
+  applied: GenerateMetadataResult["applied"];
+  runLog: AgentRunLogEntry[];
+  agentInvoked: boolean;
+  degraded: boolean;
+  degradeReason?: string;
+};
+
+export async function runScribeForWorkspace(
+  workspaceSlug: string,
+  opts?: {
+    onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
+  },
+): Promise<ScribeRunOutcome> {
+  const agent = await prisma.agent.findUnique({
+    where: { codename: SCRIBE_CODENAME },
+  });
+
+  if (!agent) {
+    return {
+      applied: { ...FALLBACK_APPLIED },
+      runLog: [],
+      agentInvoked: false,
+      degraded: true,
+      degradeReason: `agent "${SCRIBE_CODENAME}" not configured`,
+    };
+  }
+  if (!agent.deployedAt) {
+    return {
+      applied: { ...FALLBACK_APPLIED },
+      runLog: [],
+      agentInvoked: false,
+      degraded: true,
+      degradeReason: `agent "${SCRIBE_CODENAME}" exists but is not deployed`,
+    };
+  }
+
+  let runResult;
+  try {
+    runResult = await invokeAgent({
+      agent,
+      mode: agent.mode,
+      input: { mode: "initial", relicSlug: workspaceSlug },
+      onProgress: opts?.onProgress,
+    });
+  } catch (e) {
+    return {
+      applied: { ...FALLBACK_APPLIED },
+      runLog: [],
+      agentInvoked: true,
+      degraded: true,
+      degradeReason: `invokeAgent threw: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  if (!runResult.ok) {
+    // Salvage whatever the runLog has (e.g. if research succeeded but pick
+    // crashed). Still mark degraded → caller will translate to PARTIAL.
+    const salvaged = shapeMetadata(runResult.runLog);
+    return {
+      applied: salvaged,
+      runLog: runResult.runLog,
+      agentInvoked: true,
+      degraded: true,
+      degradeReason: `agent run failed (${runResult.errorCode}): ${runResult.errorMessage}`,
+    };
+  }
+
+  const applied = shapeMetadata(runResult.runLog);
+  const succeeded = lookSuccess(applied);
+  return {
+    applied,
+    runLog: runResult.runLog,
+    agentInvoked: true,
+    degraded: !succeeded,
+    degradeReason: succeeded ? undefined : "research node missing or returned fallback",
+  };
+}
+
 export async function stepGenerateMetadata(
   ctx: PipelineContext,
 ): Promise<StepResult<GenerateMetadataResult>> {
@@ -209,111 +296,29 @@ export async function stepGenerateMetadata(
     name: ctx.relic.nameEn || ctx.relic.slug,
   };
 
-  const agent = await prisma.agent.findUnique({
-    where: { codename: SCRIBE_CODENAME },
-  });
-
-  if (!agent) {
-    return await applyAndReturn({
-      ctx,
-      relicSnapshot,
-      degraded: true,
-      degradeReason: `agent "${SCRIBE_CODENAME}" not configured`,
-      applied: { ...FALLBACK_APPLIED },
-      runLog: [],
-      agentInvoked: false,
-    });
-  }
-  if (!agent.deployedAt) {
-    return await applyAndReturn({
-      ctx,
-      relicSnapshot,
-      degraded: true,
-      degradeReason: `agent "${SCRIBE_CODENAME}" exists but is not deployed`,
-      applied: { ...FALLBACK_APPLIED },
-      runLog: [],
-      agentInvoked: false,
-    });
-  }
-
-  let runResult;
-  try {
-    runResult = await invokeAgent({
-      agent,
-      mode: agent.mode,
-      input: { mode: "initial", relicSlug: ctx.relic.slug },
-    });
-  } catch (e) {
-    return await applyAndReturn({
-      ctx,
-      relicSnapshot,
-      degraded: true,
-      degradeReason: `invokeAgent threw: ${e instanceof Error ? e.message : String(e)}`,
-      applied: { ...FALLBACK_APPLIED },
-      runLog: [],
-      agentInvoked: true,
-    });
-  }
-
-  if (!runResult.ok) {
-    // Salvage whatever the runLog has (e.g. if research succeeded but pick
-    // crashed). Still mark degraded → pipeline finalize will pick PARTIAL.
-    const salvaged = shapeMetadata(runResult.runLog);
-    return await applyAndReturn({
-      ctx,
-      relicSnapshot,
-      degraded: true,
-      degradeReason: `agent run failed (${runResult.errorCode}): ${runResult.errorMessage}`,
-      applied: salvaged,
-      runLog: runResult.runLog,
-      agentInvoked: true,
-    });
-  }
-
-  const applied = shapeMetadata(runResult.runLog);
-  // Even if invokeAgent says ok, double-check the writeback looks complete.
-  const succeeded = lookSuccess(applied);
-  return await applyAndReturn({
-    ctx,
-    relicSnapshot,
-    degraded: !succeeded,
-    degradeReason: succeeded ? undefined : "research node missing or returned fallback",
-    applied,
-    runLog: runResult.runLog,
-    agentInvoked: true,
-  });
-}
-
-async function applyAndReturn(args: {
-  ctx: PipelineContext;
-  relicSnapshot: { id: string; slug: string; name: string };
-  degraded: boolean;
-  degradeReason?: string;
-  applied: GenerateMetadataResult["applied"];
-  agentInvoked: boolean;
-  runLog: AgentRunLogEntry[];
-}): Promise<StepResult<GenerateMetadataResult>> {
-  const { ctx, relicSnapshot, degraded, degradeReason, applied, agentInvoked, runLog } = args;
+  const outcome = await runScribeForWorkspace(ctx.relic.slug);
 
   try {
     const updateData: Prisma.RelicUpdateInput = {
-      iconKey: applied.iconKey,
-      nameZh: applied.nameZh,
-      nameEn: applied.nameEn,
-      classifZh: applied.classifZh,
-      classifEn: applied.classifEn,
-      rarity: applied.rarity,
+      iconKey: outcome.applied.iconKey,
+      nameZh: outcome.applied.nameZh,
+      nameEn: outcome.applied.nameEn,
+      classifZh: outcome.applied.classifZh,
+      classifEn: outcome.applied.classifEn,
+      rarity: outcome.applied.rarity,
       // Only overwrite optional fields when the agent actually produced a value
       // (preserves admin manual edits when the DAG missed a node).
-      ...(applied.formKind !== null ? { formKind: applied.formKind } : {}),
-      ...(applied.formReason !== null ? { formReason: applied.formReason } : {}),
-      ...(applied.loreZh !== null ? { loreZh: applied.loreZh } : {}),
-      ...(applied.loreEn !== null ? { loreEn: applied.loreEn } : {}),
-      ...(applied.primaryImagePath !== null ? { primaryImagePath: applied.primaryImagePath } : {}),
-      ...(applied.candidateImages !== null
-        ? { candidateImages: applied.candidateImages as unknown as Prisma.InputJsonValue }
+      ...(outcome.applied.formKind !== null ? { formKind: outcome.applied.formKind } : {}),
+      ...(outcome.applied.formReason !== null ? { formReason: outcome.applied.formReason } : {}),
+      ...(outcome.applied.loreZh !== null ? { loreZh: outcome.applied.loreZh } : {}),
+      ...(outcome.applied.loreEn !== null ? { loreEn: outcome.applied.loreEn } : {}),
+      ...(outcome.applied.primaryImagePath !== null
+        ? { primaryImagePath: outcome.applied.primaryImagePath }
         : {}),
-      pipelineTrace: runLog as unknown as Prisma.InputJsonValue,
+      ...(outcome.applied.candidateImages !== null
+        ? { candidateImages: outcome.applied.candidateImages as unknown as Prisma.InputJsonValue }
+        : {}),
+      pipelineTrace: outcome.runLog as unknown as Prisma.InputJsonValue,
     };
     await prisma.relic.update({ where: { id: ctx.relic.id }, data: updateData });
   } catch (e) {
@@ -323,7 +328,7 @@ async function applyAndReturn(args: {
     };
   }
 
-  if (degraded) {
+  if (outcome.degraded) {
     await recordRelicLog({
       action: "PROCESSING_STEP",
       relic: relicSnapshot,
@@ -333,14 +338,19 @@ async function applyAndReturn(args: {
         step: "GENERATE_METADATA",
         ok: true,
         degraded: true,
-        reason: degradeReason ?? "unknown",
-        applied,
+        reason: outcome.degradeReason ?? "unknown",
+        applied: outcome.applied,
       },
     });
   }
 
   return {
     ok: true,
-    data: { agentInvoked, degraded, degradeReason, applied },
+    data: {
+      agentInvoked: outcome.agentInvoked,
+      degraded: outcome.degraded,
+      degradeReason: outcome.degradeReason,
+      applied: outcome.applied,
+    },
   };
 }

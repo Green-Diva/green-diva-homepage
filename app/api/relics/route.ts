@@ -71,8 +71,6 @@ export async function POST(req: NextRequest) {
         derivedArchivePath: data.derivedArchivePath ?? null,
         loreEn: data.loreEn ?? null,
         loreZh: data.loreZh ?? null,
-        acquiredAt: data.acquiredAt ? new Date(data.acquiredAt) : null,
-        origin: data.origin ?? null,
         passwordHash,
       },
       select: { id: true, slug: true, nameEn: true },

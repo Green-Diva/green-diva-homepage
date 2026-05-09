@@ -63,18 +63,22 @@ app/
                           [id]/jobs GET，[id]/jobs/[jobId] GET / [jobId]/retry POST
     skills/             — GET / POST，[id] PATCH / DELETE，[id]/test-invoke POST
     relics/             — GET / POST 列表 + 创建
-                          draft POST（multimodal 上传：ZIP 或图片/PDF/Word/音视频混合）
                           [id] GET / PATCH / DELETE
                           [id]/{model,primary,enhanced,derived,archive,photos/[i]} GET 资产流
                           [id]/candidate?path=<> GET 单候选图（in-set 校验）
                           [id]/job GET 最新 RelicProcessingJob（详情页轮询用）
                           [id]/jobs/[jobId]/retry POST 续跑指定 step
-                          [id]/confirm POST AWAITING_REVIEW → READY（一次性确认）
+                          [id]/confirm POST AWAITING_REVIEW → READY（**仅历史孤儿**用，新流程不再产生 AWAITING_REVIEW）
                           [id]/enhance-2d POST 触发 cutout（异步 AgentJob）
                           [id]/create-3d POST 触发 Meshy（异步；要求 enhancedImagePath ≠ null）
                           [id]/regen-metadata POST admin「🔄 重新生成」（同步，返回预览不写库）
                           [id]/asset-job/[jobId] GET 上面两个异步触发的轮询端点
                           [id]/{extract,unlock,log} 老入口
+    relic-drafts/       — GET 列出 admin 自己的 draft，POST multipart 创建 draft + 启动 draft pipeline
+                          [id] GET / PATCH（编辑 generatedMetadata） / DELETE（放弃 + fs.rm workspace）
+                          [id]/confirm POST 把 draft 转成 Relic（fs.rename + 事务建 Relic + 启 finalize pipeline）
+                          [id]/retry POST 续跑（fromStep=GENERATE_METADATA / EXTRACT_ZIP）
+                          [id]/{primary,candidate?path=<>} GET draft 阶段图片资产流
 ```
 
 ## 环境变量
@@ -144,40 +148,65 @@ dropdb green_diva && createdb -O gd_dev green_diva && npm run db:push && npm run
 
 ## Relic 上传流水线 + 状态机
 
-跨 `lib/relics/pipeline/`、`app/api/relics/{draft,[id]/...}`、`app/relic-collection/` 的子系统。**初次上传**只跑**轻量元数据生成**（~30 秒），重资源操作（fal.ai 抠图 / Meshy 3D）改成详情页 tab 上**按需触发**。
+跨 `lib/relics/pipeline/`、`app/api/relic-drafts/`、`app/api/relics/[id]/...`、`app/relic-collection/` 的子系统。**初次上传**只跑**轻量元数据生成**（~30 秒），admin 在 modal 里看到 AI 输出 → 编辑/确认/取消 → 确认后才创建 Relic 行。重资源操作（fal.ai 抠图 / Meshy 3D）改成详情页 tab 上**按需触发**。
 
-**Pipeline 三步**：
+**新流程（"上传到 RelicDraft，确认才落 Relic"）**：
 
 ```
-EXTRACT_ZIP (30%)         解 ZIP 或 multimodal 文件直接落 source/extracted/
-GENERATE_METADATA (40%)   调 RELIC-SCRIBE-001 agent，mode=initial 跑双语 lore + 元数据 + 候选图集
-PACK_DERIVED (30%)        把 derived/* + 原文件 + metadata.json 打包成 derived archive
+admin 点 grid 空格子
+  ↓
+RelicDraftPanel 三阶段 modal:
+  ① upload    POST /api/relic-drafts → 创建 RelicDraft（slot 锁定）+ runDraftPipeline
+  ② waiting   3s 轮询 /api/relic-drafts/[id]，跑 EXTRACT_ZIP + GENERATE_METADATA
+              writeback 到 RelicDraft.generatedMetadata（不创建 Relic）
+  ③ preview   admin 编辑 / 选主图 / 删候选 →
+              确认存入：POST /confirm → 事务建 Relic + fs.rename 工作目录 + runFinalizePipeline
+              放弃：DELETE /api/relic-drafts/[id] → fs.rm + 删 RelicDraft（slot 释放）
 ```
 
-**状态机（硬约束）**——首次 pipeline 跑完后 finalize 严格区分：
+**Pipeline 拆成两阶段**（[`lib/relics/pipeline/draft/runner.ts`](lib/relics/pipeline/draft/runner.ts) + [`lib/relics/pipeline/finalize/runner.ts`](lib/relics/pipeline/finalize/runner.ts)）：
 
-| 终态 | 触发条件 | 非 admin 可见 | 详情页 banner |
-|---|---|---|---|
-| `AWAITING_REVIEW` | 三步全成功且 GENERATE_METADATA 的 `applied.degraded === false`（Researcher 写好 lore + Picker 出候选集） | ✗ | 黄色 `<AwaitingReviewBanner>` —— 编修存入 / 直接存入 |
-| `PARTIAL` | 任意 step 失败，或 GENERATE_METADATA salvage 兜底（agent throw / 模型输出残缺）| ✗ | 红色 `<RelicProcessingBanner>` 失败态 + 重跑该步 |
-| `FAILED` | EXTRACT_ZIP / PACK_DERIVED 直接 throw（极少） | ✗ | 同 PARTIAL |
-| `READY` | admin 在 review 界面点「编修存入 / 直接存入」（POST `/confirm`，AWAITING_REVIEW → READY 一次性翻转） | ✓ | 无 banner |
+```
+Draft phase (RelicDraft):
+  EXTRACT_ZIP (50%)         解 ZIP 或 multimodal 文件直接落 _drafts/<id>/source/extracted/
+  GENERATE_METADATA (50%)   调 RELIC-SCRIBE-001 agent，mode=initial，writeback RelicDraft.generatedMetadata
 
-**「失败的格子绝不冒充成 pending review」**——这是不容妥协的约束。落地：
-- [`lib/relics/pipeline/index.ts`](lib/relics/pipeline/index.ts) finalize 读 `final.stepResults["GENERATE_METADATA"].degraded`，严格分流
-- [`app/relic-collection/page.tsx`](app/relic-collection/page.tsx) 非 admin 只看 READY；DRAFT/PROCESSING/AWAITING_REVIEW/PARTIAL/FAILED 全部隐藏
-- [`VaultCell.tsx`](app/relic-collection/_components/VaultCell.tsx) admin 视角：黄色 = 待存入、红色 = 失败、转圈 = 处理中
-- [`RelicProcessingBanner.tsx`](app/relic-collection/[slug]/_components/RelicProcessingBanner.tsx) `failed = status === "FAILED" || status === "PARTIAL" || job?.status === "FAILED"`，`succeeded` 排除 failed —— 别再让 PARTIAL 看着像"完成，正在刷新…"循环
+Finalize phase (Relic, 由 confirm 触发):
+  PACK_DERIVED (100%)       把 derived/* + 原文件 + metadata.json 打包；relic.status: PROCESSING → READY
+```
 
-**Pipeline 通用规则**（保留自老版本）：
-- **Fire-and-forget**：`/api/relics/draft` 创建 Job 后 `void runRelicPipeline(jobId)` 立即返回 201
-- **顶层永不 throw**：`runRelicPipeline` 顶层 `try/catch` 把任何错误写到 `Job.errorMessage` + `status=FAILED`
-- **自动重试**：runner 对瞬时错误（5xx / timeout / ECONN / EAI_AGAIN / "fetch failed"）退避至 `Job.maxAttempts=3`
-- **续跑**：`POST /api/relics/[id]/jobs/[jobId]/retry?fromStep=GENERATE_METADATA` 从指定 step 续跑；上游 step 结果从 `Job.stepResults` JSON 还原
-- **Crash recovery**：[`lib/server-init.ts::ensureServerInit()`](lib/server-init.ts) 在 `/api/relics/draft` + `/api/relics/[id]/job` 入口懒触发，重启 `RUNNING & updatedAt < 10min ago` 的 job。**新加 job-creating endpoint 时也要调** `await ensureServerInit()`
-- **文件布局**：`private/relics/{slug}/{source/{archive-{ts}.zip, extracted/}, derived/}`。derived/ 下产物：`primary-{ts}.{ext}`（旧 picker，已废弃）/ `cand-{ts}-{idx}.{ext}` 用户候选 / `cand-{ts}-net-{idx}.{ext}` 网络候选 / `enhanced-{ts}.png` 透明 PNG / `model-{ts}.glb` Meshy 输出 / `derived-{ts}.zip` 最终归档
-- **进度 UI**：3 秒 setInterval 轮询 `/api/relics/[id]/job`，完成 800ms 后 `router.refresh()`
-- **multimodal 上传**：[`RelicDraftPanel`](app/relic-collection/_components/RelicDraftPanel.tsx) 接受 ZIP / 图片 / PDF / Word / 音视频等多文件；ZIP 走 EXTRACT_ZIP 解压，其它直接落 extracted/。旧 `RelicForm` 仅作"编修"
+**RelicDraft 状态机**：
+
+| 状态 | 触发条件 | 视觉 |
+|---|---|---|
+| `PENDING` | 刚创建，pipeline 未开跑 | 草稿 cell 紫色（自己），灰色（别人） |
+| `RUNNING` | pipeline 跑中 | 转圈 icon |
+| `READY_TO_REVIEW` | EXTRACT + GENERATE 全成且 `degraded === false` | `edit_note` icon，"草稿待你确认" |
+| `FAILED` | 任意 step 失败 / GENERATE 兜底 | `error` icon，"草稿生成失败" |
+| `CANCELLED` | 中途被 DELETE 标记，等 fs cleanup | 短暂——通常立即被删 |
+
+**「失败的草稿不会冒充成 pending review」**——同样不容妥协：runner finalize 读 `meta.degraded`，degraded → FAILED；只有完整 metadata 才进 READY_TO_REVIEW。
+
+**老 Relic.status `AWAITING_REVIEW` 已弃用但保留兼容**——历史孤儿数据可走老 `<AwaitingReviewBanner>` + `/api/relics/[id]/confirm` 路径完成存入。新流程不再产生 AWAITING_REVIEW。
+
+**Slot 占用**：
+- `Relic.slot` @unique + `RelicDraft.slot` @unique，两表各自独立，但上传时 [POST /api/relic-drafts](app/api/relic-drafts/route.ts) 会同时检查两边
+- Confirm 时 slot 从 RelicDraft 转移到新建 Relic（事务内）
+- DELETE draft 释放 slot
+
+**文件布局**：
+- Draft 阶段：`private/relics/_drafts/<draftId>/{source/extracted/, derived/}` —— 路径前缀 `/_drafts/<draftId>/...`
+- Confirm 时 `fs.rename` 整个目录到 `private/relics/<finalSlug>/`，路径前缀替换为 `/<finalSlug>/...`
+- 元数据中 `primaryImagePath` / `candidateImages[].path` / `archivePath` 三处都要 path rewrite（confirm endpoint 处理）
+- DELETE 走 `fs.rm(_drafts/<id>/, { recursive, force })` + DB 删行
+
+**Pipeline 通用规则**：
+- **Fire-and-forget**：`/api/relic-drafts` 创建 RelicDraft 后 `void runDraftPipeline(draftId)` 立即返回 201
+- **顶层永不 throw**：runner 顶层 `try/catch` 把任何错误写到 `RelicDraft.errorMessage` + `status=FAILED`
+- **自动重试**：runner 对瞬时错误（5xx / timeout / ECONN / EAI_AGAIN / "fetch failed"）退避至 `maxAttempts=3`
+- **续跑**：`POST /api/relic-drafts/[id]/retry?fromStep=GENERATE_METADATA` 从指定 step 续跑；上游 step 结果从 `RelicDraft.stepResults` JSON 还原
+- **Crash recovery**：[`lib/server-init.ts::ensureServerInit()`](lib/server-init.ts) 同时处理 RelicProcessingJob 和 RelicDraft 的 RUNNING 孤儿。**新加 job-creating endpoint 时也要调** `await ensureServerInit()`
+- **进度 UI**：3 秒 setInterval 轮询 `/api/relic-drafts/[id]`，完成后 `router.push(/relic-collection/{newSlug})`
 
 **详情页按需 tab**——AssetTabs 在图片区右上角放 3 tab（[`AssetTabs.tsx`](app/relic-collection/[slug]/_components/AssetTabs.tsx)）：
 

@@ -44,8 +44,6 @@ export const relicCreateSchema = z.object({
     .nullable(),
   loreEn: z.string().max(4000).optional().nullable(),
   loreZh: z.string().max(4000).optional().nullable(),
-  acquiredAt: z.string().datetime().optional().nullable(),
-  origin: z.string().max(160).optional().nullable(),
   password: z.string().min(4).max(128).optional().nullable(),
   // Phase 5+ fields. Admin can edit them in the review UI.
   primaryImagePath: slugScopedPath.optional().nullable(),

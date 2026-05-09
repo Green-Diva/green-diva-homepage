@@ -227,13 +227,26 @@ export const handlerConfigSchema = z
 // Real JSON Schema spec compliance lives at runtime in lib/skills/invoke.ts.
 const jsonSchemaSchema = z.record(z.unknown()).nullable().optional();
 
+// Stable machine slug — LLM tool name + future admin URL. Format mirrors
+// kebab-case so it's both URL-safe and a legal Anthropic/OpenAI tool name
+// (both providers accept [a-zA-Z0-9_-]{1,64}).
+const skillSlugRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+export const skillSlugSchema = z
+  .string()
+  .min(2)
+  .max(64)
+  .regex(skillSlugRegex, "slug must be lowercase letters, digits, single dashes (no leading/trailing dash)");
+
 export const skillCreateSchema = z.object({
-  level: z.number().int().min(1).max(6),
+  slug: skillSlugSchema.optional(),
+  // level/kind/costAp kept for back-compat — new UI hides them. Optional so
+  // POST bodies that omit these fall back to schema defaults.
+  level: z.number().int().min(1).max(6).optional(),
   icon: z.string().min(1).max(64),
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
-  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]),
-  costAp: z.number().int().min(0).max(99),
+  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]).optional(),
+  costAp: z.number().int().min(0).max(99).optional(),
   descriptionEn: z.string().max(2000),
   descriptionZh: z.string().max(2000),
   // Runtime routing — see prisma/schema.prisma HandlerKind enum.

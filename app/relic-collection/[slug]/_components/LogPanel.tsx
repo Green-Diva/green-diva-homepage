@@ -13,7 +13,20 @@ type LogAction =
   | "SHARE_REVOKED"
   | "EXTRACTED"
   | "GRANTED"
-  | "GRANT_REVOKED";
+  | "GRANT_REVOKED"
+  | "PROCESSING_STARTED"
+  | "PROCESSING_STEP"
+  | "PROCESSING_SUCCEEDED"
+  | "PROCESSING_FAILED";
+
+type ProcessingDetails = {
+  phase?: string;
+  step?: string;
+  ok?: boolean;
+  ms?: number;
+  error?: string;
+  finalStatus?: string;
+};
 
 type LogRow = {
   id: string;
@@ -34,7 +47,30 @@ function detectLang(): "zh" | "en" {
 
 const PAGE_SIZE = 5;
 
-export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string; refreshKey?: number }) {
+function rarityBorderClass(r: string | undefined | null): string {
+  switch (r) {
+    case "RARE":
+      return "border-[#80c8ff]/40";
+    case "EPIC":
+      return "border-[#c79bff]/40";
+    case "LEGENDARY":
+      return "border-secondary/40";
+    case "SPECIAL":
+      return "border-[#ff9bcd]/40";
+    default:
+      return "border-primary/20";
+  }
+}
+
+export default function LogPanel({
+  relicId,
+  refreshKey = 0,
+  rarity,
+}: {
+  relicId: string;
+  refreshKey?: number;
+  rarity?: string;
+}) {
   const t = useT();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -51,6 +87,36 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
       })
       .catch(() => setLoaded(true));
   }, [relicId, refreshKey]);
+
+  function stepLabel(step: string | undefined | null): string {
+    switch (step) {
+      case "EXTRACT_ZIP":
+        return t.adminRelics.logStepExtractZip;
+      case "GENERATE_METADATA":
+        return t.adminRelics.logStepGenerateMetadata;
+      case "PACK_DERIVED":
+        return t.adminRelics.logStepPackDerived;
+      case "CUTOUT":
+        return t.adminRelics.logStepCutout;
+      case "MESHY":
+        return t.adminRelics.logStepMeshy;
+      default:
+        return step ?? "?";
+    }
+  }
+
+  function phaseLabel(phase: string | undefined | null): string {
+    switch (phase) {
+      case "finalize":
+        return t.adminRelics.logPhaseFinalize;
+      case "enhance2d":
+        return t.adminRelics.logPhaseEnhance2d;
+      case "3d":
+        return t.adminRelics.logPhase3d;
+      default:
+        return t.adminRelics.logPhaseFinalize;
+    }
+  }
 
   function actionLabel(row: LogRow): string {
     switch (row.action) {
@@ -74,10 +140,23 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
         return t.adminRelics.logActionGRANT_REVOKED;
       case "EXTRACTED":
         return t.adminRelics.logActionEXTRACTED;
+      case "PROCESSING_STARTED":
+        return t.adminRelics.logActionPROCESSING_STARTED;
+      case "PROCESSING_STEP": {
+        const d = row.details as ProcessingDetails | null;
+        return format(t.adminRelics.logActionPROCESSING_STEP, { step: stepLabel(d?.step) });
+      }
+      case "PROCESSING_SUCCEEDED":
+        return t.adminRelics.logActionPROCESSING_SUCCEEDED;
+      case "PROCESSING_FAILED": {
+        const d = row.details as ProcessingDetails | null;
+        return format(t.adminRelics.logActionPROCESSING_FAILED, { step: stepLabel(d?.step) });
+      }
     }
   }
 
-  // Color families pair related actions: 分享=yellow, 授予=green, 提取=red.
+  // Color families pair related actions: 分享=yellow, 授予=green, 提取=red,
+  // 流水线 (PROCESSING_*)=info blue family, FAILED=error red.
   // Revokes share their pair's hue but use dashed border + line-through.
   function actionColor(action: LogAction): string {
     switch (action) {
@@ -97,6 +176,14 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
         return "border-dashed border-primary/35 text-primary/55 line-through";
       case "EXTRACTED":
         return "border-error/60 text-error bg-error/10 shadow-[0_0_8px_rgba(255,77,77,0.18)]";
+      case "PROCESSING_STARTED":
+        return "border-info/55 text-info bg-info/5";
+      case "PROCESSING_STEP":
+        return "border-info/30 text-info/75";
+      case "PROCESSING_SUCCEEDED":
+        return "border-info/55 text-info bg-info/10";
+      case "PROCESSING_FAILED":
+        return "border-error/60 text-error bg-error/10 shadow-[0_0_8px_rgba(255,77,77,0.18)]";
     }
   }
 
@@ -108,6 +195,12 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
       case "GRANTED":
       case "GRANT_REVOKED":
         return "text-primary/85";
+      case "PROCESSING_STARTED":
+      case "PROCESSING_STEP":
+      case "PROCESSING_SUCCEEDED":
+        return "text-info/80";
+      case "PROCESSING_FAILED":
+        return "text-error/85";
       default:
         return "text-on-surface-variant";
     }
@@ -162,6 +255,30 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
         return row.actorNameSnapshot
           ? format(t.adminRelics.logSubjMoved, { actor })
           : null;
+      case "PROCESSING_STARTED": {
+        const d = row.details as ProcessingDetails | null;
+        const phase = phaseLabel(d?.phase);
+        return row.actorNameSnapshot
+          ? format(t.adminRelics.logSubjProcessingStarted, { actor, phase })
+          : format(t.adminRelics.logSubjProcessingStartedSystem, { phase });
+      }
+      case "PROCESSING_STEP":
+        // Step label is already in the badge — no subject phrase to avoid
+        // duplication. Inline details (ms / error) appear after the badge.
+        return null;
+      case "PROCESSING_SUCCEEDED": {
+        const d = row.details as ProcessingDetails | null;
+        return format(t.adminRelics.logSubjProcessingSucceeded, {
+          phase: phaseLabel(d?.phase),
+        });
+      }
+      case "PROCESSING_FAILED": {
+        const d = row.details as ProcessingDetails | null;
+        return format(t.adminRelics.logSubjProcessingFailed, {
+          phase: phaseLabel(d?.phase),
+          step: stepLabel(d?.step),
+        });
+      }
       default:
         return row.actorNameSnapshot
           ? format(t.adminRelics.logBy, { actor: row.actorNameSnapshot })
@@ -170,7 +287,7 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
   }
 
   return (
-    <section className="border border-primary/15 bg-surface-container/30 p-4 space-y-3">
+    <section className={"border bg-surface-container/30 p-4 space-y-3 " + rarityBorderClass(rarity)}>
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary">
           {t.adminRelics.logTitle}
@@ -231,11 +348,26 @@ export default function LogPanel({ relicId, refreshKey = 0 }: { relicId: string;
                     to: (row.details as { to?: number }).to ?? "?",
                   })
                 : null;
+            const processingExtra = (() => {
+              if (row.action !== "PROCESSING_STEP" && row.action !== "PROCESSING_FAILED") {
+                return null;
+              }
+              const d = row.details as ProcessingDetails | null;
+              const parts: string[] = [];
+              if (typeof d?.ms === "number") parts.push(`${d.ms}ms`);
+              if (d?.error) {
+                const trimmed = d.error.length > 80 ? d.error.slice(0, 80) + "…" : d.error;
+                parts.push(format(t.adminRelics.logProcessingError, { error: trimmed }));
+              }
+              return parts.length ? parts.join(" ") : null;
+            })();
             const inlineDetails = moveDetails
               ? `(${moveDetails})`
               : fields
                 ? `(${format(t.adminRelics.logFieldsSummary, { fields })})`
-                : null;
+                : processingExtra
+                  ? `(${processingExtra})`
+                  : null;
             const subject = subjectPhrase(row);
             return (
               <li

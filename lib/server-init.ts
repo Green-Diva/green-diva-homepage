@@ -1,6 +1,9 @@
 import "server-only";
+import type { RelicJobStep } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { runRelicPipeline } from "@/lib/relics/pipeline";
+import { runDraftPipeline } from "@/lib/relics/pipeline/draft/runner";
+import { runFinalizePipeline } from "@/lib/relics/pipeline/finalize/runner";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
 
 const STALE_MS = 10 * 60 * 1000;
@@ -28,7 +31,11 @@ export function ensureServerInit(): Promise<void> {
 }
 
 async function init(): Promise<void> {
-  await Promise.all([recoverRelicJobs(), recoverAgentJobs()]);
+  await Promise.all([
+    recoverRelicJobs(),
+    recoverRelicDrafts(),
+    recoverAgentJobs(),
+  ]);
 }
 
 async function recoverRelicJobs(): Promise<void> {
@@ -47,8 +54,43 @@ async function recoverRelicJobs(): Promise<void> {
     data: { status: "PENDING", errorMessage: "auto-resumed after server restart" },
   });
   for (const job of stale) {
-    void runRelicPipeline(job.id, { fromStep: job.step }).catch((e) => {
-      console.error(`[server-init] resumed relic pipeline crashed for ${job.id}`, e);
+    // Finalize jobs are single-step (PACK_DERIVED). The legacy three-step
+    // pipeline drives everything else. We pick the runner by which step the
+    // job was on when it stalled — PACK_DERIVED-only is the finalize runner.
+    if (job.step === "PACK_DERIVED") {
+      void runFinalizePipeline(job.id).catch((e) => {
+        console.error(`[server-init] resumed finalize pipeline crashed for ${job.id}`, e);
+      });
+    } else {
+      void runRelicPipeline(job.id, { fromStep: job.step }).catch((e) => {
+        console.error(`[server-init] resumed relic pipeline crashed for ${job.id}`, e);
+      });
+    }
+  }
+}
+
+async function recoverRelicDrafts(): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_MS);
+  const stale = await prisma.relicDraft.findMany({
+    where: { status: "RUNNING", updatedAt: { lt: cutoff } },
+    select: { id: true, step: true },
+  });
+  if (stale.length === 0) return;
+
+  console.warn(
+    `[server-init] resuming ${stale.length} stale RUNNING relic draft(s) older than ${STALE_MS / 1000}s`,
+  );
+  await prisma.relicDraft.updateMany({
+    where: { id: { in: stale.map((d) => d.id) } },
+    data: { status: "PENDING", errorMessage: "auto-resumed after server restart" },
+  });
+  for (const d of stale) {
+    const fromStep =
+      d.step === "EXTRACT_ZIP" || d.step === "GENERATE_METADATA"
+        ? (d.step as Extract<RelicJobStep, "EXTRACT_ZIP" | "GENERATE_METADATA">)
+        : undefined;
+    void runDraftPipeline(d.id, fromStep ? { fromStep } : undefined).catch((e) => {
+      console.error(`[server-init] resumed draft pipeline crashed for ${d.id}`, e);
     });
   }
 }

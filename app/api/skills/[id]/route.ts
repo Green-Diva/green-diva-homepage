@@ -72,6 +72,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     });
     return NextResponse.json(skill);
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return NextResponse.json({ error: "slug already in use" }, { status: 409 });
+    }
     console.error("[skills] update failed", e);
     return NextResponse.json({ error: "update failed" }, { status: 500 });
   }

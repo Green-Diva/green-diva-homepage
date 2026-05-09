@@ -22,13 +22,16 @@ type JobPayload = {
   };
 };
 
-const STEP_KEY: Record<JobStep, keyof ReturnType<typeof useT>["relicCollection"]> = {
+// `as const satisfies` keeps each value as a string literal type so the
+// later `t.relicCollection[STEP_KEY[...]]` lookup narrows to `string`,
+// not the wider union that includes nested objects (e.g. draftStageLabels).
+const STEP_KEY = {
   ENQUEUED: "jobStepEnqueued",
   EXTRACT_ZIP: "jobStepExtractZip",
   GENERATE_METADATA: "jobStepGenerateMetadata",
   PACK_DERIVED: "jobStepPackDerived",
   FINALIZE: "jobStepFinalize",
-};
+} as const satisfies Record<JobStep, keyof ReturnType<typeof useT>["relicCollection"]>;
 
 type Props = {
   relicId: string;

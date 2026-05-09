@@ -8,9 +8,19 @@ type Props = {
   ariaLabel: string;
   className?: string;
   children: ReactNode;
+  // When set, opens the modal directly into stage 2/3 (waiting / preview /
+  // failed) of an in-progress draft instead of starting a new upload. Used
+  // by draft cells in the vault grid.
+  existingDraftId?: string;
 };
 
-export default function EmptyCellAdminTrigger({ slot, ariaLabel, className, children }: Props) {
+export default function EmptyCellAdminTrigger({
+  slot,
+  ariaLabel,
+  className,
+  children,
+  existingDraftId,
+}: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -22,7 +32,13 @@ export default function EmptyCellAdminTrigger({ slot, ariaLabel, className, chil
       >
         {children}
       </button>
-      {open ? <RelicDraftPanel slot={slot} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <RelicDraftPanel
+          slot={slot}
+          existingDraftId={existingDraftId}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

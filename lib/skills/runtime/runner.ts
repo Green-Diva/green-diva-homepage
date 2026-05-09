@@ -13,6 +13,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { invokeAgent, type AgentRunResult } from "@/lib/agents/invoke";
+import { recordRelicLog } from "@/lib/relicLog";
 
 const TRANSIENT_PATTERNS = [
   /\b5\d\d\b/, // 5xx HTTP status anywhere in message
@@ -103,6 +104,11 @@ export async function runAgentJob(jobId: string): Promise<void> {
       } catch (e) {
         console.error(`[agent-job:run] ${jobId} relic writeback failed:`, e);
       }
+      try {
+        await recordRelicProcessingLog(job.input, jobId, "SUCCEEDED");
+      } catch (e) {
+        console.error(`[agent-job:run] ${jobId} relic log (success) failed:`, e);
+      }
       return;
     }
 
@@ -144,6 +150,11 @@ export async function runAgentJob(jobId: string): Promise<void> {
         endedAt: new Date(),
       },
     });
+    try {
+      await recordRelicProcessingLog(job.input, jobId, "FAILED", message);
+    } catch (e) {
+      console.error(`[agent-job:run] ${jobId} relic log (failed) failed:`, e);
+    }
   } catch (e) {
     // Catastrophic — couldn't even mark FAILED. One last attempt to record it.
     console.error(`[agent-job:run] ${jobId} catastrophic top-level error`, e);
@@ -213,4 +224,41 @@ async function maybeWriteRelicAsset(
   // initial / regenMetadata don't go through this runner — they're called
   // synchronously from the pipeline step / regen endpoint and write back
   // from the caller's context.
+}
+
+// — RelicLog hook for relic-bound async invocations — — — — — — — — — — —
+//
+// PROCESSING_STARTED is recorded by the trigger endpoint (enhance-2d /
+// create-3d). PROCESSING_SUCCEEDED / PROCESSING_FAILED is recorded here
+// by the runner when the AgentJob terminates. Sync modes (initial /
+// regenMetadata) record their own pipeline events elsewhere — this hook
+// is a no-op for them.
+async function recordRelicProcessingLog(
+  rawInput: unknown,
+  jobId: string,
+  outcome: "SUCCEEDED" | "FAILED",
+  errorMessage?: string | null,
+): Promise<void> {
+  if (!isObject(rawInput)) return;
+  const relicId = typeof rawInput._relicId === "string" ? rawInput._relicId : null;
+  const mode = typeof rawInput.mode === "string" ? rawInput.mode : null;
+  if (!relicId || !mode) return;
+  const phase = mode === "2dEnhance" ? "enhance2d" : mode === "3dCreate" ? "3d" : null;
+  if (!phase) return;
+
+  const relic = await prisma.relic.findUnique({
+    where: { id: relicId },
+    select: { id: true, slug: true, nameEn: true },
+  });
+  if (!relic) return;
+
+  const details: Record<string, unknown> = { phase, jobId };
+  if (errorMessage) details.error = errorMessage.slice(0, 200);
+
+  await recordRelicLog({
+    action: outcome === "SUCCEEDED" ? "PROCESSING_SUCCEEDED" : "PROCESSING_FAILED",
+    relic: { id: relic.id, slug: relic.slug, name: relic.nameEn || relic.slug },
+    actor: null,
+    details: details as Prisma.InputJsonValue,
+  });
 }

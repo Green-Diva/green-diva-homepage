@@ -8,9 +8,13 @@
 //   - "set as primary" radio (single-select)
 //   - "delete" checkbox (soft delete; file stays on disk)
 //
+// Click a thumbnail to open the full-size lightbox.
+//
 // Pure controlled component — emits onChange with the next array + the
 // next primaryPath. RelicForm's submit handler folds this into PATCH.
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 
 export type CandidateImage = {
@@ -30,7 +34,14 @@ type Props = {
   primaryPath: string | null;
   onChange: (next: { candidates: CandidateImage[]; primaryPath: string | null }) => void;
   disabled?: boolean;
+  // Override candidate-image URL construction. Default points at the
+  // /api/relics/[id]/candidate stream; the draft preview modal passes a
+  // function that builds /api/relic-drafts/[id]/candidate URLs instead.
+  assetUrlFor?: (relicId: string, path: string) => string;
 };
+
+const DEFAULT_ASSET_URL = (relicId: string, p: string) =>
+  `/api/relics/${relicId}/candidate?path=${encodeURIComponent(p)}`;
 
 export default function CandidateImageGallery({
   relicId,
@@ -38,10 +49,13 @@ export default function CandidateImageGallery({
   primaryPath,
   onChange,
   disabled,
+  assetUrlFor,
 }: Props) {
   const t = useT();
+  const [previewing, setPreviewing] = useState<CandidateImage | null>(null);
   const visible = candidates.filter((c) => !c.deleted);
   const hidden = candidates.filter((c) => c.deleted);
+  const resolveUrl = assetUrlFor ?? DEFAULT_ASSET_URL;
 
   const setPrimary = (path: string) => {
     if (disabled) return;
@@ -85,7 +99,9 @@ export default function CandidateImageGallery({
             isPrimary={primaryPath === c.path}
             onSetPrimary={() => setPrimary(c.path)}
             onDelete={() => toggleDeleted(c.path, true)}
+            onPreview={() => setPreviewing(c)}
             disabled={disabled}
+            assetUrlFor={resolveUrl}
           />
         ))}
       </ul>
@@ -113,6 +129,13 @@ export default function CandidateImageGallery({
           </ul>
         </details>
       ) : null}
+      {previewing ? (
+        <CandidateLightbox
+          src={resolveUrl(relicId, previewing.path)}
+          candidate={previewing}
+          onClose={() => setPreviewing(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -123,14 +146,18 @@ function CandidateRow({
   isPrimary,
   onSetPrimary,
   onDelete,
+  onPreview,
   disabled,
+  assetUrlFor,
 }: {
   relicId: string;
   candidate: CandidateImage;
   isPrimary: boolean;
   onSetPrimary: () => void;
   onDelete: () => void;
+  onPreview: () => void;
   disabled?: boolean;
+  assetUrlFor: (relicId: string, path: string) => string;
 }) {
   const t = useT();
   const sourceLabel =
@@ -148,12 +175,19 @@ function CandidateRow({
           : "border-primary/15 hover:border-primary/35",
       ].join(" ")}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`/api/relics/${relicId}/candidate?path=${encodeURIComponent(candidate.path)}`}
-        alt=""
-        className="w-16 h-16 object-cover bg-background/40 shrink-0"
-      />
+      <button
+        type="button"
+        onClick={onPreview}
+        aria-label={t.adminRelics.candidateGalleryPreviewLabel}
+        className="shrink-0 cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={assetUrlFor(relicId, candidate.path)}
+          alt=""
+          className="w-16 h-16 object-cover bg-background/40"
+        />
+      </button>
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <span
@@ -207,5 +241,86 @@ function CandidateRow({
         </button>
       </div>
     </li>
+  );
+}
+
+// Full-size preview overlay. Rendered above the host modal (z-300 vs the
+// draft modal's z-200) via portal so we don't fight z-index with whatever
+// surrounding wizard / form mounted us. Doesn't toggle body.style.overflow
+// because the host modal already locked it.
+function CandidateLightbox({
+  src,
+  candidate,
+  onClose,
+}: {
+  src: string;
+  candidate: CandidateImage;
+  onClose: () => void;
+}) {
+  const t = useT();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  const dims =
+    candidate.width && candidate.height ? `${candidate.width}×${candidate.height}` : "";
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-sm p-6"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t.adminRelics.candidateGalleryClose}
+        className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center border border-on-surface-variant/40 hover:border-on-surface text-on-surface-variant hover:text-on-surface bg-background/40"
+      >
+        <span className="material-symbols-outlined text-[20px]">close</span>
+      </button>
+      <div
+        className="flex flex-col items-center gap-3 max-w-[92vw] max-h-[92vh]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          className="max-w-[92vw] max-h-[80vh] object-contain shadow-[0_0_32px_rgba(0,0,0,0.6)]"
+        />
+        <div className="text-center text-[11px] text-on-surface-variant space-y-0.5 max-w-[92vw]">
+          <div className="flex items-center justify-center gap-2">
+            <span className="font-label text-[9px] tracking-[0.2em] uppercase text-secondary">
+              {candidate.source === "network"
+                ? t.adminRelics.candidateGallerySourceNet
+                : t.adminRelics.candidateGallerySourceUser}
+            </span>
+            {dims ? <span className="text-on-surface-variant/70">{dims}</span> : null}
+          </div>
+          <div className="truncate">{candidate.originalFilename ?? candidate.path}</div>
+          {candidate.sourceUrl ? (
+            <a
+              href={candidate.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary/80 hover:text-primary truncate inline-block max-w-full"
+            >
+              {candidate.sourceUrl}
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

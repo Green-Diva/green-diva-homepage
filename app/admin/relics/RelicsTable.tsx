@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
-import { format } from "@/lib/i18n/format";
 import RelicForm, { type RelicEditValue } from "./RelicForm";
 
 type Row = {
@@ -21,16 +20,6 @@ export default function RelicsTable({ rows }: { rows: Row[] }) {
   const t = useT();
   const router = useRouter();
   const [editing, setEditing] = useState<Row | "new" | null>(null);
-
-  async function onDelete(row: Row) {
-    if (!confirm(format(t.adminRelics.confirmRemove, { name: row.nameEn }))) return;
-    const res = await fetch(`/api/relics/${row.id}`, { method: "DELETE" });
-    if (res.ok) {
-      router.refresh();
-    } else {
-      alert(t.adminRelics.saveFailed);
-    }
-  }
 
   return (
     <>
@@ -90,13 +79,6 @@ export default function RelicsTable({ rows }: { rows: Row[] }) {
                       className="font-label text-[11px] tracking-[0.2em] uppercase text-primary hover:underline"
                     >
                       {t.adminRelics.edit}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(r)}
-                      className="font-label text-[11px] tracking-[0.2em] uppercase text-error hover:underline"
-                    >
-                      {t.adminRelics.remove}
                     </button>
                   </td>
                 </tr>

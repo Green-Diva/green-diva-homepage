@@ -65,40 +65,27 @@ export default function RelicViewer({ modelUrl, alt, t }: Props) {
 
   if (errored) {
     return (
-      <div className="aspect-square w-full bg-surface-container/40 border border-error/30 flex items-center justify-center lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-        <span className="font-label text-[11px] tracking-[0.2em] uppercase text-error">
-          {t.relicCollection.viewerUnsupported}
-        </span>
-      </div>
+      <span className="font-label text-[11px] tracking-[0.2em] uppercase text-error">
+        {t.relicCollection.viewerUnsupported}
+      </span>
     );
   }
 
   if (!ready) {
     return (
-      <div className="relative aspect-square w-full bg-surface-container/40 border border-primary/30 overflow-hidden flex items-center justify-center lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent animate-[scan_2.4s_linear_infinite]" />
-        <span className="font-label text-[11px] tracking-[0.3em] uppercase text-primary z-10">
-          {t.relicCollection.viewerLoading}
-        </span>
-      </div>
+      <span className="font-label text-[11px] tracking-[0.3em] uppercase text-primary">
+        {t.relicCollection.viewerLoading}
+      </span>
     );
   }
 
   return (
-    <div className="aspect-square w-full bg-surface-container/40 border border-primary/30 relative overflow-hidden lg:aspect-auto lg:h-full lg:max-h-full lg:flex-1">
-      <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-l border-t border-primary/70 z-10" />
-      <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-r border-t border-primary/70 z-10" />
-      <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-l border-b border-primary/70 z-10" />
-      <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-r border-b border-primary/70 z-10" />
-      <div className="absolute inset-0 flex items-center justify-center px-4 lg:px-6 pt-20 lg:pt-24 pb-4 lg:pb-6">
-        <div className="w-full max-w-[520px] aspect-square">
-          <ModelViewerElement
-            modelUrl={modelUrl}
-            alt={alt}
-            autoRotate={!reduceMotion}
-          />
-        </div>
-      </div>
+    <div className="w-full h-full">
+      <ModelViewerElement
+        modelUrl={modelUrl}
+        alt={alt}
+        autoRotate={!reduceMotion}
+      />
     </div>
   );
 }
@@ -130,9 +117,19 @@ function ModelViewerElement({
     el.setAttribute("shadow-softness", "0.6");
     el.setAttribute("interaction-prompt", "none");
     el.setAttribute("loading", "eager");
+    // Tight framing — camera fits the model's bounding box snugly. Combined
+    // with the narrow FOV below, the displayed object size matches the 2D
+    // enhanced cutout (edges flush with canvas). Width auto-scales by aspect.
+    el.setAttribute("bounds", "tight");
+    el.setAttribute("field-of-view", "30deg");
+    el.setAttribute("max-field-of-view", "30deg");
     el.style.width = "100%";
     el.style.height = "100%";
     el.style.backgroundColor = "transparent";
+    // No CSS scale — bounds=tight already fits the model to the container;
+    // upscaling would magnify the source. If a model's bbox ever exceeds the
+    // viewport, bounds=tight clamps it down, so the "shrink-to-fit" case is
+    // handled by model-viewer itself.
     host.appendChild(el);
     return () => {
       host.innerHTML = "";

@@ -24,6 +24,27 @@ function parsePercent(v: string): number {
   return Number(v.replace("%", ""));
 }
 
+function statusOf(equip: EquipRow | undefined | null): ConnectionStatus {
+  if (!equip) return "empty";
+  return equip.skill.status === "ONLINE" ? "online" : "offline";
+}
+
+function statusRank(s: ConnectionStatus): number {
+  return s === "online" ? 2 : s === "offline" ? 1 : 0;
+}
+
+// A trunk only carries signal when both endpoints can — pick the weaker so a
+// trunk into an empty slot stays dim even if the on-axis end is ONLINE.
+function combineStatus(a: ConnectionStatus, b: ConnectionStatus): ConnectionStatus {
+  return statusRank(a) <= statusRank(b) ? a : b;
+}
+
+type Trace = {
+  key: string;
+  path: string;
+  status: ConnectionStatus;
+};
+
 export default function SkillConnections({
   mode,
   slots,
@@ -43,6 +64,47 @@ export default function SkillConnections({
   const cx = parsePercent(central.left);
   const cy = parsePercent(central.top);
   const palette = STATUS_COLORS[mode];
+
+  const traces: Trace[] = [];
+
+  // Column trunks: from each on-axis slot, draw vertical segments to its
+  // column neighbours so all 6 slots read as one connected harness.
+  for (const mid of slots.filter((p) => Math.abs(parsePercent(p.top) - cy) < 0.5)) {
+    const midStatus = statusOf(slotted.get(mid.i));
+    const mx = parsePercent(mid.left);
+    const my = parsePercent(mid.top);
+    const sameCol = slots.filter(
+      (p) => Math.abs(parsePercent(p.left) - mx) < 0.5 && p.i !== mid.i,
+    );
+    for (const peer of sameCol) {
+      const peerStatus = statusOf(slotted.get(peer.i));
+      const py = parsePercent(peer.top);
+      traces.push({
+        key: `trunk-${mid.i}-${peer.i}`,
+        path: `M ${mx} ${my} L ${mx} ${py}`,
+        status: combineStatus(midStatus, peerStatus),
+      });
+    }
+  }
+
+  // L-shape elbow from each off-axis slot to the central node; on-axis slots
+  // run a straight horizontal trace.
+  for (const pos of slots) {
+    const status = statusOf(slotted.get(pos.i));
+    const x = parsePercent(pos.left);
+    const y = parsePercent(pos.top);
+    const onAxis = Math.abs(y - cy) < 0.5;
+    const midY = (y + cy) / 2;
+    const path = onAxis
+      ? `M ${x} ${y} L ${cx} ${cy}`
+      : `M ${x} ${y} L ${x} ${midY} L ${cx} ${midY} L ${cx} ${cy}`;
+    traces.push({ key: `elbow-${pos.i}`, path, status });
+  }
+
+  // Off-axis elbows from opposite columns share the central segment
+  // (cx, midY → cx, cy). Draw weaker traces first so an empty slot's gray
+  // doesn't paint over an adjacent ONLINE slot's glow.
+  traces.sort((a, b) => statusRank(a.status) - statusRank(b.status));
 
   return (
     <svg
@@ -67,90 +129,39 @@ export default function SkillConnections({
           </feMerge>
         </filter>
       </defs>
-      {/* Column trunks: for each on-axis slot, draw vertical segments to its
-          column neighbours so all 6 slots read as one connected harness. */}
-      {slots
-        .filter((p) => Math.abs(parsePercent(p.top) - cy) < 0.5)
-        .flatMap((mid) => {
-          const equip = slotted.get(mid.i) ?? null;
-          const status: ConnectionStatus = !equip
-            ? "empty"
-            : equip.skill.status === "ONLINE"
-              ? "online"
-              : "offline";
-          const color = palette[status];
-          const mx = parsePercent(mid.left);
-          const my = parsePercent(mid.top);
-          const sameCol = slots.filter((p) => Math.abs(parsePercent(p.left) - mx) < 0.5 && p.i !== mid.i);
-          return sameCol.map((peer) => {
-            const py = parsePercent(peer.top);
-            const path = `M ${mx} ${my} L ${mx} ${py}`;
-            return (
-              <g key={`trunk-${mid.i}-${peer.i}`}>
-                <path
-                  d={path}
-                  fill="none"
-                  stroke="rgba(0,0,0,0.55)"
-                  strokeWidth={status === "online" ? 3 : 2.2}
-                  strokeLinecap="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <path
-                  d={path}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={status === "online" ? 1.6 : 1}
-                  strokeLinecap="round"
-                  opacity={status === "online" ? 0.95 : 0.6}
-                  filter={status === "online" ? `url(#gd-conn-glow-${mode})` : undefined}
-                  vectorEffect="non-scaling-stroke"
-                />
-              </g>
-            );
-          });
-        })}
-      {slots.map((pos) => {
-        const equip = slotted.get(pos.i) ?? null;
-        const status: ConnectionStatus = !equip
-          ? "empty"
-          : equip.skill.status === "ONLINE"
-            ? "online"
-            : "offline";
-        const color = palette[status];
-        const x = parsePercent(pos.left);
-        const y = parsePercent(pos.top);
-        // L-shape elbow gives the 2077-style PCB trace look. Half-vertical first,
-        // then horizontal into the central node. Slots already level with the
-        // central node skip the elbow and run a straight horizontal trace.
-        const onAxis = Math.abs(y - cy) < 0.5;
-        const midY = (y + cy) / 2;
-        const path = onAxis
-          ? `M ${x} ${y} L ${cx} ${cy}`
-          : `M ${x} ${y} L ${x} ${midY} L ${cx} ${midY} L ${cx} ${cy}`;
+      {/* Halo pass — dark backing for every trace, kept under all colour. */}
+      {traces.map((t) => {
+        const isOnline = t.status === "online";
         return (
-          <g key={pos.i}>
-            {/* Dark halo for contrast against bright spine art */}
-            <path
-              d={path}
-              fill="none"
-              stroke="rgba(0,0,0,0.55)"
-              strokeWidth={status === "online" ? 3 : 2.2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <path
-              d={path}
-              fill="none"
-              stroke={color}
-              strokeWidth={status === "online" ? 1.6 : 1}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={status === "online" ? 0.95 : 0.6}
-              filter={status === "online" ? `url(#gd-conn-glow-${mode})` : undefined}
-              vectorEffect="non-scaling-stroke"
-            />
-          </g>
+          <path
+            key={`halo-${t.key}`}
+            d={t.path}
+            fill="none"
+            stroke="rgba(0,0,0,0.55)"
+            strokeWidth={isOnline ? 3 : 2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })}
+      {/* Colour pass — sorted weak→strong so ONLINE glow paints last. */}
+      {traces.map((t) => {
+        const color = palette[t.status];
+        const isOnline = t.status === "online";
+        return (
+          <path
+            key={`color-${t.key}`}
+            d={t.path}
+            fill="none"
+            stroke={color}
+            strokeWidth={isOnline ? 1.6 : 1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={isOnline ? 0.95 : 0.6}
+            filter={isOnline ? `url(#gd-conn-glow-${mode})` : undefined}
+            vectorEffect="non-scaling-stroke"
+          />
         );
       })}
     </svg>

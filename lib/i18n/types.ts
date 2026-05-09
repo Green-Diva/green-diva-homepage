@@ -233,8 +233,6 @@ export interface Dictionary {
     rateLimited: string;
     cancel: string;
     lore: string;
-    acquired: string;
-    origin: string;
     archiveDownload: string;
     derivedDownload: string;
     downloadUnavailable: string;
@@ -284,6 +282,32 @@ export interface Dictionary {
     cellProcessing: string;
     cellAwaitingReview: string;
     cellGenerationFailed: string;
+    cellDraftRunning: string;
+    cellDraftReady: string;
+    cellDraftFailed: string;
+    // Draft 3-stage modal — stage 2 (waiting) + stage 3 (preview/edit).
+    draftWaitingTitle: string;
+    draftWaitingSubtitle: string;
+    draftWaitingProgress: string; // {{progress}}
+    // Per-stage labels shown in the waiting view's activity timeline.
+    // Keep keys aligned with STAGE_DEFS in RelicDraftPanel.tsx.
+    draftStageLabels: {
+      extract: string;
+      summary: string;
+      research: string;
+      pick: string;
+    };
+    draftFailedTitle: string;
+    draftFailedRetry: string;
+    draftFailedAbandon: string;
+    draftPreviewTitle: string;
+    draftPreviewSubtitle: string;
+    draftPreviewFormKind: string;
+    draftPreviewFormReason: string;
+    draftPreviewAbandon: string;
+    draftPreviewSaveAndStore: string;
+    draftPreviewStoring: string;
+    draftAbandonConfirm: string;
     reviewBannerTitle: string;
     reviewBannerSubtitle: string;
     reviewBannerEdit: string;
@@ -304,6 +328,10 @@ export interface Dictionary {
     generateFailed: string;
     generateRetry: string;
     viewerForging: string;
+    assetReady: string;
+    assetMissing: string;
+    assetDraftLocked: string;
+    assetViewInDetail: string;
   };
   agentControl: {
     pageTitle: string;
@@ -415,6 +443,10 @@ export interface Dictionary {
     skillEquipFromLibrary: string;
     skillEmptyEquipped: string;
     skillEmptyLibrary: string;
+    skillStatusOnline: string;
+    skillStatusOffline: string;
+    skillTestInvoke: string;
+    skillTestInvokeTitle: string;
   };
   adminRelics: {
     pageTitle: string;
@@ -428,8 +460,6 @@ export interface Dictionary {
     colPassword: string;
     colActions: string;
     edit: string;
-    remove: string;
-    confirmRemove: string; // {{name}}
     yes: string;
     no: string;
     formNew: string;
@@ -442,8 +472,6 @@ export interface Dictionary {
     fClassifZh: string;
     fRarity: string;
     fIcon: string;
-    fOrigin: string;
-    fAcquired: string;
     fLoreEn: string;
     fLoreZh: string;
     fPassword: string;
@@ -533,6 +561,20 @@ export interface Dictionary {
     logSubjCreated: string; // {{actor}}
     logSubjEdited: string; // {{actor}}
     logSubjMoved: string; // {{actor}}
+    logSubjProcessingStarted: string; // {{actor}} {{phase}}
+    logSubjProcessingStartedSystem: string; // {{phase}}
+    logSubjProcessingStep: string; // {{step}}
+    logSubjProcessingSucceeded: string; // {{phase}}
+    logSubjProcessingFailed: string; // {{phase}} {{step}}
+    logPhaseFinalize: string;
+    logPhaseEnhance2d: string;
+    logPhase3d: string;
+    logStepExtractZip: string;
+    logStepGenerateMetadata: string;
+    logStepPackDerived: string;
+    logStepCutout: string;
+    logStepMeshy: string;
+    logProcessingError: string; // {{error}}
     logMoveDetails: string; // {{from}} {{to}}
     logPagePrev: string;
     logPageNext: string;
@@ -546,6 +588,8 @@ export interface Dictionary {
     candidateGallerySourceNet: string;
     candidateGalleryPrimary: string;
     candidateGalleryDelete: string;
+    candidateGalleryPreviewLabel: string;
+    candidateGalleryClose: string;
     // RelicForm — RegenMetadataPreview
     regenTitle: string;
     regenButton: string;

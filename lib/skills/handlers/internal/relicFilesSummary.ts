@@ -34,7 +34,11 @@ import { HandlerError, type SkillHandler } from "../../types";
 
 const TEXT_EXTS = new Set([".txt", ".md", ".json", ".csv", ".log"]);
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".heic", ".gif"]);
-const SAFE_SLUG_RE = /^[a-zA-Z0-9_-]+$/;
+// Allow either a Relic slug ("vault-001-abcdef") or a RelicDraft workspace
+// slug ("_drafts/<cuid>") — the inner slash + leading underscore are the
+// only divergence from the Relic-only shape.
+const SAFE_SLUG_RE = /^(_drafts\/)?[a-zA-Z0-9_-]+$/;
+const DRAFT_PREFIX = "_drafts/";
 
 const DEFAULT_MAX_FILES = 50;
 const DEFAULT_MAX_TEXT_BYTES = 8192;
@@ -83,17 +87,35 @@ async function readVaultRelicFiles(opts: {
       "INVALID_CONFIG",
     );
   }
-  const relic = await prisma.relic.findUnique({
-    where: { slug: opts.relicSlug },
-    select: { draftNote: true },
-  });
-  if (!relic) {
-    throw new HandlerError(
-      `relic-files-summary: relic with slug "${opts.relicSlug}" not found`,
-      "INVALID_CONFIG",
-    );
+  let userBrief = "";
+  if (opts.relicSlug.startsWith(DRAFT_PREFIX)) {
+    // Draft phase — no Relic row exists yet; pull the user's description
+    // from the corresponding RelicDraft.
+    const draftId = opts.relicSlug.slice(DRAFT_PREFIX.length);
+    const draft = await prisma.relicDraft.findUnique({
+      where: { id: draftId },
+      select: { draftNote: true },
+    });
+    if (!draft) {
+      throw new HandlerError(
+        `relic-files-summary: draft with id "${draftId}" not found`,
+        "INVALID_CONFIG",
+      );
+    }
+    userBrief = (draft.draftNote ?? "").trim();
+  } else {
+    const relic = await prisma.relic.findUnique({
+      where: { slug: opts.relicSlug },
+      select: { draftNote: true },
+    });
+    if (!relic) {
+      throw new HandlerError(
+        `relic-files-summary: relic with slug "${opts.relicSlug}" not found`,
+        "INVALID_CONFIG",
+      );
+    }
+    userBrief = (relic.draftNote ?? "").trim();
   }
-  const userBrief = (relic.draftNote ?? "").trim();
 
   const dirs = pipelineDirsForSlug(opts.relicSlug);
   const entries = await listFilesRecursive(dirs.extracted, opts.maxFiles);

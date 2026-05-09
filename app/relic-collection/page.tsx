@@ -7,7 +7,7 @@ import { format } from "@/lib/i18n/format";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getSharedRelicIds } from "@/lib/relicShare";
 import { getGrantedRelicIds } from "@/lib/relicGrant";
-import VaultCell, { type CellRelic } from "./_components/VaultCell";
+import VaultCell, { type CellRelic, type CellDraft } from "./_components/VaultCell";
 import SidebarFilter, { type RarityFilter } from "./_components/SidebarFilter";
 import UserMenu from "@/components/UserMenu";
 
@@ -44,7 +44,7 @@ export default async function RelicCollectionPage({
     return qs ? `/relic-collection?${qs}` : "/relic-collection";
   };
 
-  const [t, locale, user, unlockedIds, allRelics] = await Promise.all([
+  const [t, locale, user, unlockedIds, allRelics, allDrafts] = await Promise.all([
     getDictionary(),
     getLocale(),
     getCurrentUser(),
@@ -65,6 +65,18 @@ export default async function RelicCollectionPage({
         extractedAt: true,
         extractedById: true,
         extractedBy: { select: { name: true } },
+      },
+    }),
+    // Drafts visible to all admins (so other admins see the slot is taken).
+    // Only the originator can click in. Non-admin viewers don't see drafts
+    // at all — they're filtered below.
+    prisma.relicDraft.findMany({
+      orderBy: { slot: "asc" },
+      select: {
+        id: true,
+        slot: true,
+        status: true,
+        uploadedById: true,
       },
     }),
   ]);
@@ -97,6 +109,20 @@ export default async function RelicCollectionPage({
 
   const slotMap = new Map<number, (typeof allRelics)[number]>();
   for (const r of filtered) slotMap.set(r.slot, r);
+
+  // Drafts only show to admins. The "ownedByMe" flag controls whether
+  // clicking the cell opens the wizard (own draft) or just renders a
+  // read-only placeholder (another admin's draft).
+  const draftMap = new Map<number, CellDraft>();
+  if (isAdmin) {
+    for (const d of allDrafts) {
+      draftMap.set(d.slot, {
+        id: d.id,
+        status: d.status,
+        ownedByMe: d.uploadedById === user?.id,
+      });
+    }
+  }
 
   // Capacity counter reflects what the viewer can actually see. Non-admin
   // shouldn't get a hint that there are pending relics behind the curtain.
@@ -175,6 +201,7 @@ export default async function RelicCollectionPage({
             <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 xl:grid-cols-10 2xl:grid-cols-10 gap-px p-px border border-primary/15 bg-surface-container/30 [background-image:radial-gradient(circle_at_center,rgba(82,253,207,0.06)_1px,transparent_1.5px)] [background-size:14px_14px] lg:flex-1 lg:min-h-0 lg:grid-rows-5">
               {Array.from({ length: endSlot - startSlot + 1 }, (_, i) => startSlot + i).map((slot) => {
                 const relic = slotMap.get(slot) ?? null;
+                const draft = draftMap.get(slot) ?? null;
                 const access = relic
                   ? canAccessRelic(relic, user, unlockedIds, sharedIds, grantedIds)
                   : null;
@@ -204,6 +231,7 @@ export default async function RelicCollectionPage({
                     key={slot}
                     slot={slot}
                     relic={cellRelic}
+                    draft={draft}
                     access={access}
                     locale={locale}
                     t={t}

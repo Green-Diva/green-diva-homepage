@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { AuthError, getCurrentUser, requireAdmin } from "@/lib/auth";
@@ -50,9 +49,6 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if ("password" in data) {
     update.passwordHash = data.password ? await bcrypt.hash(data.password, 12) : null;
     delete update.password;
-  }
-  if ("acquiredAt" in data) {
-    update.acquiredAt = data.acquiredAt ? new Date(data.acquiredAt) : null;
   }
   // capture before-state for diff log
   const before = await prisma.relic.findUnique({
@@ -113,61 +109,3 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
 }
 
-const deleteBody = z.object({
-  targetUserId: z.string().min(1).max(64).optional().nullable(),
-  notes: z.string().max(500).optional().nullable(),
-});
-
-export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  let me;
-  try {
-    me = await requireAdmin();
-  } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    throw e;
-  }
-  const { id } = await ctx.params;
-  // Accept optional body { targetUserId?, notes? } describing who the
-  // extracted item was given to (may be sent as JSON or absent).
-  let body: { targetUserId?: string | null; notes?: string | null } = {};
-  try {
-    if (req.headers.get("content-type")?.includes("application/json")) {
-      const json = await req.json();
-      const parsed = deleteBody.safeParse(json);
-      if (parsed.success) body = parsed.data;
-    }
-  } catch {
-    // ignore — empty body is fine
-  }
-
-  const before = await prisma.relic.findUnique({
-    where: { id },
-    select: { id: true, slug: true, nameEn: true, slot: true, rarity: true },
-  });
-  if (!before) return NextResponse.json({ error: "not found" }, { status: 404 });
-
-  let target: { id: string; name: string } | null = null;
-  if (body.targetUserId) {
-    const u = await prisma.user.findUnique({
-      where: { id: body.targetUserId },
-      select: { id: true, name: true },
-    });
-    if (u) target = u;
-  }
-
-  try {
-    await prisma.relic.delete({ where: { id } });
-    await recordRelicLog({
-      action: "EXTRACTED",
-      relic: { id: before.id, slug: before.slug, name: before.nameEn },
-      actor: { id: me.id, name: me.name },
-      target,
-      notes: body.notes ?? null,
-      details: { slot: before.slot, rarity: before.rarity },
-    });
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    console.error("[api/relics DELETE] delete failed", e);
-    return NextResponse.json({ error: "delete failed" }, { status: 400 });
-  }
-}

@@ -7,11 +7,11 @@
 // path-traversal guard, so guessing arbitrary paths is rejected.
 
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "node:fs";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
-import { inferContentType, resolveRelicAsset } from "@/lib/relicStorage";
+import { resolveRelicAsset } from "@/lib/relicStorage";
+import { serveImageFile } from "@/lib/relics/serveImage";
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -53,11 +53,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!abs) return new NextResponse("forbidden", { status: 403 });
 
   try {
-    const buf = await fs.readFile(abs);
+    const { buf, contentType } = await serveImageFile(abs);
     return new NextResponse(buf, {
       status: 200,
       headers: {
-        "Content-Type": inferContentType(abs),
+        "Content-Type": contentType,
         "Cache-Control": "private, max-age=3600",
       },
     });

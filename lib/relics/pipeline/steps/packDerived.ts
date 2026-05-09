@@ -66,8 +66,6 @@ export async function stepPackDerived(
           iconKey: fresh.iconKey,
           loreEn: fresh.loreEn,
           loreZh: fresh.loreZh,
-          origin: fresh.origin,
-          acquiredAt: fresh.acquiredAt,
           status: fresh.status,
           draftNote: fresh.draftNote,
         }
