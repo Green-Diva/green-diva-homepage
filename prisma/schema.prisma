@@ -158,7 +158,6 @@ model Relic {
   // The full DAG runLog from the most recent agent invocation, for the
   // admin trace viewer. Bounded by AgentJob limits upstream.
   pipelineTrace      Json?
-  photoPaths         String[]
   archivePath        String?
   derivedArchivePath String?
   loreEn             String?

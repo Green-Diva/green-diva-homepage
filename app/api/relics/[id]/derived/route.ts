@@ -81,7 +81,6 @@ export async function GET(
       enhancedImagePath: relic.enhancedImagePath,
       modelPath: relic.modelPath,
       candidateImages: relic.candidateImages,
-      photoPaths: relic.photoPaths,
     },
   };
   zip.file("metadata.json", JSON.stringify(metadata, null, 2));

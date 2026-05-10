@@ -48,7 +48,8 @@ const SKILL_FAL_CUTOUT = {
       maxBytes: 25 * 1024 * 1024,
     },
     responseTransform: {
-      _download: "{{response._download}}",
+      downloadBase64: "{{response._download.base64}}",
+      downloadContentType: "{{response._download.contentType}}",
       sourceUrl: "{{response.image.url}}",
     },
   } as Prisma.InputJsonValue,
@@ -74,8 +75,8 @@ const SKILL_SAVE_ASSET_ENHANCED = {
     bodyTemplate: {
       relicSlug: "{{relicSlug}}",
       kind: "enhanced",
-      base64: "{{_download.base64}}",
-      contentType: "{{_download.contentType}}",
+      base64: "{{downloadBase64}}",
+      contentType: "{{downloadContentType}}",
     },
     responseTransform: {
       savedPath: "{{response.savedPath}}",
@@ -108,7 +109,8 @@ const FORGE_PIPELINE = {
       equipSlot: 2,
       inputFrom: {
         merge: {
-          _download: "cutout.output._download",
+          downloadBase64: "cutout.output.downloadBase64",
+          downloadContentType: "cutout.output.downloadContentType",
           relicSlug: "agent.input.relicSlug",
           relicId: "agent.input._relicId",
         },
@@ -137,7 +139,19 @@ async function ensureSkill(
 ): Promise<string> {
   const existing = await prisma.skill.findUnique({ where: { slug: spec.slug } });
   if (existing) {
-    console.log(`[migrate-cutout-forge] skill "${spec.slug}" already exists (${existing.id}); skipping`);
+    await prisma.skill.update({
+      where: { id: existing.id },
+      data: {
+        handlerConfig: spec.handlerConfig,
+        nameEn: spec.nameEn,
+        nameZh: spec.nameZh,
+        descriptionEn: spec.descriptionEn,
+        descriptionZh: spec.descriptionZh,
+        kind: spec.kind,
+        status: "ONLINE",
+      },
+    });
+    console.log(`[migrate-cutout-forge] skill "${spec.slug}" exists (${existing.id}); healed config`);
     return existing.id;
   }
   const created = await prisma.skill.create({

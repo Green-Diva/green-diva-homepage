@@ -12,7 +12,6 @@ import { getSharedRelicIds } from "@/lib/relicShare";
 import { getGrantedRelicIds } from "@/lib/relicGrant";
 import UserMenu from "@/components/UserMenu";
 import AssetTabs from "./_components/AssetTabs";
-import PhotoCarousel from "./_components/PhotoCarousel";
 import AdminToolbar from "./_components/AdminToolbar";
 import LogPanel from "./_components/LogPanel";
 import RelicProcessingBanner from "./_components/RelicProcessingBanner";
@@ -330,144 +329,127 @@ export default async function RelicDetailPage({
               </div>
             ) : null}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0">
-            {/* Left: 3-tab asset switcher (原图 / 2D 增强 / 3D 立体). The
+              {/* Left: 3-tab asset switcher (原图 / 2D 增强 / 3D 立体). The
                 latter two are admin-triggered and run async via AgentJob. */}
-            <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col">
-              <AssetTabs
-                relicId={relic.id}
-                hasPrimary={!!relic.primaryImagePath}
-                hasEnhanced={!!relic.enhancedImagePath}
-                hasModel={!!relic.modelPath}
-                formKind={relic.formKind}
-                alt={name}
-                isAdmin={isAdmin}
-                t={t}
-              />
-            </div>
+              <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col">
+                <AssetTabs
+                  relicId={relic.id}
+                  hasPrimary={!!relic.primaryImagePath}
+                  hasEnhanced={!!relic.enhancedImagePath}
+                  hasModel={!!relic.modelPath}
+                  formKind={relic.formKind}
+                  alt={name}
+                  isAdmin={isAdmin}
+                  t={t}
+                />
+              </div>
 
-            {/* Right: metadata stack of independent modules. Column itself
+              {/* Right: metadata stack of independent modules. Column itself
                 does NOT scroll; only the lore body inside its module does.
                 Activity log module is pinned at the bottom. */}
-            <div className="lg:col-span-5 lg:min-h-0 flex flex-col gap-3">
-              {/* Module 1 — identity card. Two-column layout: small thumbnail
+              <div className="lg:col-span-5 lg:min-h-0 flex flex-col gap-3">
+                {/* Module 1 — identity card. Two-column layout: small thumbnail
                   on the left, key info stack on the right (slot / name /
                   subtitle / rarity). Corner ornaments + LED echo the grid
                   cell aesthetic. */}
-              <div className={
-                "shrink-0 relative border bg-surface-container/30 p-3 " +
-                rarityBorder(relic.rarity)
-              }>
-                {/* Corner ornaments — same L-marks as VaultCell. */}
-                <span className="absolute top-0 left-0 w-2 h-2 border-l border-t border-primary/60" />
-                <span className="absolute top-0 right-0 w-2 h-2 border-r border-t border-primary/60" />
-                <span className="absolute bottom-0 left-0 w-2 h-2 border-l border-b border-primary/60" />
-                <span className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-primary/60" />
+                <div className={
+                  "shrink-0 relative border bg-surface-container/30 p-3 " +
+                  rarityBorder(relic.rarity)
+                }>
+                  {/* Corner ornaments — same L-marks as VaultCell. */}
+                  <span className="absolute top-0 left-0 w-2 h-2 border-l border-t border-primary/60" />
+                  <span className="absolute top-0 right-0 w-2 h-2 border-r border-t border-primary/60" />
+                  <span className="absolute bottom-0 left-0 w-2 h-2 border-l border-b border-primary/60" />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-primary/60" />
 
-                {/* LED top-right, rarity-hued + glowing. */}
-                <span
-                  className={"absolute top-2 right-3 w-2 h-2 rounded-full " + rarityLedClass(relic.rarity)}
-                  aria-hidden
-                />
+                  {/* LED top-right, rarity-hued + glowing. */}
+                  <span
+                    className={"absolute top-2 right-3 w-2 h-2 rounded-full " + rarityLedClass(relic.rarity)}
+                    aria-hidden
+                  />
 
-                <div className="flex items-stretch gap-3">
-                  {/* Left — square thumbnail. Fallback to Material icon when
+                  <div className="flex items-stretch gap-3">
+                    {/* Left — square thumbnail. Fallback to Material icon when
                       no primary image exists yet. */}
-                  <div className={
-                    "shrink-0 w-20 h-20 border bg-background/60 relative overflow-hidden flex items-center justify-center " +
-                    rarityBorderSoft(relic.rarity)
-                  }>
-                    {relic.primaryImagePath ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`/api/relics/${relic.id}/primary`}
-                        alt={name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span
-                        className={"material-symbols-outlined text-[28px] " + rarityAccentText(relic.rarity)}
-                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
-                        aria-hidden
-                      >
-                        {relic.iconKey || "inventory_2"}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Right — info stack. */}
-                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                    <span className="font-label text-[10px] tracking-[0.3em] text-on-surface-variant/75">
-                      {t.relicCollection.slotNo} · {String(relic.slot).padStart(3, "0")}
-                    </span>
-                    <div className="flex items-baseline gap-2.5 flex-wrap">
-                      <h1 className="font-headline text-[22px] md:text-[24px] text-primary sacred-glow leading-[1.15] truncate min-w-0">
-                        {name}
-                      </h1>
-                      <span className={"shrink-0 px-2 py-0.5 border font-label text-[9px] tracking-[0.25em] uppercase " + rarityColor(relic.rarity)}>
-                        {rarityLabel(t, relic.rarity)}
-                      </span>
+                    <div className={
+                      "shrink-0 w-20 h-20 border bg-background/60 relative overflow-hidden flex items-center justify-center " +
+                      rarityBorderSoft(relic.rarity)
+                    }>
+                      {relic.primaryImagePath ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/relics/${relic.id}/primary`}
+                          alt={name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span
+                          className={"material-symbols-outlined text-[28px] " + rarityAccentText(relic.rarity)}
+                          style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
+                          aria-hidden
+                        >
+                          {relic.iconKey || "inventory_2"}
+                        </span>
+                      )}
                     </div>
-                    <p className="font-label text-[10px] tracking-[0.25em] uppercase text-secondary opacity-90 truncate">
-                      {classif}
-                    </p>
-                    {isExtracted ? (
-                      <div className="mt-1">
-                        <span className="px-2 py-0.5 border border-on-surface-variant/40 font-label text-[9px] tracking-[0.25em] uppercase text-on-surface-variant bg-on-surface-variant/5">
-                          {t.relicCollection.extractedTag}
-                          {relic.extractedBy ? ` · ${format(t.relicCollection.extractedBy, { name: relic.extractedBy.name })}` : ""}
+
+                    {/* Right — info stack. */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <span className="font-label text-[10px] tracking-[0.3em] text-on-surface-variant/75">
+                        {t.relicCollection.slotNo} · {String(relic.slot).padStart(3, "0")}
+                      </span>
+                      <div className="flex items-baseline gap-2.5 flex-wrap">
+                        <h1 className="font-headline text-[22px] md:text-[24px] text-primary sacred-glow leading-[1.15] truncate min-w-0">
+                          {name}
+                        </h1>
+                        <span className={"shrink-0 px-2 py-0.5 border font-label text-[9px] tracking-[0.25em] uppercase " + rarityColor(relic.rarity)}>
+                          {rarityLabel(t, relic.rarity)}
                         </span>
                       </div>
-                    ) : null}
+                      <p className="font-label text-[10px] tracking-[0.25em] uppercase text-secondary opacity-90 truncate">
+                        {classif}
+                      </p>
+                      {isExtracted ? (
+                        <div className="mt-1">
+                          <span className="px-2 py-0.5 border border-on-surface-variant/40 font-label text-[9px] tracking-[0.25em] uppercase text-on-surface-variant bg-on-surface-variant/5">
+                            {t.relicCollection.extractedTag}
+                            {relic.extractedBy ? ` · ${format(t.relicCollection.extractedBy, { name: relic.extractedBy.name })}` : ""}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
+
+                  {summary ? (
+                    <p className="mt-3 font-body text-[12px] text-on-surface-variant/85 leading-[1.55] italic">
+                      {summary}
+                    </p>
+                  ) : null}
                 </div>
 
-                {summary ? (
-                  <p className="mt-3 font-body text-[12px] text-on-surface-variant/85 leading-[1.55] italic">
-                    {summary}
-                  </p>
+                {/* Module 3 — lore. Body has internal overflow with a visible
+                  themed scrollbar so the user sees "this scrolls". */}
+                {lore ? (
+                  <div className={
+                    "flex flex-col border bg-surface-container/30 p-4 lg:flex-1 lg:min-h-0 " +
+                    rarityBorder(relic.rarity)
+                  }>
+                    <h2 className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary mb-3 shrink-0">
+                      {t.relicCollection.lore}
+                    </h2>
+                    <div className="font-body text-[14px] text-on-surface-variant leading-[1.8] prose prose-invert prose-sm max-w-none lg:flex-1 lg:min-h-0 lg:overflow-y-auto pr-2 -mr-2 lore-scrollbar">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{lore}</ReactMarkdown>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Module 4 — activity log, pinned at bottom of column. */}
+                {isAdmin ? (
+                  <div className="shrink-0">
+                    <LogPanel relicId={relic.id} rarity={relic.rarity} />
+                  </div>
                 ) : null}
               </div>
-
-              {/* Module 3 — lore. Body has internal overflow with a visible
-                  themed scrollbar so the user sees "this scrolls". */}
-              {lore ? (
-                <div className={
-                  "flex flex-col border bg-surface-container/30 p-4 lg:flex-1 lg:min-h-0 " +
-                  rarityBorder(relic.rarity)
-                }>
-                  <h2 className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary mb-3 shrink-0">
-                    {t.relicCollection.lore}
-                  </h2>
-                  <div className="font-body text-[14px] text-on-surface-variant leading-[1.8] prose prose-invert prose-sm max-w-none lg:flex-1 lg:min-h-0 lg:overflow-y-auto pr-2 -mr-2 lore-scrollbar">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{lore}</ReactMarkdown>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Module 4 (optional) — photos. */}
-              {relic.photoPaths.length > 0 ? (
-                <div className={
-                  "shrink-0 border bg-surface-container/30 p-4 " +
-                  rarityBorder(relic.rarity)
-                }>
-                  <h2 className="font-label text-[10px] tracking-[0.3em] uppercase text-secondary mb-3">
-                    {locale === "zh" ? "影像" : "Photos"}
-                  </h2>
-                  <PhotoCarousel
-                    relicId={relic.id}
-                    count={relic.photoPaths.length}
-                    alt={name}
-                  />
-                </div>
-              ) : null}
-
-              {/* Module 5 — activity log, pinned at bottom of column. */}
-              {isAdmin ? (
-                <div className="shrink-0">
-                  <LogPanel relicId={relic.id} rarity={relic.rarity} />
-                </div>
-              ) : null}
-            </div>
             </div>
           </>
         )}

@@ -57,7 +57,7 @@ const SKILL_MESHY_HTTP = {
       url: "https://api.meshy.ai/openapi/v1/image-to-3d/{{response.result}}",
       method: "GET",
       intervalMs: 10_000,
-      timeoutMs: 5 * 60_000,
+      timeoutMs: 15 * 60_000,
       successWhen: { path: "status", equals: "SUCCEEDED" },
       failureWhen: [
         { path: "status", equals: "FAILED" },
@@ -71,7 +71,8 @@ const SKILL_MESHY_HTTP = {
       maxBytes: 50 * 1024 * 1024,
     },
     responseTransform: {
-      _download: "{{response._download}}",
+      downloadBase64: "{{response._download.base64}}",
+      downloadContentType: "{{response._download.contentType}}",
       taskId: "{{response.id}}",
       previewImageUrl: "{{response.thumbnail_url}}",
     },
@@ -98,8 +99,8 @@ const SKILL_SAVE_ASSET = {
     bodyTemplate: {
       relicSlug: "{{relicSlug}}",
       kind: "{{kind}}",
-      base64: "{{_download.base64}}",
-      contentType: "{{_download.contentType}}",
+      base64: "{{downloadBase64}}",
+      contentType: "{{downloadContentType}}",
     },
     responseTransform: {
       savedPath: "{{response.savedPath}}",
@@ -137,7 +138,8 @@ const FORGE_PIPELINE = {
       equipSlot: 2,
       inputFrom: {
         merge: {
-          _download: "meshy-3d.output._download",
+          downloadBase64: "meshy-3d.output.downloadBase64",
+          downloadContentType: "meshy-3d.output.downloadContentType",
           relicSlug: "agent.input.relicSlug",
           relicId: "agent.input._relicId",
           kind: "agent.input.kind",
@@ -175,7 +177,19 @@ async function ensureSkill(
 ): Promise<string> {
   const existing = await prisma.skill.findUnique({ where: { slug: spec.slug } });
   if (existing) {
-    console.log(`[migrate-meshy-forge] skill "${spec.slug}" already exists (${existing.id}); skipping`);
+    await prisma.skill.update({
+      where: { id: existing.id },
+      data: {
+        handlerConfig: spec.handlerConfig,
+        nameEn: spec.nameEn,
+        nameZh: spec.nameZh,
+        descriptionEn: spec.descriptionEn,
+        descriptionZh: spec.descriptionZh,
+        kind: spec.kind,
+        status: "ONLINE",
+      },
+    });
+    console.log(`[migrate-meshy-forge] skill "${spec.slug}" exists (${existing.id}); healed config`);
     return existing.id;
   }
   const created = await prisma.skill.create({

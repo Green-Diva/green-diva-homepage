@@ -29,7 +29,6 @@ export const relicCreateSchema = z.object({
   rarity: z.enum(RARITIES),
   iconKey: z.string().max(64).optional().nullable(),
   modelPath: z.string().max(512).optional().nullable(),
-  photoPaths: z.array(z.string().max(512)).max(20).optional().default([]),
   archivePath: z
     .string()
     .max(512)

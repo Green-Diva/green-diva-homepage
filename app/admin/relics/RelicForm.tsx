@@ -19,7 +19,6 @@ import RegenMetadataPreview from "./RegenMetadataPreview";
 import AssetCard from "./AssetCard";
 import MetaFields, { type MetaFieldsValue } from "./MetaFields";
 import LoreFields from "./LoreFields";
-import ArchiveFields from "./ArchiveFields";
 
 const RARITIES = ["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"] as const;
 
@@ -41,7 +40,6 @@ type FormState = {
   loreZh: string;
   password: string;
   modelPath: string;
-  photoPaths: string[];
   archivePath: string;
   derivedArchivePath: string;
   primaryImagePath: string | null;
@@ -66,7 +64,6 @@ const EMPTY: FormState = {
   loreZh: "",
   password: "",
   modelPath: "",
-  photoPaths: [],
   archivePath: "",
   derivedArchivePath: "",
   primaryImagePath: null,
@@ -93,16 +90,16 @@ export default function RelicForm({
   const [state, setState] = useState<FormState>(() =>
     initial
       ? {
-          ...EMPTY,
-          slot: initial.slot,
-          slug: initial.slug,
-          meta: {
-            ...EMPTY.meta,
-            nameEn: initial.nameEn,
-            nameZh: initial.nameZh,
-            rarity: initial.rarity,
-          },
-        }
+        ...EMPTY,
+        slot: initial.slot,
+        slug: initial.slug,
+        meta: {
+          ...EMPTY.meta,
+          nameEn: initial.nameEn,
+          nameZh: initial.nameZh,
+          rarity: initial.rarity,
+        },
+      }
       : { ...EMPTY, slot: presetSlot ?? EMPTY.slot },
   );
   const [pending, setPending] = useState(false);
@@ -146,7 +143,6 @@ export default function RelicForm({
           loreZh: d.loreZh ?? "",
           password: "",
           modelPath: d.modelPath ?? "",
-          photoPaths: Array.isArray(d.photoPaths) ? d.photoPaths : [],
           archivePath: d.archivePath ?? "",
           derivedArchivePath: d.derivedArchivePath ?? "",
           primaryImagePath: typeof d.primaryImagePath === "string" ? d.primaryImagePath : null,
@@ -181,7 +177,6 @@ export default function RelicForm({
           loreZh: d.loreZh ?? "",
           password: "",
           modelPath: d.modelPath ?? "",
-          photoPaths: Array.isArray(d.photoPaths) ? d.photoPaths : [],
           archivePath: d.archivePath ?? "",
           derivedArchivePath: d.derivedArchivePath ?? "",
           primaryImagePath: typeof d.primaryImagePath === "string" ? d.primaryImagePath : null,
@@ -218,7 +213,6 @@ export default function RelicForm({
       ...(state.candidateImages !== null ? { candidateImages: state.candidateImages } : {}),
       ...(state.primaryImagePath !== null ? { primaryImagePath: state.primaryImagePath } : {}),
       modelPath: state.modelPath || null,
-      photoPaths: state.photoPaths,
       archivePath: state.archivePath || null,
       derivedArchivePath: state.derivedArchivePath || null,
     };
@@ -374,29 +368,7 @@ export default function RelicForm({
           </div>
         ) : null}
 
-        {/* §7 资料包 — folded by default */}
-        {isEdit ? (
-          <ArchiveFields
-            slug={state.slug}
-            archivePath={state.archivePath}
-            derivedArchivePath={state.derivedArchivePath}
-            photoPaths={state.photoPaths}
-            modelPath={state.modelPath}
-            onChange={(next) =>
-              setState((s) => ({
-                ...s,
-                archivePath: next.archivePath,
-                derivedArchivePath: next.derivedArchivePath,
-                photoPaths: next.photoPaths,
-                modelPath: next.modelPath,
-              }))
-            }
-            disabled={pending}
-            t={t}
-          />
-        ) : null}
-
-        {/* §8 解锁密码 — folded */}
+        {/* §7 解锁密码 — folded */}
         <details className="border border-primary/15 bg-surface-container/20">
           <summary className="cursor-pointer px-3 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant hover:text-primary select-none">
             {isEdit && initial?.hasPassword

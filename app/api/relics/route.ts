@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
         rarity: data.rarity,
         iconKey: data.iconKey ?? null,
         modelPath: data.modelPath ?? null,
-        photoPaths: data.photoPaths ?? [],
         archivePath: data.archivePath ?? null,
         derivedArchivePath: data.derivedArchivePath ?? null,
         loreEn: data.loreEn ?? null,
