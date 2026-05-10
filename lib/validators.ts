@@ -104,17 +104,58 @@ const dagBranchNodeSchema = z.object({
   position: positionSchema,
 });
 
-const dagNodeSchema = z.discriminatedUnion("type", [
-  dagSkillNodeSchema,
-  dagBranchNodeSchema,
-]);
-
 const dagEdgeSchema = z.object({
   from: z.string().min(1).max(64),
   to: z.string().min(1).max(64),
   // Required iff source node is a branch — must match a case label or defaultLabel.
   when: z.string().min(1).max(64).optional(),
 });
+
+// Phase 8 — loop node. Body is a self-contained sub-DAG (own nodes +
+// edges) so the outer topology stays acyclic. Each iteration runs the
+// body with its `inputFrom` resolved value as the iteration state;
+// subsequent iterations feed the prior iteration's leaf output back as
+// the next iteration's state. Exit on the first matching exitWhen case
+// OR on hitting maxIterations.
+//
+// Recursive shape via z.lazy() — body.nodes can itself contain loop
+// nodes. Nesting depth capped at runtime (not schema) to keep cost +
+// stack bounded.
+//
+// The lazy is anchored on the BODY object (not the union) because
+// z.discriminatedUnion requires concrete ZodObject options. Trick:
+// dagLoopNodeSchema's `body` is the only recursive seam; once parsing
+// reaches it, lazy forwards back to the same dagNodeSchema discriminator.
+const dagLoopNodeSchema: z.ZodTypeAny = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
+  type: z.literal("loop"),
+  inputFrom: sourceRef,
+  // Hard cap on iterations — runtime burns LLM tokens / API quota per
+  // pass, so the upper bound matters for cost predictability. Admin
+  // can request a wider cap if a use case warrants more.
+  maxIterations: z.number().int().min(1).max(10),
+  // Each case: when this matches the iteration's leaf output (drilled
+  // by `path`), the loop exits. Empty / unset = run to maxIterations.
+  // `label` field is required by branchCaseSchema but unused here (no
+  // labeled exit edges) — admins set any non-empty string.
+  exitWhen: z.array(branchCaseSchema).max(10).optional(),
+  // Recursive seam. body.nodes can itself contain loop nodes; the lazy
+  // breaks the cyclic type reference at compile time.
+  body: z.lazy(() =>
+    z.object({
+      nodes: z.array(dagNodeSchema).min(1).max(20),
+      edges: z.array(dagEdgeSchema).max(40),
+    }),
+  ),
+  aggregate: z.enum(["last", "concat-array"]).optional(),
+  position: positionSchema,
+});
+
+const dagNodeSchema = z.discriminatedUnion("type", [
+  dagSkillNodeSchema,
+  dagBranchNodeSchema,
+  dagLoopNodeSchema as unknown as typeof dagSkillNodeSchema,
+]);
 
 export const pipelineConfigV2Schema = z.object({
   version: z.literal(2),

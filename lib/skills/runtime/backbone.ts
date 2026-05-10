@@ -27,6 +27,7 @@
 // live leaf's output (a leaf = node with no outgoing edges).
 
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { invokeSkill } from "@/lib/skills/invoke";
 import type { AgentRunResult, AgentRunLogEntry } from "@/lib/agents/invoke";
@@ -57,9 +58,38 @@ type BranchNode = {
   defaultLabel?: string;
 };
 
-type DagNode = SkillNode | BranchNode;
+// Phase 8 — loop node. Runs `body` sub-DAG up to maxIterations times.
+// Each iteration uses the previous iteration's leaf output as its input
+// (first iteration uses inputFrom-resolved value). Exits when any
+// exitWhen case matches the iteration's leaf output, or when
+// maxIterations is reached. Body is a SELF-CONTAINED sub-DAG — its
+// node IDs / source refs are scoped to the body; the outer DAG sees the
+// loop node as opaque, exposing only the loop's aggregated output.
+type LoopNode = {
+  id: string;
+  type: "loop";
+  inputFrom: SourceRef;
+  maxIterations: number;
+  exitWhen?: BranchCase[];
+  body: { nodes: DagNode[]; edges: DagEdge[] };
+  aggregate?: "last" | "concat-array";
+};
+
+type DagNode = SkillNode | BranchNode | LoopNode;
 type DagEdge = { from: string; to: string; when?: string };
 type DagConfig = { version: 2; nodes: DagNode[]; edges: DagEdge[] };
+
+// Hard cap on loop nesting — prevents runaway recursion if admin
+// accidentally configures deeply nested loops. Two levels covers
+// "outer loop coordinates per-item processing, inner loop retries".
+const MAX_LOOP_DEPTH = 2;
+
+// Equip map shape used internally — defined here so the recursive
+// runBackbone (sub-DAG invocation from loop bodies) can pass the same
+// map down without re-loading from DB. Mirrors the Prisma payload of
+// `findMany({ include: { skill: true } })`.
+type BackboneEquip = Prisma.AgentSkillEquipGetPayload<{ include: { skill: true } }>;
+type BackboneEquipMap = Map<number, BackboneEquip>;
 
 // — — Validation + v1 → v2 normalization — — — — — — — — — — — — — — —
 
@@ -180,6 +210,55 @@ function validateAndNormalize(cfg: unknown): ValidationOk | ValidationFail {
         return { ok: false, code: "PIPELINE_INVALID", message: `node "${id}".equipSlot must be 0-5` };
       }
       nodes.push({ id, type: "skill", equipSlot: slot, inputFrom: inputRef });
+    } else if (raw.type === "loop") {
+      const maxIter = raw.maxIterations;
+      if (typeof maxIter !== "number" || !Number.isInteger(maxIter) || maxIter < 1 || maxIter > 10) {
+        return { ok: false, code: "PIPELINE_INVALID", message: `loop "${id}".maxIterations must be 1-10` };
+      }
+      // exitWhen reuses BranchCase shape — admin sets `label` to any
+      // non-empty string; we ignore the label since loop exit isn't via
+      // labeled edges.
+      const exitWhen: BranchCase[] | undefined = (() => {
+        if (raw.exitWhen === undefined) return undefined;
+        if (!Array.isArray(raw.exitWhen)) return undefined;
+        const cases: BranchCase[] = [];
+        for (const c of raw.exitWhen) {
+          if (!isObject(c)) continue;
+          const path = typeof c.path === "string" ? c.path : null;
+          if (path === null) continue;
+          if (c.op !== "eq" && c.op !== "ne" && c.op !== "in" && c.op !== "exists") continue;
+          const label = typeof c.label === "string" && c.label ? c.label : "exit";
+          cases.push({ path, op: c.op, value: c.value, label });
+        }
+        return cases;
+      })();
+      if (!isObject(raw.body) || !Array.isArray(raw.body.nodes) || !Array.isArray(raw.body.edges)) {
+        return { ok: false, code: "PIPELINE_INVALID", message: `loop "${id}".body must have nodes[] + edges[]` };
+      }
+      // Recursively validate body sub-DAG. Wrap in v2 envelope so
+      // validateAndNormalize gives full topological + ref checks.
+      const bodyValidated = validateAndNormalize({
+        version: 2,
+        nodes: raw.body.nodes,
+        edges: raw.body.edges,
+      });
+      if (!bodyValidated.ok) {
+        return {
+          ok: false,
+          code: "PIPELINE_INVALID",
+          message: `loop "${id}".body invalid: ${bodyValidated.message}`,
+        };
+      }
+      const aggregate = raw.aggregate === "concat-array" ? "concat-array" : "last";
+      nodes.push({
+        id,
+        type: "loop",
+        inputFrom: inputRef,
+        maxIterations: maxIter,
+        exitWhen,
+        body: bodyValidated.config,
+        aggregate,
+      });
     } else if (raw.type === "branch") {
       if (!Array.isArray(raw.cases) || raw.cases.length === 0) {
         return { ok: false, code: "PIPELINE_INVALID", message: `branch "${id}" must have ≥1 case` };
@@ -208,7 +287,7 @@ function validateAndNormalize(cfg: unknown): ValidationOk | ValidationFail {
       return {
         ok: false,
         code: "PIPELINE_INVALID",
-        message: `node "${id}".type must be "skill" or "branch"`,
+        message: `node "${id}".type must be "skill" | "branch" | "loop"`,
       };
     }
   }
@@ -259,6 +338,8 @@ function checkDag(dag: DagConfig): ValidationOk | ValidationFail {
         };
       }
     }
+    // Loop nodes have unlabeled outgoing edges (one downstream chain
+    // after the loop exits) — no `when` validation needed.
   }
 
   for (const n of dag.nodes) {
@@ -340,12 +421,27 @@ export async function runBackbone(opts: {
   // the same percentage for the duration of a long step. Errors thrown by
   // the callback are swallowed — progress reporting must never break a run.
   onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
+  // INTERNAL — recursive sub-DAG invocations from loop nodes set these.
+  // _internalEquips: skip the DB equip lookup (parent already has it).
+  // _depth: track nesting for MAX_LOOP_DEPTH enforcement.
+  // _runLog: append to caller's runLog (so loop body entries land in
+  //          the same trace, prefixed with the loop's iteration).
+  // _stepIdPrefix: e.g. "imageLoop#2/" — prefixes every entry's stepId.
+  _internalEquips?: BackboneEquipMap;
+  _depth?: number;
+  _runLog?: AgentRunLogEntry[];
+  _stepIdPrefix?: string;
 }): Promise<AgentRunResult> {
   const v = validateAndNormalize(opts.pipelineConfig);
   if (!v.ok) {
-    return { ok: false, errorCode: v.code, errorMessage: v.message, runLog: [] };
+    return { ok: false, errorCode: v.code, errorMessage: v.message, runLog: opts._runLog ?? [] };
   }
   const config = v.config;
+  const stepIdPrefix = opts._stepIdPrefix ?? "";
+  const depth = opts._depth ?? 0;
+  // Sub-DAG invocations append to the caller's runLog so all entries
+  // (including loop body iterations) end up in one unified trace.
+  const runLog: AgentRunLogEntry[] = opts._runLog ?? [];
   const emitProgress = async () => {
     if (!opts.onProgress) return;
     try {
@@ -355,13 +451,20 @@ export async function runBackbone(opts: {
     }
   };
 
-  const equips = await prisma.agentSkillEquip.findMany({
-    where: { agentId: opts.agentId, slotIndex: { not: null } },
-    include: { skill: true },
-  });
-  const equipBySlot = new Map<number, (typeof equips)[number]>();
-  for (const e of equips) {
-    if (e.slotIndex !== null) equipBySlot.set(e.slotIndex, e);
+  // Equip lookup: top-level invocations hit DB; sub-DAG invocations
+  // (loop body) reuse the parent's equip map.
+  let equipBySlot: BackboneEquipMap;
+  if (opts._internalEquips) {
+    equipBySlot = opts._internalEquips;
+  } else {
+    const equips = await prisma.agentSkillEquip.findMany({
+      where: { agentId: opts.agentId, slotIndex: { not: null } },
+      include: { skill: true },
+    });
+    equipBySlot = new Map();
+    for (const e of equips) {
+      if (e.slotIndex !== null) equipBySlot.set(e.slotIndex, e);
+    }
   }
 
   // Topo order for traversal.
@@ -397,7 +500,6 @@ export async function runBackbone(opts: {
   const liveNodes = new Set<string>();
   const skippedNodes = new Set<string>();
   const outputs = new Map<string, unknown>();
-  const runLog: AgentRunLogEntry[] = [];
 
   // Skipped sources resolve to null so a downstream merge can detect "branch
   // didn't run". `agent.input` is always available regardless of liveness.
@@ -433,7 +535,7 @@ export async function runBackbone(opts: {
   ): AgentRunResult => {
     const now = new Date();
     runLog.push({
-      stepId: nodeId,
+      stepId: stepIdPrefix + nodeId,
       skillId: extras?.skillId,
       startedAt: now.toISOString(),
       endedAt: now.toISOString(),
@@ -456,7 +558,7 @@ export async function runBackbone(opts: {
       skippedNodes.add(id);
       const now = new Date();
       runLog.push({
-        stepId: id,
+        stepId: stepIdPrefix + id,
         startedAt: now.toISOString(),
         endedAt: now.toISOString(),
         durationMs: 0,
@@ -488,7 +590,7 @@ export async function runBackbone(opts: {
       const endedAt = new Date();
       if (!invokeResult.ok) {
         runLog.push({
-          stepId: id,
+          stepId: stepIdPrefix + id,
           skillId: equip.skill.id,
           startedAt: startedAt.toISOString(),
           endedAt: endedAt.toISOString(),
@@ -508,7 +610,7 @@ export async function runBackbone(opts: {
       outputs.set(id, invokeResult.output);
       liveNodes.add(id);
       runLog.push({
-        stepId: id,
+        stepId: stepIdPrefix + id,
         skillId: equip.skill.id,
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
@@ -518,7 +620,7 @@ export async function runBackbone(opts: {
       });
       for (const e of config.edges) if (e.from === id) liveEdges.add(edgeKey(e));
       await emitProgress();
-    } else {
+    } else if (node.type === "branch") {
       const branchInput = resolveRef(node.inputFrom);
       let chosenLabel: string | undefined;
       for (const c of node.cases) {
@@ -548,7 +650,7 @@ export async function runBackbone(opts: {
       outputs.set(id, { branch: chosenLabel, value: branchInput });
       liveNodes.add(id);
       runLog.push({
-        stepId: id,
+        stepId: stepIdPrefix + id,
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
         durationMs: endedAt.getTime() - startMs,
@@ -559,6 +661,89 @@ export async function runBackbone(opts: {
       for (const e of config.edges) {
         if (e.from === id && e.when === chosenLabel) liveEdges.add(edgeKey(e));
       }
+      await emitProgress();
+    } else {
+      // node.type === "loop" — Phase 8.
+      if (depth >= MAX_LOOP_DEPTH) {
+        return failNode(
+          id,
+          "LOOP_TOO_DEEP",
+          `loop "${id}" exceeds MAX_LOOP_DEPTH=${MAX_LOOP_DEPTH}`,
+        );
+      }
+      let iterInput = resolveRef(node.inputFrom);
+      let iterOutput: unknown = undefined;
+      const aggregated: unknown[] = [];
+      const aggregateMode = node.aggregate ?? "last";
+      let exitedBy: "exitWhen" | "maxIterations" = "maxIterations";
+      let iterCount = 0;
+      let aborted = false;
+      let abortCode = "";
+      let abortMessage = "";
+      for (let i = 0; i < node.maxIterations; i++) {
+        iterCount = i + 1;
+        // Recurse into the same backbone executor with the body sub-DAG
+        // as pipelineConfig + the outer equip map preserved + this
+        // iteration's input as agent.input. The runLog is shared (entries
+        // append directly to outer trace, prefixed with "<id>#<n>/").
+        const sub = await runBackbone({
+          agentId: opts.agentId,
+          input: iterInput,
+          pipelineConfig: { version: 2, nodes: node.body.nodes, edges: node.body.edges },
+          onProgress: opts.onProgress,
+          _internalEquips: equipBySlot,
+          _depth: depth + 1,
+          _runLog: runLog,
+          _stepIdPrefix: `${stepIdPrefix}${id}#${iterCount}/`,
+        });
+        if (!sub.ok) {
+          aborted = true;
+          abortCode = sub.errorCode;
+          abortMessage = `loop "${id}" iter ${iterCount}: ${sub.errorMessage}`;
+          break;
+        }
+        iterOutput = sub.output;
+        if (aggregateMode === "concat-array" && Array.isArray(iterOutput)) {
+          aggregated.push(...iterOutput);
+        } else {
+          aggregated.push(iterOutput);
+        }
+        if (node.exitWhen && node.exitWhen.length > 0) {
+          const matched = node.exitWhen.some((c) => evalCase(iterOutput, c));
+          if (matched) {
+            exitedBy = "exitWhen";
+            break;
+          }
+        }
+        // Feed forward — next iteration's input is this iteration's output.
+        iterInput = iterOutput;
+      }
+      const endedAt = new Date();
+      if (aborted) {
+        runLog.push({
+          stepId: stepIdPrefix + id,
+          startedAt: startedAt.toISOString(),
+          endedAt: endedAt.toISOString(),
+          durationMs: endedAt.getTime() - startMs,
+          ok: false,
+          errorCode: abortCode,
+          errorMessage: abortMessage,
+          output: { iterations: iterCount, partialAggregate: aggregated },
+        });
+        return { ok: false, errorCode: abortCode, errorMessage: abortMessage, runLog };
+      }
+      const finalOut = aggregateMode === "concat-array" ? aggregated : iterOutput;
+      outputs.set(id, finalOut);
+      liveNodes.add(id);
+      runLog.push({
+        stepId: stepIdPrefix + id,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+        durationMs: endedAt.getTime() - startMs,
+        ok: true,
+        output: { iterations: iterCount, exitedBy, finalOutput: finalOut },
+      });
+      for (const e of config.edges) if (e.from === id) liveEdges.add(edgeKey(e));
       await emitProgress();
     }
   }
