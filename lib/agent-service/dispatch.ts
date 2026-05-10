@@ -183,6 +183,13 @@ export async function dispatchScene(
         mode: resolved.agent.mode,
         input: jsonOrNull(resolved.agentInput),
         status: "PENDING",
+        // Phase 7 telemetry — populated by every scene-routed call so the
+        // Activity tab can group by scene + show actor + routedTo.
+        // Direct /api/agents/[id]/invoke leaves these null.
+        sceneKey,
+        actorUserId: actor?.userId ?? null,
+        actorName: actor?.name ?? null,
+        routedTo: resolved.routedTo,
       },
       select: { id: true, status: true, createdAt: true },
     });
@@ -237,6 +244,11 @@ export async function callScene<T = unknown>(
         status: "RUNNING",
         startedAt: new Date(),
         attempts: 1,
+        // Phase 7 telemetry (same as dispatchScene path).
+        sceneKey,
+        actorUserId: actor?.userId ?? null,
+        actorName: actor?.name ?? null,
+        routedTo: resolved.routedTo,
       },
       select: { id: true },
     });

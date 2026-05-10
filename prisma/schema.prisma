@@ -442,8 +442,19 @@ model AgentJob {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
+  // Phase 7 — telemetry for the cross-module Activity tab. All nullable
+  // because direct /api/agents/[id]/invoke (no scene) keeps these blank.
+  // sceneKey: which registered scene fired this call (e.g. "relic.create3d").
+  // actorUserId / actorName: snapshot of the admin/user who invoked.
+  // routedTo: "primary" or "fallback" when SceneBinding.rolloutPct < 100.
+  sceneKey     String?
+  actorUserId  String?
+  actorName    String?
+  routedTo     String?
+
   @@index([status, updatedAt])
   @@index([agentId, createdAt])
+  @@index([sceneKey, createdAt])
 }
 
 enum SkillKind {

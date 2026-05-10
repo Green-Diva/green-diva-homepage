@@ -443,6 +443,18 @@ export interface Dictionary {
     tabAgents: string;
     tabSkillLibrary: string;
     tabScenes: string;
+    tabActivity: string;
+    activityTitle: string;
+    activityRefresh: string;
+    activityLoading: string;
+    activityEmpty: string;
+    activityAdminOnly: string;
+    activityFilterScene: string;
+    activityFilterAgent: string;
+    activityFilterStatus: string;
+    activityFilterWindow: string;
+    activityCountTotal: string;
+    activityAny: string;
     exportAgent: string;
     importAgent: string;
     importAgentTitle: string;
