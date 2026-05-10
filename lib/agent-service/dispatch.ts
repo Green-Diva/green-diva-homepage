@@ -43,6 +43,10 @@ type ResolvedBinding = {
   agentInput: unknown;
   ctxResolved: unknown;
   actor: SceneActor | null;
+  // Phase 6.2: which slot of the binding actually fired this call.
+  // "primary" or "fallback" — surfaced in dispatch result so callers can
+  // log A/B routing for telemetry without re-doing the rolloutPct math.
+  routedTo: "primary" | "fallback";
 };
 
 async function resolveBinding(
@@ -76,14 +80,45 @@ async function resolveBinding(
     throw new SceneError("BINDING_DISABLED", `scene "${sceneKey}" binding is disabled`, 503);
   }
 
-  const agent = await prisma.agent.findUnique({
-    where: { id: binding.agentId },
+  // Phase 6.2 — staged rollout / canary. When rolloutPct < 100 AND a
+  // fallbackAgentId is set, roll a per-call dice: probability rolloutPct%
+  // for the primary agent, the rest for the fallback. Both agents must
+  // exist + be deployed; if either is missing, fall back to whichever is
+  // healthy. routedTo is surfaced so the runner can log A/B telemetry.
+  const rolloutPct = typeof binding.rolloutPct === "number" ? binding.rolloutPct : 100;
+  const usePrimary =
+    rolloutPct >= 100 ||
+    !binding.fallbackAgentId ||
+    Math.random() * 100 < rolloutPct;
+  const targetAgentId = usePrimary ? binding.agentId : (binding.fallbackAgentId ?? binding.agentId);
+
+  let agent = await prisma.agent.findUnique({
+    where: { id: targetAgentId },
     select: { id: true, codename: true, mode: true, deployedAt: true },
   });
+  let routedTo: "primary" | "fallback" = usePrimary ? "primary" : "fallback";
+
+  // If the chosen agent is missing/undeployed AND we have an alternative,
+  // try the other one. Avoids a "fallback agent got deleted" outage when
+  // the primary is still healthy.
+  if ((!agent || !agent.deployedAt) && targetAgentId !== binding.agentId) {
+    const alt = await prisma.agent.findUnique({
+      where: { id: binding.agentId },
+      select: { id: true, codename: true, mode: true, deployedAt: true },
+    });
+    if (alt && alt.deployedAt) {
+      agent = alt;
+      routedTo = "primary";
+      console.warn(
+        `[scene:dispatch] ${sceneKey} fallback agent unavailable → using primary "${alt.codename}"`,
+      );
+    }
+  }
+
   if (!agent) {
     throw new SceneError(
       "AGENT_MISSING",
-      `scene "${sceneKey}" binding points to agentId "${binding.agentId}" which no longer exists`,
+      `scene "${sceneKey}" binding points to agentId "${targetAgentId}" which no longer exists`,
       503,
     );
   }
@@ -118,6 +153,7 @@ async function resolveBinding(
     agentInput,
     ctxResolved: ctxResult.data,
     actor,
+    routedTo,
   };
 }
 

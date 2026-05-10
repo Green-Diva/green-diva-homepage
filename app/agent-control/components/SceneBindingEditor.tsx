@@ -69,6 +69,11 @@ export default function SceneBindingEditor({
   );
   const [enabled, setEnabled] = useState<boolean>(binding?.enabled ?? true);
   const [notes, setNotes] = useState<string>(binding?.notes ?? "");
+  // Phase 6.2 — staged rollout / canary. rolloutPct=100 means "always
+  // primary"; <100 sends (100-rolloutPct)% of dispatch calls to the
+  // fallback agent (if set).
+  const [rolloutPct, setRolloutPct] = useState<number>(binding?.rolloutPct ?? 100);
+  const [fallbackAgentId, setFallbackAgentId] = useState<string>(binding?.fallbackAgentId ?? "");
 
   const [sampleCtxText, setSampleCtxText] = useState<string>("{}");
   const [sampleResult, setSampleResult] = useState<
@@ -139,6 +144,8 @@ export default function SceneBindingEditor({
           outputMap: (outputMapParsed as { ok: true; value: unknown }).value,
           enabled,
           notes: notes.trim() || null,
+          rolloutPct,
+          fallbackAgentId: fallbackAgentId || null,
         }),
       });
       if (!res.ok) {
@@ -315,6 +322,53 @@ export default function SceneBindingEditor({
         </div>
         <p className="text-[11px] text-on-surface-variant -mt-3">
           {t.agentControl.sceneEditorEnabledHint}
+        </p>
+
+        {/* Rollout + fallback (Phase 6.2). Only meaningful when both
+            primary + fallback are set; rolloutPct=100 disables the
+            random split and always goes to primary. */}
+        <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-4 items-start">
+          <label className="block">
+            <div className="font-label text-[10px] tracking-[0.3em] uppercase text-primary mb-1">
+              {t.agentControl.sceneEditorRolloutPct}
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={rolloutPct}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setRolloutPct(Number.isFinite(n) ? Math.max(0, Math.min(100, Math.floor(n))) : 100);
+              }}
+              disabled={busy}
+              className="w-full bg-surface-variant border border-primary/30 rounded px-3 py-2 text-sm text-on-surface font-mono focus:outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <div className="font-label text-[10px] tracking-[0.3em] uppercase text-primary mb-1">
+              {t.agentControl.sceneEditorFallbackAgent}
+            </div>
+            <select
+              value={fallbackAgentId}
+              onChange={(e) => setFallbackAgentId(e.target.value)}
+              disabled={busy}
+              className="w-full bg-surface-variant border border-primary/30 rounded px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary"
+            >
+              <option value="">{t.agentControl.sceneEditorFallbackNone}</option>
+              {selectableAgents
+                .filter((a) => a.id !== agentId)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.codename}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+        <p className="text-[11px] text-on-surface-variant -mt-3">
+          {t.agentControl.sceneEditorRolloutHint}
         </p>
 
         {/* Sample run section */}

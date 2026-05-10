@@ -493,6 +493,10 @@ export interface Dictionary {
     sceneEditorResultOk: string;
     sceneEditorResultErr: string;
     sceneEditorSampleCtxInvalid: string;
+    sceneEditorRolloutPct: string;
+    sceneEditorFallbackAgent: string;
+    sceneEditorFallbackNone: string;
+    sceneEditorRolloutHint: string;
     skillLibraryTitle: string;
     skillKindPassive: string;
     skillKindActive: string;

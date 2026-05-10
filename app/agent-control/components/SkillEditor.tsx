@@ -20,10 +20,10 @@ const STATUS_OPTIONS = ["ONLINE", "OFFLINE"] as const;
 // Internal handler slugs registered in lib/skills/handlers/internal/index.ts.
 // Hardcoded here on purpose — adding a new internal handler is a code commit
 // (CLAUDE.md "no ZIP plugins"), so the dropdown stays in lockstep manually.
-// Phase 5 cleanup removed: meshy-3d, relic-cutout, relic-image-pick (forge'd).
+// Phase 5+6 cleanup removed: meshy-3d, relic-cutout, relic-image-pick,
+// relic-gemini-researcher (all forge'd to LLM_PROMPT/HTTP_API skills).
 const INTERNAL_HANDLER_SLUGS = [
   "relic-files-summary",
-  "relic-gemini-researcher",
   "relic-smart-image-pick",
   "image-to-data-uri",
 ] as const;
