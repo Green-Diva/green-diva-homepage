@@ -124,9 +124,9 @@ export async function runOrchestrator(opts: {
     };
   }
 
-  // toolName → skill lookup for invocation.
-  const toolMap = new Map<string, Skill>();
-  for (const e of usableEquips) toolMap.set(toolNameFor(e.skill), e.skill);
+  // Runtime index built from this agent's equipped ONLINE skills.
+  const equippedSkillIndex = new Map<string, Skill>();
+  for (const e of usableEquips) equippedSkillIndex.set(toolNameFor(e.skill), e.skill);
 
   const maxIter = typeof config.maxIterations === "number" ? Math.min(50, Math.max(1, config.maxIterations)) : 10;
   const temperature = typeof config.temperature === "number" ? config.temperature : 1.0;
@@ -144,7 +144,7 @@ export async function runOrchestrator(opts: {
     const stepId = `iter-${iter + 1}.tool-${idx + 1}`;
     const startedAt = new Date();
     const startedAtMs = Date.now();
-    const skill = toolMap.get(toolName);
+    const skill = equippedSkillIndex.get(toolName);
     if (!skill) {
       const message = `LLM called unknown tool "${toolName}"`;
       runLog.push({

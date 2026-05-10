@@ -525,12 +525,12 @@ model AgentSkillEquip {
   @@index([skillId])
 }
 
-// SceneBinding — admin-editable mapping of a code-registered Scene
+// SceneBinding — admin-editable routing of a code-registered Scene
 // (lib/<module>/scenes.ts → registerScene) to the Agent that satisfies it.
 //
 // The Scene definition (zod schemas, capability tags, label) lives in
 // code so type checks bite at build time. The CHOICE OF AGENT and the
-// input/output mapping live here so admin can rewire scenes without
+// input/output templates live here so admin can rewire scenes without
 // touching code (the entire point of the agent service).
 //
 // onDelete: Restrict on the agent FK is intentional — we don't want
