@@ -72,9 +72,9 @@ async function updateBindingOutputMap(
   console.log(`[migrate-phase5] set outputMap for ${sceneKey}`);
 }
 
-type DagNode = { id: string; type?: string; equipSlot?: number; [k: string]: unknown };
-type DagEdge = { from: string; to: string; when?: string; [k: string]: unknown };
-type DagConfig = { version?: number; nodes?: DagNode[]; edges?: DagEdge[]; [k: string]: unknown };
+type DagNode = { id: string; type?: string; equipSlot?: number;[k: string]: unknown };
+type DagEdge = { from: string; to: string; when?: string;[k: string]: unknown };
+type DagConfig = { version?: number; nodes?: DagNode[]; edges?: DagEdge[];[k: string]: unknown };
 
 // Removes specific node IDs + any edges that touch them. Also strips the
 // branch-router's `cases` entries that target the dropped labels (cutout
@@ -95,7 +95,7 @@ function stripScribeStaleNodes(pipeline: DagConfig | null): {
       // dropped labels too.
       const rawCases = (n as Record<string, unknown>).cases;
       if (n.id === "mode" && Array.isArray(rawCases)) {
-        const cases = rawCases as Array<{ label?: string; [k: string]: unknown }>;
+        const cases = rawCases as Array<{ label?: string;[k: string]: unknown }>;
         return {
           ...n,
           cases: cases.filter((c) => !dropBranchLabels.has(c.label ?? "")),
@@ -152,15 +152,14 @@ async function cleanScribeLoadout(prisma: PrismaClient): Promise<void> {
 async function dropObsoleteSkills(prisma: PrismaClient): Promise<void> {
   // Keyed by handler slug inside handlerConfig — slug column on Skill
   // can vary (e.g. derived ones); the inner `handler` field is the
-  // canonical identifier for INTERNAL handlers.
+  // canonical identifier for the obsolete rows we want to delete.
   const obsoleteHandlers = ["relic-cutout", "meshy-3d", "relic-image-pick"];
   // Use raw SQL because Prisma's JsonFilter doesn't support cross-DB
   // path-equals reliably; SCRIBE-001 doesn't reference these via slug
-  // alone (they're INTERNAL with handlerConfig.handler set).
+  // alone.
   const rows = await prisma.$queryRawUnsafe<{ id: string; slug: string | null; nameEn: string }[]>(
     `SELECT id, slug, "nameEn" FROM "Skill"
-     WHERE "kind" = 'INTERNAL'
-       AND "handlerConfig"->>'handler' = ANY($1::text[])`,
+     WHERE "handlerConfig"->>'handler' = ANY($1::text[])`,
     obsoleteHandlers,
   );
   if (rows.length === 0) {

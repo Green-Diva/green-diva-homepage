@@ -54,8 +54,7 @@ async function clearScribeLoadout(prisma: PrismaClient): Promise<void> {
 async function dropGeminiResearcherSkill(prisma: PrismaClient): Promise<void> {
   const rows = await prisma.$queryRawUnsafe<{ id: string; nameEn: string }[]>(
     `SELECT id, "nameEn" FROM "Skill"
-     WHERE "kind" = 'INTERNAL'
-       AND "handlerConfig"->>'handler' = 'relic-gemini-researcher'`,
+     WHERE "handlerConfig"->>'handler' = 'relic-gemini-researcher'`,
   );
   if (rows.length === 0) {
     console.log("[migrate-phase6] no relic-gemini-researcher Skill row to drop");
