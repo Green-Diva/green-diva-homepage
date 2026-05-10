@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useT } from "@/lib/i18n/client";
+import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { SkillRow, HandlerKind } from "../types";
 
@@ -20,17 +20,163 @@ const STATUS_OPTIONS = ["ONLINE", "OFFLINE"] as const;
 // Internal handler slugs registered in lib/skills/handlers/internal/index.ts.
 // Hardcoded here on purpose — adding a new internal handler is a code commit
 // (CLAUDE.md "no ZIP plugins"), so the dropdown stays in lockstep manually.
+// Phase 5 cleanup removed: meshy-3d, relic-cutout, relic-image-pick (forge'd).
 const INTERNAL_HANDLER_SLUGS = [
   "relic-files-summary",
   "relic-gemini-researcher",
   "relic-smart-image-pick",
-  "relic-cutout",
-  "meshy-3d",
-  "relic-image-pick",
+  "image-to-data-uri",
 ] as const;
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-const LLM_PROVIDERS = ["anthropic", "openai"] as const;
+// Phase 2.1 added gemini support — surface it in the structured form.
+const LLM_PROVIDERS = ["anthropic", "openai", "gemini"] as const;
+
+// — — Skill Presets (Phase 3) — — — — — — — — — — — — — — — — — — — — —
+//
+// "What does this skill do?" is the admin-facing concept; handlerKind is
+// the storage detail. Every preset maps to a (handlerKind, defaultConfig)
+// pair. Selecting a preset for a fresh skill scaffolds the config; for an
+// edited skill it just shifts kind without clobbering admin's typed
+// fields. The raw handlerKind dropdown still exists in Advanced mode.
+type SkillPreset = {
+  key: string;
+  labelEn: string;
+  labelZh: string;
+  descEn: string;
+  descZh: string;
+  handlerKind: HandlerKind;
+  // Only applied when admin first picks the preset on a NEW skill, OR
+  // when switching from a different preset (so config doesn't end up
+  // half-old / half-new). Existing same-preset edits are preserved.
+  defaultConfig: Record<string, unknown>;
+};
+
+const SKILL_PRESETS: SkillPreset[] = [
+  {
+    key: "llm-anthropic",
+    labelEn: "Call an LLM (Anthropic Claude)",
+    labelZh: "调用 LLM（Anthropic Claude）",
+    descEn: "System prompt + user template → text or JSON. Vision optional.",
+    descZh: "system prompt + user template → 文本或 JSON。可选视觉。",
+    handlerKind: "LLM_PROMPT",
+    defaultConfig: { provider: "anthropic", model: "claude-opus-4-7" },
+  },
+  {
+    key: "llm-openai",
+    labelEn: "Call an LLM (OpenAI GPT)",
+    labelZh: "调用 LLM（OpenAI GPT）",
+    descEn: "GPT-4o / GPT-4 family. JSON mode supported.",
+    descZh: "GPT-4o / GPT-4 系列。支持 JSON 模式。",
+    handlerKind: "LLM_PROMPT",
+    defaultConfig: { provider: "openai", model: "gpt-4o" },
+  },
+  {
+    key: "llm-gemini",
+    labelEn: "Call an LLM (Google Gemini, multimodal)",
+    labelZh: "调用 LLM（Google Gemini，多模态）",
+    descEn: "Vision + optional Google Search grounding. Best for research / image-heavy tasks.",
+    descZh: "视觉 + 可选 Google Search grounding。调研 / 多图任务最佳。",
+    handlerKind: "LLM_PROMPT",
+    defaultConfig: { provider: "gemini", model: "gemini-2.5-flash" },
+  },
+  {
+    key: "http-api",
+    labelEn: "Call an external HTTP API",
+    labelZh: "调用外部 HTTP API",
+    descEn: "REST request with auth, body template, response shaping.",
+    descZh: "REST 请求，含鉴权、body 模板、响应塑形。",
+    handlerKind: "HTTP_API",
+    defaultConfig: { method: "POST", responseType: "json" },
+  },
+  {
+    key: "http-async",
+    labelEn: "Async HTTP API (submit + poll + download)",
+    labelZh: "异步 HTTP API（提交 + 轮询 + 下载）",
+    descEn: "Submit a long-running task, poll for status, download result. Used for Meshy / fal.",
+    descZh: "提交长任务，轮询状态，下载结果。Meshy / fal 等用此预设。",
+    handlerKind: "HTTP_API",
+    defaultConfig: {
+      method: "POST",
+      responseType: "json",
+      polling: {
+        url: "{{response.statusUrl}}",
+        method: "GET",
+        intervalMs: 5000,
+        timeoutMs: 300000,
+        successWhen: { path: "status", equals: "SUCCEEDED" },
+      },
+    },
+  },
+  {
+    key: "save-asset",
+    labelEn: "Save asset to relic storage",
+    labelZh: "保存资产到 relic 存储",
+    descEn: "POST a base64 blob to /api/internal/save-asset and emit _relicWriteback for runner persistence.",
+    descZh: "POST base64 到 /api/internal/save-asset，并产出 _relicWriteback 让 runner 写回 Relic 列。",
+    handlerKind: "HTTP_API",
+    defaultConfig: {
+      method: "POST",
+      url: "http://localhost:3000/api/internal/save-asset",
+      authEnv: "INTERNAL_SERVICE_TOKEN",
+      authScheme: "Header",
+      authHeader: "X-Internal-Token",
+      bodyTemplate: {
+        relicSlug: "{{relicSlug}}",
+        kind: "{{kind}}",
+        base64: "{{_download.base64}}",
+        contentType: "{{_download.contentType}}",
+      },
+      responseTransform: {
+        savedPath: "{{response.savedPath}}",
+        _relicWriteback: {
+          id: "{{input.relicId}}",
+          fields: { enhancedImagePath: "{{response.savedPath}}" },
+        },
+      },
+    },
+  },
+  {
+    key: "internal",
+    labelEn: "Internal main-app function (advanced)",
+    labelZh: "主站内部函数（高级）",
+    descEn: "Dispatch to a registered in-repo handler. Adding new ones requires a code commit.",
+    descZh: "调度仓库内已注册的处理函数。新增需要 commit。",
+    handlerKind: "INTERNAL",
+    defaultConfig: { handler: "" },
+  },
+  {
+    key: "mcp",
+    labelEn: "MCP server (Phase 5+)",
+    labelZh: "MCP 服务器（Phase 5+）",
+    descEn: "Remote MCP-protocol agent. Placeholder; runtime support coming later.",
+    descZh: "远程 MCP 协议代理。占位，运行时支持稍后。",
+    handlerKind: "MCP_SERVER",
+    defaultConfig: {},
+  },
+];
+
+// Best-guess preset from an existing skill row. Used to initialise the
+// preset selector when admin opens an existing skill in edit mode.
+function derivePresetKey(
+  kind: HandlerKind,
+  config: Record<string, unknown> | null | undefined,
+): string {
+  const cfg = isObject(config) ? config : {};
+  if (kind === "INTERNAL") return "internal";
+  if (kind === "MCP_SERVER") return "mcp";
+  if (kind === "LLM_PROMPT") {
+    const provider = typeof cfg.provider === "string" ? cfg.provider : "anthropic";
+    if (provider === "gemini") return "llm-gemini";
+    if (provider === "openai") return "llm-openai";
+    return "llm-anthropic";
+  }
+  // HTTP_API: distinguish save-asset / async / vanilla via heuristics.
+  const url = typeof cfg.url === "string" ? cfg.url : "";
+  if (url.includes("/api/internal/save-asset")) return "save-asset";
+  if (isObject(cfg.polling)) return "http-async";
+  return "http-api";
+}
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -91,8 +237,18 @@ function pretty(v: unknown): string {
 
 export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) {
   const t = useT();
+  const { locale } = useI18n();
   const router = useRouter();
   const [v, setV] = useState(() => blank(initial));
+  // Preset key drives the visible "What this skill does" selector. Derive
+  // from the existing skill on first render; subsequent edits via the
+  // selector (or via the Advanced raw kind dropdown) keep this in sync.
+  const [presetKey, setPresetKey] = useState<string>(() =>
+    derivePresetKey(
+      (initial?.handlerKind ?? "INTERNAL") as HandlerKind,
+      initial?.handlerConfig ?? null,
+    ),
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -193,6 +349,31 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
         if (!stripKeys.has(k)) out[k] = val;
       }
       return out;
+    });
+  }
+
+  // Preset switch: scaffolds defaults on top of the current config.
+  // - If admin is creating a new skill OR moving to a different handlerKind,
+  //   we scaffold with preset.defaultConfig (admin-edited keys take
+  //   precedence — only blank/missing keys are filled).
+  // - If admin is staying within the same handlerKind (e.g. switching from
+  //   "Async HTTP API" to "Save asset to relic storage" — both HTTP_API),
+  //   we MERGE preset defaults so they overwrite top-level keys but
+  //   admin-edited custom keys (e.g. notes) survive.
+  function onPresetChange(nextKey: string) {
+    const preset = SKILL_PRESETS.find((p) => p.key === nextKey);
+    if (!preset) return;
+    setPresetKey(nextKey);
+    const wasSameKind = v.handlerKind === preset.handlerKind;
+    setV((s) => ({ ...s, handlerKind: preset.handlerKind }));
+    setConfig((c) => {
+      // Switching kind → start over with the preset defaults; existing
+      // config was for a different runtime entirely.
+      if (!wasSameKind) return { ...preset.defaultConfig };
+      // Same kind → overlay preset defaults so the new preset's idea of
+      // "what defaults look like" wins, but admin's notes and other
+      // unrecognized keys are preserved.
+      return { ...c, ...preset.defaultConfig };
     });
   }
 
@@ -430,25 +611,45 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                 </button>
               </div>
               <div className="mb-3">
-                <label className={labelCls}>Handler Type</label>
+                <label className={labelCls}>What this skill does</label>
                 <select
-                  value={v.handlerKind}
-                  onChange={(e) => onHandlerKindChange(e.target.value as HandlerKind)}
+                  value={presetKey}
+                  onChange={(e) => onPresetChange(e.target.value)}
                   className={inputCls}
                   required
                 >
-                  {HANDLER_KIND_OPTIONS.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
+                  {SKILL_PRESETS.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {locale === "zh" ? p.labelZh : p.labelEn}
                     </option>
                   ))}
                 </select>
                 <p className={helpCls}>
-                  {v.handlerKind === "HTTP_API" && "REST endpoint. authEnv stays as env name; never paste keys."}
-                  {v.handlerKind === "LLM_PROMPT" && "LLM call. Anthropic + OpenAI supported."}
-                  {v.handlerKind === "MCP_SERVER" && "Remote MCP agent. Placeholder until Phase 5."}
-                  {v.handlerKind === "INTERNAL" && "In-repo function dispatched by slug. Add new ones via PR."}
+                  {(() => {
+                    const p = SKILL_PRESETS.find((x) => x.key === presetKey);
+                    if (!p) return null;
+                    return locale === "zh" ? p.descZh : p.descEn;
+                  })()}
                 </p>
+                {advanced ? (
+                  <div className="mt-3 border-t border-primary/10 pt-3">
+                    <label className={labelCls}>Handler Kind (raw)</label>
+                    <select
+                      value={v.handlerKind}
+                      onChange={(e) => onHandlerKindChange(e.target.value as HandlerKind)}
+                      className={inputCls + " font-mono text-[12px]"}
+                    >
+                      {HANDLER_KIND_OPTIONS.map((k) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                    <p className={helpCls}>
+                      Storage detail. Most admins should use the preset above instead.
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               {advanced ? (

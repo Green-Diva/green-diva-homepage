@@ -5,14 +5,26 @@ import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import UserMenu from "@/components/UserMenu";
 import AgentClient from "./AgentClient";
-import type { AgentRow, SkillRow, EquipRow } from "./types";
+import type {
+  AgentRow,
+  SkillRow,
+  EquipRow,
+  SceneBindingRow,
+  AgentPickerOption,
+  SerializableSceneDef,
+} from "./types";
 import type { AgentSkill, PipelineConfig, DispatcherConfig } from "@/lib/agentTypes";
+import { listSerializableScenes } from "@/lib/agent-service";
+// Side-effect: triggers each module's scenes.ts → registerScene at server
+// boot. Without this, listSerializableScenes() returns an empty list and
+// the Scenes tab appears empty even though bindings exist in DB.
+import "@/lib/scenes-init";
 
 export default async function AgentControlPage() {
   const me = await getCurrentUser();
   if (!me) redirect("/login?from=/agent-control");
 
-  const [agents, skillsRaw, equipRecords] = await Promise.all([
+  const [agents, skillsRaw, equipRecords, bindingRecords] = await Promise.all([
     prisma.agent.findMany({
       orderBy: [{ serial: "asc" }, { createdAt: "asc" }],
       include: { createdBy: { select: { id: true, name: true } } },
@@ -26,6 +38,20 @@ export default async function AgentControlPage() {
         skill: { include: { createdBy: { select: { id: true, name: true } } } },
       },
       orderBy: [{ slotIndex: "asc" }],
+    }),
+    prisma.sceneBinding.findMany({
+      orderBy: { sceneKey: "asc" },
+      include: {
+        agent: {
+          select: {
+            id: true,
+            codename: true,
+            mode: true,
+            deployedAt: true,
+            capabilities: true,
+          },
+        },
+      },
     }),
   ]);
 
@@ -119,6 +145,40 @@ export default async function AgentControlPage() {
     return acc;
   }, {});
 
+  // Scene-binding view rows (denormalized agent join + ISO dates).
+  const sceneBindings: SceneBindingRow[] = bindingRecords.map((b) => ({
+    sceneKey: b.sceneKey,
+    agentId: b.agentId,
+    agentCodename: b.agent?.codename ?? null,
+    agentMode: (b.agent?.mode as SceneBindingRow["agentMode"]) ?? null,
+    agentDeployed: !!b.agent?.deployedAt,
+    agentCapabilities: b.agent?.capabilities ?? [],
+    inputMap: b.inputMap,
+    outputMap: b.outputMap,
+    enabled: b.enabled,
+    notes: b.notes,
+    rolloutPct: b.rolloutPct,
+    fallbackAgentId: b.fallbackAgentId,
+    createdAt: b.createdAt.toISOString(),
+    updatedAt: b.updatedAt.toISOString(),
+  }));
+
+  // Compact agent options for the binding picker (no loadout / config).
+  const agentOptions: AgentPickerOption[] = agents.map((a) => ({
+    id: a.id,
+    codename: a.codename,
+    nameEn: a.nameEn,
+    nameZh: a.nameZh,
+    mode: a.mode as AgentPickerOption["mode"],
+    deployedAt: a.deployedAt ? a.deployedAt.toISOString() : null,
+    capabilities: a.capabilities,
+  }));
+
+  // Scene definitions (registry → serializable). Empty when scenes-init
+  // wasn't imported above, which would mean none of the relic.* / etc.
+  // scenes registered — that's a code-side bug, not a data issue.
+  const sceneDefs: SerializableSceneDef[] = listSerializableScenes();
+
   const isAdmin = me.level >= ADMIN_LEVEL;
 
   return (
@@ -158,6 +218,9 @@ export default async function AgentControlPage() {
           isAdmin={isAdmin}
           skills={skills}
           equipsByAgentId={equipsByAgentId}
+          sceneBindings={sceneBindings}
+          sceneDefs={sceneDefs}
+          agentOptions={agentOptions}
         />
       </Suspense>
     </div>

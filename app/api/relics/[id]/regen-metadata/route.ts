@@ -1,9 +1,10 @@
 // POST /api/relics/[id]/regen-metadata — admin-only, **synchronous**.
 //
-// Calls the relic scribe agent in `mode: "regenMetadata"` with the relic's
-// current loreZh/loreEn (and optional admin feedback) and returns the new
-// metadata fields for the RelicForm to preview. Does NOT persist — admin
-// clicks "应用" in the UI to PATCH the relic with the chosen values.
+// Routes through the agent-service's "relic.regen-metadata" scene with
+// the relic's current loreZh/loreEn (and optional admin feedback) and
+// returns the new metadata fields for the RelicForm to preview. Does
+// NOT persist — admin clicks "应用" in the UI to PATCH the relic with
+// the chosen values.
 //
 // Body: `{ feedback?: string }`
 // Returns: `{ titleZh, titleEn, subtitleZh, subtitleEn, icon, rarity, formKind }`
@@ -11,9 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
-import { invokeAgent, type AgentRunLogEntry } from "@/lib/agents/invoke";
-
-const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
+import { callScene, SceneError } from "@/lib/agent-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -21,17 +20,10 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function findNodeOutput(runLog: AgentRunLogEntry[], stepId: string): unknown | undefined {
-  for (let i = runLog.length - 1; i >= 0; i -= 1) {
-    const e = runLog[i];
-    if (e.stepId === stepId && e.ok && !e.skipped) return e.output;
-  }
-  return undefined;
-}
-
 export async function POST(req: NextRequest, { params }: Ctx) {
+  let me;
   try {
-    await requireAdmin();
+    me = await requireAdmin();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -54,32 +46,29 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  const agent = await prisma.agent.findUnique({
-    where: { codename: SCRIBE_CODENAME },
-  });
-  if (!agent) return NextResponse.json({ error: "scribe agent missing" }, { status: 503 });
-  if (!agent.deployedAt) {
-    return NextResponse.json({ error: "scribe agent not deployed" }, { status: 503 });
-  }
-
   let result;
   try {
-    result = await invokeAgent({
-      agent,
-      mode: agent.mode,
-      input: {
-        mode: "regenMetadata",
+    result = await callScene(
+      "relic.regen-metadata",
+      {
         relicSlug: relic.slug,
         existingLore: { zh: relic.loreZh, en: relic.loreEn },
         ...(feedback ? { feedback } : {}),
       },
-    });
-  } catch (e) {
-    console.error("[api/relics/regen-metadata] invokeAgent threw", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "regen failed" },
-      { status: 500 },
+      {
+        actor: { userId: me.id, level: me.level, name: me.name },
+        // Regen reuses lore (no grounded research) so it's quick — but
+        // metadata derivation still hits Gemini. Bump above the default
+        // to absorb cold-start latency without timing out.
+        timeoutMs: 60_000,
+      },
     );
+  } catch (e) {
+    if (e instanceof SceneError) {
+      return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+    }
+    console.error("[api/relics/regen-metadata] callScene threw", e);
+    return NextResponse.json({ error: "regen failed" }, { status: 500 });
   }
 
   if (!result.ok) {
@@ -89,9 +78,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // Pull from research-regen node specifically (or fall back to leaf output).
-  const fromNode = findNodeOutput(result.runLog, "research-regen");
-  const out = isObject(fromNode) ? fromNode : isObject(result.output) ? result.output : {};
+  // Phase 5: bound agent's SceneBinding outputMap exposes the relevant
+  // metadata fields directly under result.output (no more node-ID
+  // peeking from runLog). For relic.regen-metadata the binding pulls
+  // from runLog.byId.research-regen.output and re-shapes — admin can
+  // swap agents without this endpoint caring.
+  const out = isObject(result.output) ? result.output : {};
 
   return NextResponse.json({
     titleZh: typeof out.titleZh === "string" ? out.titleZh : "",

@@ -176,10 +176,21 @@ export async function runAgentJob(jobId: string): Promise<void> {
 
 // — Relic writeback hook — — — — — — — — — — — — — — — — — — — — — — —
 //
-// Runner-level writeback: when a relic-bound agent invocation succeeds
-// (input contains `_relicId` + a known mode), copy the relevant fields
-// from the agent's leaf output into the Relic row. Unknown modes / inputs
-// without `_relicId` are no-ops, so general agent invocations are unaffected.
+// Two paths, tried in order:
+//
+// 1. Data-driven (preferred — Phase 2.3+): when the agent's leaf output
+//    carries `_relicWriteback: { id, fields }`, apply each whitelisted
+//    field to that Relic row. Skills produce this shape via SceneBinding
+//    outputMap or directly in their leaf output, so adding a new
+//    writeback target is purely a config change — no runner code edits.
+//
+// 2. Legacy hardcoded (Phase 0b → 2.4 transition): when input.mode +
+//    input._relicId match a known shape (2dEnhance / 3dCreate), apply
+//    the per-mode field. Removed after Phase 2.4 finishes migrating all
+//    relic.* scenes to emit `_relicWriteback`.
+//
+// Unknown modes / inputs without `_relicId` and without `_relicWriteback`
+// are no-ops, so general agent invocations are unaffected.
 //
 // Idempotent: re-running the same input writes the same fields. Safe to
 // trigger multiple times (e.g. via retry).
@@ -188,42 +199,97 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+// Allowlist of Relic columns that may be written via the data-driven
+// `_relicWriteback.fields` channel. Anything else is dropped with a
+// warning — we don't let agents write arbitrary columns (passwordHash,
+// extractedById, status…) through this hook.
+const ALLOWED_WRITEBACK_FIELDS = new Set<string>([
+  "enhancedImagePath",
+  "modelPath",
+  "primaryImagePath",
+  "formKind",
+  "formReason",
+  "loreZh",
+  "loreEn",
+  "nameZh",
+  "nameEn",
+  "classifZh",
+  "classifEn",
+  "rarity",
+  "iconKey",
+  "candidateImages",
+  "pipelineTrace",
+]);
+
+async function tryDataDrivenWriteback(rawOutput: unknown): Promise<boolean> {
+  if (!isObject(rawOutput)) return false;
+  const wb = rawOutput._relicWriteback;
+  if (!isObject(wb)) return false;
+  const id = typeof wb.id === "string" ? wb.id : null;
+  const fields = isObject(wb.fields) ? wb.fields : null;
+  if (!id || !fields) return false;
+
+  const safe: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (!ALLOWED_WRITEBACK_FIELDS.has(k)) {
+      console.warn(
+        `[agent-job:run] writeback skipped unknown field "${k}" for relic ${id} (not in allowlist)`,
+      );
+      continue;
+    }
+    safe[k] = v;
+  }
+  if (Object.keys(safe).length === 0) return true; // recognized but nothing to write
+
+  try {
+    await prisma.relic.update({
+      where: { id },
+      data: safe as unknown as Prisma.RelicUpdateInput,
+    });
+  } catch (e) {
+    console.error(`[agent-job:run] data-driven writeback failed for relic ${id}:`, e);
+  }
+  return true;
+}
+
+async function tryLegacyModeWriteback(
+  rawInput: unknown,
+  rawOutput: unknown,
+): Promise<boolean> {
+  if (!isObject(rawInput)) return false;
+  const relicId = typeof rawInput._relicId === "string" ? rawInput._relicId : null;
+  const mode = typeof rawInput.mode === "string" ? rawInput.mode : null;
+  if (!relicId || !mode) return false;
+
+  if (mode === "2dEnhance") {
+    if (!isObject(rawOutput)) return true; // recognized mode, nothing to write
+    const enhancedImagePath =
+      typeof rawOutput.enhancedImagePath === "string" ? rawOutput.enhancedImagePath : null;
+    if (!enhancedImagePath) return true;
+    await prisma.relic.update({ where: { id: relicId }, data: { enhancedImagePath } });
+    return true;
+  }
+
+  if (mode === "3dCreate") {
+    if (!isObject(rawOutput)) return true;
+    const modelPath =
+      typeof rawOutput.modelPath === "string" ? rawOutput.modelPath : null;
+    if (!modelPath) return true;
+    await prisma.relic.update({ where: { id: relicId }, data: { modelPath } });
+    return true;
+  }
+
+  // initial / regenMetadata are sync — pipeline / regen endpoint write
+  // from caller context. Not our problem here.
+  return false;
+}
+
 async function maybeWriteRelicAsset(
   rawInput: unknown,
   rawOutput: unknown,
 ): Promise<void> {
-  if (!isObject(rawInput)) return;
-  const relicId = typeof rawInput._relicId === "string" ? rawInput._relicId : null;
-  const mode = typeof rawInput.mode === "string" ? rawInput.mode : null;
-  if (!relicId || !mode) return;
-
-  if (mode === "2dEnhance") {
-    if (!isObject(rawOutput)) return;
-    const enhancedImagePath =
-      typeof rawOutput.enhancedImagePath === "string" ? rawOutput.enhancedImagePath : null;
-    if (!enhancedImagePath) return;
-    await prisma.relic.update({
-      where: { id: relicId },
-      data: { enhancedImagePath },
-    });
-    return;
-  }
-
-  if (mode === "3dCreate") {
-    if (!isObject(rawOutput)) return;
-    const modelPath =
-      typeof rawOutput.modelPath === "string" ? rawOutput.modelPath : null;
-    if (!modelPath) return;
-    await prisma.relic.update({
-      where: { id: relicId },
-      data: { modelPath },
-    });
-    return;
-  }
-
-  // initial / regenMetadata don't go through this runner — they're called
-  // synchronously from the pipeline step / regen endpoint and write back
-  // from the caller's context.
+  if (await tryDataDrivenWriteback(rawOutput)) return;
+  await tryLegacyModeWriteback(rawInput, rawOutput);
 }
 
 // — RelicLog hook for relic-bound async invocations — — — — — — — — — — —

@@ -388,9 +388,15 @@ model Agent {
   pipelineConfig   Json?
   dispatcherConfig Json?
   deployedAt       DateTime?
+  // Capability tags ("image-cutout", "lore-writing", "metadata-derivation",
+  // ...). Used by /agent-control?tab=scenes to filter which agents are
+  // valid candidates for a given scene (an agent matches iff its tags ⊇
+  // the scene's requiredCapabilities). Hand-curated by admin.
+  capabilities     String[]             @default([])
   skills           Json?
   skillEquips      AgentSkillEquip[]
   agentJobs        AgentJob[]
+  sceneBindings    SceneBinding[]
   availableAp      Int                  @default(0)
   createdById      String?
   createdBy        User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
@@ -520,4 +526,43 @@ model AgentSkillEquip {
   @@index([agentId])
   @@index([agentId, slotIndex])
   @@index([skillId])
+}
+
+// SceneBinding — admin-editable mapping of a code-registered Scene
+// (lib/<module>/scenes.ts → registerScene) to the Agent that satisfies it.
+//
+// The Scene definition (zod schemas, capability tags, label) lives in
+// code so type checks bite at build time. The CHOICE OF AGENT and the
+// input/output mapping live here so admin can rewire scenes without
+// touching code (the entire point of the agent service).
+//
+// onDelete: Restrict on the agent FK is intentional — we don't want
+// dropping an agent to silently break N scenes. The /agent-control delete
+// flow surfaces "this agent has N bindings" before allowing the delete.
+model SceneBinding {
+  id              String   @id @default(cuid())
+  // Matches a SceneDefinition.key registered in code. Unique — one
+  // binding per scene. For A/B / staged rollout use rolloutPct +
+  // fallbackAgentId rather than two binding rows.
+  sceneKey        String   @unique
+  agentId         String
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  // Json template applied to { ctx, actor } at dispatch time to produce
+  // AgentJob.input. See lib/agent-service/template.ts for syntax.
+  inputMap        Json
+  // Optional Json template applied to { output, ctx, actor } AFTER the
+  // agent finishes, to reshape output into the scene's outputSchema.
+  outputMap       Json?
+  enabled         Boolean  @default(true)
+  notes           String?
+  // Phase 5 fields — staged rollout / canary. 100 means "always primary".
+  // fallbackAgentId is intentionally a bare String (no FK relation) so
+  // dropping the fallback agent doesn't cascade-fail the binding.
+  rolloutPct      Int      @default(100)
+  fallbackAgentId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([enabled])
 }

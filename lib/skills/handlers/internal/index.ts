@@ -9,22 +9,27 @@
 
 import { HandlerError, type SkillHandler } from "../../types";
 import { relicFilesSummary } from "./relicFilesSummary";
-import { relicImagePick } from "./relicImagePick";
-import { meshy3d } from "./meshy3d";
 import { geminiResearcher } from "./geminiResearcher";
 import { smartImagePicker } from "./smartImagePicker";
-import { falCutout } from "./falCutout";
+import { imageToDataUri } from "./imageToDataUri";
 
 const internalHandlers: Record<string, SkillHandler> = {
   "relic-files-summary": relicFilesSummary,
-  // Legacy v1 picker — kept for backward compat with any agent still wired
-  // to it; new flows use relic-smart-image-pick instead.
-  "relic-image-pick": relicImagePick,
-  "meshy-3d": meshy3d,
-  // Phase 5+ handlers (lore/multimodal flow):
+  // Phase 2.4 / Phase 5: the surviving INTERNAL handlers are the ones
+  // that genuinely need main-app process access. Everything that used
+  // to be INTERNAL-by-default (meshy-3d / relic-cutout / relic-image-pick
+  // legacy v1) was migrated to forge agents (HTTP_API + LLM_PROMPT
+  // skills) and the originals deleted in migrate-phase5-cleanup.
+  //
+  // Still here:
+  //   - relic-gemini-researcher: pending Phase 5 round 2 (LORE-FORGE-001)
+  //   - relic-smart-image-pick: needs backbone DAG `loop` primitive
+  //     (Phase 6) before it can be decomposed
   "relic-gemini-researcher": geminiResearcher,
   "relic-smart-image-pick": smartImagePicker,
-  "relic-cutout": falCutout,
+  // File-IO helper used by all forge agents — minimal surface, no
+  // business logic.
+  "image-to-data-uri": imageToDataUri,
 };
 
 export const internal: SkillHandler = async (input, config, ctx) => {

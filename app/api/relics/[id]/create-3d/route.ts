@@ -1,31 +1,63 @@
-// POST /api/relics/[id]/create-3d — admin-only, async via AgentJob.
+// POST /api/relics/[id]/create-3d — admin-only, async via SceneBinding.
 //
-// Hard precondition: Relic.enhancedImagePath must be set (i.e. 2D 增强 has
+// Routes through the agent-service's "relic.create3d" scene. Hard
+// precondition: Relic.enhancedImagePath must be set (i.e. 2D 增强 has
 // already run). Meshy gets the transparent PNG, not the original snapshot,
 // so 3D quality stays high. 409 if precondition fails.
 //
-// Triggers the relic scribe agent in `mode: "3dCreate"`. Returns `{ jobId }`;
-// frontend polls /api/relics/[id]/asset-job/[jobId]. Runner's writeback hook
-// fills Relic.modelPath on success.
+// Returns `{ jobId, agentId, status, createdAt }`; frontend polls
+// /api/agent-jobs/[jobId]. Runner's writeback hook fills Relic.modelPath
+// on success.
 
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { recordRelicLog } from "@/lib/relicLog";
-import { runAgentJob } from "@/lib/skills/runtime/runner";
+import { dispatchScene, SceneError } from "@/lib/agent-service";
 
-const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
+// Body schema for the pre-flight 3D config dialog. All fields optional —
+// missing keys fall back to the meshy3d handler's defaults (PBR / HD /
+// auto-size all on, GLB only, auto symmetry, standard model_type).
+const Body = z
+  .object({
+    enablePbr: z.boolean().optional(),
+    hdTexture: z.boolean().optional(),
+    autoSize: z.boolean().optional(),
+    targetFormats: z.array(z.enum(["glb", "obj", "fbx", "stl", "usdz", "3mf"])).optional(),
+    texturePrompt: z.string().max(600).optional(),
+    targetPolycount: z.number().int().min(100).max(300_000).optional(),
+    symmetryMode: z.enum(["off", "auto", "on"]).optional(),
+    modelType: z.enum(["standard", "lowpoly"]).optional(),
+  })
+  .strict();
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(_req: NextRequest, { params }: Ctx) {
+export async function POST(req: NextRequest, { params }: Ctx) {
   let me;
   try {
     me = await requireAdmin();
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
+  }
+
+  // Parse optional Meshy-config body. Older clients still POST with empty body
+  // — keep backward compat by treating missing/invalid JSON as no overrides.
+  let opts: z.infer<typeof Body> = {};
+  try {
+    const raw = await req.json();
+    const parsed = Body.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "invalid options: " + parsed.error.issues.map((i) => i.message).join("; ") },
+        { status: 400 },
+      );
+    }
+    opts = parsed.data;
+  } catch {
+    // empty / non-JSON body → use defaults
   }
 
   const { id } = await params;
@@ -41,35 +73,23 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     );
   }
 
-  const agent = await prisma.agent.findUnique({
-    where: { codename: SCRIBE_CODENAME },
-    select: { id: true, mode: true, deployedAt: true },
-  });
-  if (!agent) return NextResponse.json({ error: "scribe agent missing" }, { status: 503 });
-  if (!agent.deployedAt) {
-    return NextResponse.json({ error: "scribe agent not deployed" }, { status: 503 });
-  }
-
-  const input = {
-    mode: "3dCreate" as const,
-    relicSlug: relic.slug,
-    imagePath: relic.enhancedImagePath, // transparent PNG → cleaner 3D
-    _relicId: relic.id,
-  };
-
-  let job;
+  let dispatch;
   try {
-    job = await prisma.agentJob.create({
-      data: {
-        agentId: agent.id,
-        mode: agent.mode,
-        input: input as unknown as Prisma.InputJsonValue,
-        status: "PENDING",
+    dispatch = await dispatchScene(
+      "relic.create3d",
+      {
+        relicId: relic.id,
+        relicSlug: relic.slug,
+        enhancedImagePath: relic.enhancedImagePath,
+        opts,
       },
-      select: { id: true, status: true, createdAt: true },
-    });
+      { actor: { userId: me.id, level: me.level, name: me.name } },
+    );
   } catch (e) {
-    console.error("[api/relics/create-3d] create job failed", e);
+    if (e instanceof SceneError) {
+      return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+    }
+    console.error("[api/relics/create-3d] dispatch failed", e);
     return NextResponse.json({ error: "enqueue failed" }, { status: 500 });
   }
 
@@ -77,13 +97,16 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     action: "PROCESSING_STARTED",
     relic: { id: relic.id, slug: relic.slug, name: relic.nameEn || relic.slug },
     actor: { id: me.id, name: me.name },
-    details: { phase: "3d", jobId: job.id },
+    details: { phase: "3d", jobId: dispatch.jobId },
   });
 
-  void runAgentJob(job.id);
-
   return NextResponse.json(
-    { jobId: job.id, agentId: agent.id, status: job.status, createdAt: job.createdAt },
+    {
+      jobId: dispatch.jobId,
+      agentId: dispatch.agentId,
+      status: dispatch.status,
+      createdAt: dispatch.createdAt,
+    },
     { status: 201 },
   );
 }

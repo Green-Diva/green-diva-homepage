@@ -1,22 +1,17 @@
-// POST /api/relics/[id]/enhance-2d — admin-only, async via AgentJob.
+// POST /api/relics/[id]/enhance-2d — admin-only, async via SceneBinding.
 //
-// Triggers the relic scribe agent in `mode: "2dEnhance"`. Input carries
-// `relicSlug + imagePath` (the relic's primaryImagePath) so the cutout
-// node can read the source image without an extra DB hop. The runner's
-// writeback hook (lib/skills/runtime/runner.ts::maybeWriteRelicAsset)
-// updates Relic.enhancedImagePath on success.
+// Routes through the agent-service's "relic.enhance2d" scene. The actual
+// agent (binding-resolved) runs in the background; the runner's
+// maybeWriteRelicAsset hook updates Relic.enhancedImagePath on success.
 //
-// Returns `{ jobId }` immediately. Frontend polls
-// /api/relics/[id]/asset-job/[jobId] every 3s.
+// Returns `{ jobId, agentId, status, createdAt }` immediately. Frontend
+// polls /api/agent-jobs/[jobId] every 3s.
 
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { recordRelicLog } from "@/lib/relicLog";
-import { runAgentJob } from "@/lib/skills/runtime/runner";
-
-const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
+import { dispatchScene, SceneError } from "@/lib/agent-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -42,35 +37,22 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     );
   }
 
-  const agent = await prisma.agent.findUnique({
-    where: { codename: SCRIBE_CODENAME },
-    select: { id: true, mode: true, deployedAt: true },
-  });
-  if (!agent) return NextResponse.json({ error: "scribe agent missing" }, { status: 503 });
-  if (!agent.deployedAt) {
-    return NextResponse.json({ error: "scribe agent not deployed" }, { status: 503 });
-  }
-
-  const input = {
-    mode: "2dEnhance" as const,
-    relicSlug: relic.slug,
-    imagePath: relic.primaryImagePath,
-    _relicId: relic.id,
-  };
-
-  let job;
+  let dispatch;
   try {
-    job = await prisma.agentJob.create({
-      data: {
-        agentId: agent.id,
-        mode: agent.mode,
-        input: input as unknown as Prisma.InputJsonValue,
-        status: "PENDING",
+    dispatch = await dispatchScene(
+      "relic.enhance2d",
+      {
+        relicId: relic.id,
+        relicSlug: relic.slug,
+        primaryImagePath: relic.primaryImagePath,
       },
-      select: { id: true, status: true, createdAt: true },
-    });
+      { actor: { userId: me.id, level: me.level, name: me.name } },
+    );
   } catch (e) {
-    console.error("[api/relics/enhance-2d] create job failed", e);
+    if (e instanceof SceneError) {
+      return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+    }
+    console.error("[api/relics/enhance-2d] dispatch failed", e);
     return NextResponse.json({ error: "enqueue failed" }, { status: 500 });
   }
 
@@ -78,13 +60,16 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     action: "PROCESSING_STARTED",
     relic: { id: relic.id, slug: relic.slug, name: relic.nameEn || relic.slug },
     actor: { id: me.id, name: me.name },
-    details: { phase: "enhance2d", jobId: job.id },
+    details: { phase: "enhance2d", jobId: dispatch.jobId },
   });
 
-  void runAgentJob(job.id);
-
   return NextResponse.json(
-    { jobId: job.id, agentId: agent.id, status: job.status, createdAt: job.createdAt },
+    {
+      jobId: dispatch.jobId,
+      agentId: dispatch.agentId,
+      status: dispatch.status,
+      createdAt: dispatch.createdAt,
+    },
     { status: 201 },
   );
 }

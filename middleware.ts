@@ -16,6 +16,16 @@ const PUBLIC_PATHS = new Set<string>([
 
 const PUBLIC_PREFIXES: string[] = [];
 
+// Internal-only API endpoints: server-to-server calls inside the same
+// Node process (HTTP_API skills hitting the main app's persistence /
+// summary endpoints). They use the HMAC-derived X-Internal-Token header
+// (verified inside the route via lib/internal-token.ts) instead of the
+// session cookie + Origin/Referer dance. Must be EXACT MATCH per the
+// PROJECT POLICY above — no prefix wildcards.
+const INTERNAL_API_PATHS = new Set<string>([
+  "/api/internal/save-asset",
+]);
+
 const STATIC_PREFIXES = ["/_next", "/fonts", "/images", "/videos"];
 
 const VAULT_COOKIE = "gd_vault";
@@ -82,6 +92,13 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (STATIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // Internal-API exemption: bypass session cookie + CSRF (the route's
+  // HMAC token check is the real auth). Placed BEFORE csrfBlocked so
+  // server-to-server fetches (no Origin/Referer) don't 403.
+  if (INTERNAL_API_PATHS.has(pathname)) {
     return NextResponse.next();
   }
 

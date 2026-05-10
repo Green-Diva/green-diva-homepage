@@ -16,11 +16,25 @@
 import "server-only";
 import type { Rarity, RelicFormKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { invokeAgent, type AgentRunLogEntry } from "@/lib/agents/invoke";
+import type { AgentRunLogEntry } from "@/lib/agents/invoke";
+import { callScene, SceneError } from "@/lib/agent-service";
 import { recordRelicLog } from "@/lib/relicLog";
 import type { PipelineContext, StepResult } from "../context";
 
-const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
+// Phase 5: pipeline step now reads result.output directly. The bound
+// agent's SceneBinding outputMap is responsible for shaping `output` to
+// expose `research` and `pick` keys (typically by pulling from
+// runLog.byId.<nodeId>.output). This decouples the pipeline from the
+// agent's internal node IDs — admin can swap agents without rewriting
+// the pipeline as long as the new agent's binding produces the same
+// output shape.
+//
+// Expected shape of result.output:
+//   {
+//     research: { titleZh, titleEn, subtitleZh, subtitleEn, icon,
+//                 rarity, formKind, decisionReason, loreZh, loreEn },
+//     pick:     { recommendedPrimaryPath, candidates: [...] }
+//   }
 
 const RARITY_VALUES: ReadonlyArray<Rarity> = [
   "COMMON",
@@ -41,15 +55,6 @@ const FALLBACK = {
   classifEn: "Reliq · Lost",
   rarity: "COMMON" as Rarity,
 };
-
-// DAG node IDs the scribe agent's Backbone is expected to use. The pipeline
-// step pulls each node's output from the runLog to assemble the writeback
-// payload. If the user rebuilds the DAG with different IDs, fields go
-// untouched (degrade gracefully).
-const DAG_NODE_IDS = {
-  research: "research",
-  pick: "pick",
-} as const;
 
 type CandidateImage = {
   path: string;
@@ -111,14 +116,6 @@ function pickFormKind(v: unknown): RelicFormKind | null {
   return null;
 }
 
-function findNodeOutput(runLog: AgentRunLogEntry[], stepId: string): unknown | undefined {
-  for (let i = runLog.length - 1; i >= 0; i -= 1) {
-    const e = runLog[i];
-    if (e.stepId === stepId && e.ok && !e.skipped) return e.output;
-  }
-  return undefined;
-}
-
 function shapeCandidates(raw: unknown): CandidateImage[] | null {
   if (!Array.isArray(raw)) return null;
   const out: CandidateImage[] = [];
@@ -140,33 +137,37 @@ function shapeCandidates(raw: unknown): CandidateImage[] | null {
   return out.length > 0 ? out : null;
 }
 
-// Builds the writeback payload from the agent's runLog. Each field is
-// independently optional — a partial DAG run still produces a partial
-// payload, the pipeline step's overall `degraded` flag tells the runner
-// whether to mark PARTIAL or AWAITING_REVIEW.
-function shapeMetadata(runLog: AgentRunLogEntry[]): GenerateMetadataResult["applied"] {
-  const research = findNodeOutput(runLog, DAG_NODE_IDS.research);
-  const meta = isObject(research) ? research : {};
+// Builds the writeback payload from the bound agent's outputMap-shaped
+// output. Each field is independently optional — a partial DAG run still
+// produces a partial payload, the pipeline step's overall `degraded` flag
+// tells the runner whether to mark PARTIAL or AWAITING_REVIEW.
+//
+// Expected shape: { research?: {...}, pick?: {...} }. Whatever doesn't
+// match falls through to FALLBACK.
+function shapeMetadata(output: unknown): GenerateMetadataResult["applied"] {
+  const root = isObject(output) ? output : {};
+  const research = isObject(root.research) ? root.research : null;
+  const pickOut = isObject(root.pick) ? root.pick : null;
+  const meta = research ?? {};
   // Slice caps match cell truncate width budget (with small overshoot buffer).
   const classifZh = pickString(meta.subtitleZh ?? meta.classifZh, FALLBACK.classifZh, 10);
   const classifEn = pickString(meta.subtitleEn ?? meta.classifEn, FALLBACK.classifEn, 18);
   const formKind = pickFormKind(meta.formKind);
-  const formReason = isObject(meta) && typeof meta.decisionReason === "string"
+  const formReason = typeof meta.decisionReason === "string"
     ? pickString(meta.decisionReason, "", 500) || null
     : null;
-  const loreZh = isObject(meta) && typeof meta.loreZh === "string" && meta.loreZh.trim()
+  const loreZh = typeof meta.loreZh === "string" && meta.loreZh.trim()
     ? meta.loreZh.trim().slice(0, 4000)
     : null;
-  const loreEn = isObject(meta) && typeof meta.loreEn === "string" && meta.loreEn.trim()
+  const loreEn = typeof meta.loreEn === "string" && meta.loreEn.trim()
     ? meta.loreEn.trim().slice(0, 4000)
     : null;
 
-  const pickOut = findNodeOutput(runLog, DAG_NODE_IDS.pick);
   const primaryImagePath =
-    isObject(pickOut) && typeof pickOut.recommendedPrimaryPath === "string"
+    pickOut && typeof pickOut.recommendedPrimaryPath === "string"
       ? pickOut.recommendedPrimaryPath
       : null;
-  const candidateImages = isObject(pickOut) ? shapeCandidates(pickOut.candidates) : null;
+  const candidateImages = pickOut ? shapeCandidates(pickOut.candidates) : null;
 
   return {
     iconKey: pickString(meta.icon ?? meta.iconKey, FALLBACK.iconKey, 64),
@@ -216,74 +217,82 @@ export type ScribeRunOutcome = {
   degradeReason?: string;
 };
 
+// Codes that mean "the agent never actually got to run" — we set
+// agentInvoked: false so the pipeline summary can distinguish "wiring
+// problem" from "agent ran but failed".
+const PRE_RUN_FAILURE_CODES = new Set([
+  "UNKNOWN_SCENE",
+  "UNBOUND_SCENE",
+  "BINDING_DISABLED",
+  "AGENT_MISSING",
+  "AGENT_NOT_DEPLOYED",
+  "CONTEXT_INVALID",
+  "TEMPLATE_ERROR",
+]);
+
 export async function runScribeForWorkspace(
   workspaceSlug: string,
   opts?: {
     onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
   },
 ): Promise<ScribeRunOutcome> {
-  const agent = await prisma.agent.findUnique({
-    where: { codename: SCRIBE_CODENAME },
-  });
-
-  if (!agent) {
-    return {
-      applied: { ...FALLBACK_APPLIED },
-      runLog: [],
-      agentInvoked: false,
-      degraded: true,
-      degradeReason: `agent "${SCRIBE_CODENAME}" not configured`,
-    };
-  }
-  if (!agent.deployedAt) {
-    return {
-      applied: { ...FALLBACK_APPLIED },
-      runLog: [],
-      agentInvoked: false,
-      degraded: true,
-      degradeReason: `agent "${SCRIBE_CODENAME}" exists but is not deployed`,
-    };
-  }
-
-  let runResult;
+  let result;
   try {
-    runResult = await invokeAgent({
-      agent,
-      mode: agent.mode,
-      input: { mode: "initial", relicSlug: workspaceSlug },
-      onProgress: opts?.onProgress,
-    });
+    result = await callScene(
+      "relic.draft-metadata",
+      { workspaceSlug },
+      {
+        onProgress: opts?.onProgress,
+        // Initial mode: grounded research (~30s) + metadata derivation
+        // (~10s) + smart-pick. 5 minutes of headroom; pipeline retry
+        // sits above this for transient failures.
+        timeoutMs: 5 * 60_000,
+      },
+    );
   } catch (e) {
+    if (e instanceof SceneError) {
+      return {
+        applied: { ...FALLBACK_APPLIED },
+        runLog: [],
+        agentInvoked: !PRE_RUN_FAILURE_CODES.has(e.code),
+        degraded: true,
+        degradeReason: `scene dispatch failed (${e.code}): ${e.message}`,
+      };
+    }
     return {
       applied: { ...FALLBACK_APPLIED },
       runLog: [],
       agentInvoked: true,
       degraded: true,
-      degradeReason: `invokeAgent threw: ${e instanceof Error ? e.message : String(e)}`,
+      degradeReason: `callScene threw: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 
-  if (!runResult.ok) {
-    // Salvage whatever the runLog has (e.g. if research succeeded but pick
-    // crashed). Still mark degraded → caller will translate to PARTIAL.
-    const salvaged = shapeMetadata(runResult.runLog);
+  const runLog = (Array.isArray(result.runLog) ? result.runLog : []) as AgentRunLogEntry[];
+
+  if (!result.ok) {
+    // Salvage whatever fields the failure runLog produced. The output
+    // is undefined on failure — pipeline FALLBACK applies.
+    const salvaged = shapeMetadata(undefined);
     return {
       applied: salvaged,
-      runLog: runResult.runLog,
+      runLog,
       agentInvoked: true,
       degraded: true,
-      degradeReason: `agent run failed (${runResult.errorCode}): ${runResult.errorMessage}`,
+      degradeReason: `agent run failed (${result.errorCode}): ${result.errorMessage}`,
     };
   }
 
-  const applied = shapeMetadata(runResult.runLog);
+  const applied = shapeMetadata(result.output);
   const succeeded = lookSuccess(applied);
   return {
     applied,
-    runLog: runResult.runLog,
+    runLog,
     agentInvoked: true,
     degraded: !succeeded,
-    degradeReason: succeeded ? undefined : "research node missing or returned fallback",
+    degradeReason: succeeded
+      ? undefined
+      : "binding outputMap didn't expose research/pick — see SceneBinding for relic.draft-metadata",
   };
 }
 

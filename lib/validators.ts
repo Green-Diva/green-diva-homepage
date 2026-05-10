@@ -278,3 +278,129 @@ export const agentSkillUnlockSchema = z.object({
 
 export type SkillCreateInput = z.infer<typeof skillCreateSchema>;
 export type SkillUpdateInput = z.infer<typeof skillUpdateSchema>;
+
+// — — SceneBinding (agent-service Phase 0c) — —
+//
+// PATCH body for /api/scene-bindings/[sceneKey]. Used as upsert: if the
+// row doesn't yet exist for this sceneKey (e.g. a freshly-registered
+// scene without a default seed), the endpoint creates it. Admin always
+// supplies the full set of fields — partial PATCH semantics would force
+// us to query-then-merge inside the endpoint, complicating template
+// validation.
+//
+// inputMap is intentionally a permissive `unknown` — applyTemplate is
+// happy with any nested shape. The runtime layer (lib/agent-service)
+// is what fails dispatch if the produced AgentJob.input doesn't match
+// the bound agent's inputSchema.
+export const sceneBindingUpdateSchema = z.object({
+  agentId: z.string().cuid(),
+  inputMap: z.unknown(),
+  outputMap: z.unknown().optional().nullable(),
+  enabled: z.boolean().default(true),
+  notes: z.string().max(500).nullable().optional(),
+  rolloutPct: z.number().int().min(0).max(100).optional(),
+  fallbackAgentId: z.string().cuid().nullable().optional(),
+});
+export type SceneBindingUpdateInput = z.infer<typeof sceneBindingUpdateSchema>;
+
+export const sceneSampleRunSchema = z.object({
+  ctx: z.unknown(),
+});
+
+// — — Agent Export / Import (Phase 4) — —
+//
+// JSON envelope for portable agent definitions. An export is everything
+// needed to recreate the agent on a different deployment: meta + backbone
+// DAG + every equipped skill's full definition + slot index. NOT included:
+// runtime state (deployedAt, createdAt, ids), AgentJob history,
+// SceneBindings (those are deployment-specific and admin re-binds after
+// import).
+//
+// Versioned via the literal `format` discriminator so future schema
+// changes can branch on it without breaking older exports.
+const exportSkillSchema = z.object({
+  slug: z.string().min(1).max(64),
+  level: z.number().int().min(1).max(6),
+  icon: z.string().min(1).max(64),
+  nameEn: z.string().min(1).max(80),
+  nameZh: z.string().min(1).max(80),
+  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]),
+  costAp: z.number().int().min(0).max(99),
+  descriptionEn: z.string().max(2000),
+  descriptionZh: z.string().max(2000),
+  status: z.enum(["ONLINE", "OFFLINE"]),
+  handlerKind: handlerKindSchema,
+  handlerConfig: handlerConfigSchema,
+  inputSchema: jsonSchemaSchema,
+  outputSchema: jsonSchemaSchema,
+  // Equipment metadata (carried alongside the skill so import re-creates
+  // both atomically).
+  slotIndex: z.number().int().min(0).max(5).nullable(),
+  unlocked: z.boolean(),
+});
+
+const exportAgentMetaSchema = z.object({
+  codename: z.string().min(1).max(64),
+  codenameZh: z.string().max(64).nullable().optional(),
+  nameEn: z.string().min(1).max(80),
+  nameZh: z.string().min(1).max(80),
+  mode: z.enum(["MECHANICAL", "AUTONOMOUS"]),
+  avatarUrl: z.string().min(1).max(500),
+  descriptionEn: z.string().max(2000).nullable().optional(),
+  descriptionZh: z.string().max(2000).nullable().optional(),
+  capabilities: z.array(z.string().min(1).max(64)).max(40).default([]),
+  // pipelineConfig / dispatcherConfig validated on import as plain JSON;
+  // re-validating against pipelineConfigSchema/dispatcherConfigSchema
+  // happens via the existing /api/agents/[id]/pipeline route flow if
+  // admin edits after import. Strict re-validation here would reject
+  // valid-but-not-yet-shape-checked JSON and turn import into a paper
+  // chase; we trust the export source.
+  pipelineConfig: z.unknown().nullable().optional(),
+  dispatcherConfig: z.unknown().nullable().optional(),
+});
+
+export const agentExportSchema = z.object({
+  format: z.literal("green-diva-agent-export-v1"),
+  exportedAt: z.string().optional(),
+  exportedBy: z.string().optional(),
+  agent: exportAgentMetaSchema,
+  skills: z.array(exportSkillSchema).max(20),
+});
+export type AgentExport = z.infer<typeof agentExportSchema>;
+
+// Import-side options. `conflictPolicy` controls what happens when an
+// agent codename or skill slug collides with existing rows.
+//   - rejectOnAgentConflict (default true): refuse if codename exists.
+//     Admin then explicitly retries with newCodename to rename.
+//   - skillConflict: "reuse" (default) keeps the existing skill (admin
+//     can compare configs in SkillLibrary later); "rename" auto-suffixes
+//     the imported skill's slug and creates a fresh row.
+export const agentImportOptionsSchema = z.object({
+  payload: agentExportSchema,
+  newCodename: z.string().min(1).max(64).optional(),
+  rejectOnAgentConflict: z.boolean().optional().default(true),
+  skillConflict: z.enum(["reuse", "rename"]).optional().default("reuse"),
+});
+export type AgentImportInput = z.infer<typeof agentImportOptionsSchema>;
+
+// — — Internal save-asset endpoint (agent-service Phase 2.3) — —
+//
+// Body for POST /api/internal/save-asset. Used by HTTP_API skills that
+// need to persist a downloaded blob (Meshy GLB, fal cutout PNG, …) into
+// `private/relics/<slug>/derived/`. Restricted to relic-* slug formats
+// + a small allowlist of `kind` values to keep filenames predictable.
+//
+// `ext` is parsed from contentType when omitted, falling back to ".bin".
+// We never trust client-side filenames (path-traversal risk).
+const RELIC_SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
+const KIND_RE = /^[a-z0-9-]{1,32}$/;
+const EXT_RE = /^\.[a-z0-9]{1,8}$/;
+
+export const internalSaveAssetSchema = z.object({
+  relicSlug: z.string().regex(RELIC_SLUG_RE, "relicSlug must match [a-zA-Z0-9_-]{1,80}"),
+  kind: z.string().regex(KIND_RE, 'kind must match [a-z0-9-]{1,32} (e.g. "enhanced", "model")'),
+  base64: z.string().min(1).max(120_000_000), // ~90MB raw — base64 swells ~33%
+  contentType: z.string().max(120).optional(),
+  ext: z.string().regex(EXT_RE, 'ext must look like ".png" / ".glb"').optional(),
+});
+export type InternalSaveAssetInput = z.infer<typeof internalSaveAssetSchema>;

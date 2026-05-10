@@ -25,7 +25,7 @@
 // CandidateImageGallery). They can toggle delete + change which one is the
 // primary. Recommended primary on output is just AI's first guess.
 //
-// handlerConfig:
+// handlerConfig (everything optional — falls back to bundled defaults):
 //   {
 //     searchAuthEnv?: string,           // default "SERPAPI_KEY"
 //     visionAuthEnv?: string,           // default "GEMINI_API_KEY"
@@ -33,6 +33,21 @@
 //     enableVisionFilter?: boolean,     // default true
 //     maxNetworkFetch?: number,         // default 3
 //     maxImageBytes?: number,           // per-image cap, default 10MB
+//
+//     // — Phase 2.4.3 admin-tunable knobs —
+//
+//     serpUrl?: string,                 // default "https://serpapi.com/search.json"
+//     serpEngine?: string,              // default "google_images"
+//     serpMinWidth?: number,            // default 600 — drops thumbnail-grade results
+//     visionMinConfidence?: number,     // default 0.6 — vision verdict threshold
+//     visionMatchBoost?: number,        // default 50 — score added when vision says match
+//     visionMissPenalty?: number,       // default 30 — score subtracted when vision rejects
+//     watermarkPattern?: string,        // default "watermark|preview|sample|stocksy|gettyimages"
+//                                       //   case-insensitive RegExp source applied to result URL
+//     prompts?: {
+//       visionFilterWithRefine?: string,    // overrides DEFAULT_VISION_PROMPT_WITH_REFINE
+//       visionFilterNoRefine?: string,      // overrides DEFAULT_VISION_PROMPT_NO_REFINE
+//     },
 //   }
 //
 // Input:
@@ -65,12 +80,109 @@ function isSidecarBasename(p: string): boolean {
   const base = path.basename(p);
   return base.startsWith("._") || base === ".DS_Store" || base === "Thumbs.db";
 }
-const WATERMARK_HINTS = /watermark|preview|sample|stocksy|gettyimages/i;
+const DEFAULT_WATERMARK_PATTERN = "watermark|preview|sample|stocksy|gettyimages";
 const DEFAULT_MAX_NET = 3;
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 const DEFAULT_VISION_MODEL = "gemini-2.5-flash";
-const VISION_MIN_CONFIDENCE = 0.6;
+const DEFAULT_VISION_MIN_CONFIDENCE = 0.6;
+const DEFAULT_VISION_MATCH_BOOST = 50;
+const DEFAULT_VISION_MISS_PENALTY = 30;
+const DEFAULT_SERP_URL = "https://serpapi.com/search.json";
+const DEFAULT_SERP_ENGINE = "google_images";
+const DEFAULT_SERP_MIN_WIDTH = 600;
 const VISION_MAX_REF_BYTES = 5 * 1024 * 1024;
+
+// — — DEFAULT prompts — — — — — — — — — — — — — — — — — — — — — — — — —
+// The vision-filter system prompt has two variants depending on whether
+// the round should also synthesise a refinedQuery. Admin overrides via
+// handlerConfig.prompts.{visionFilterWithRefine|visionFilterNoRefine}.
+
+export const DEFAULT_VISION_PROMPT_WITH_REFINE = [
+  "You compare a user's reference photo against candidate images to identify the EXACT same product (not just similar items from the same brand or series).",
+  "",
+  "The FIRST image is the REFERENCE — what the user actually has. The remaining images are CANDIDATES from a Google Image search.",
+  "",
+  "For each candidate, decide whether it depicts the SAME PHYSICAL PRODUCT as the reference. Manufacturers ship many similar-looking products in the same series — identical-looking sculpts and packaging styles are common between different SKUs. A different SKU = NOT a match, even if visually close.",
+  "",
+  "Output STRICT JSON in this shape (no markdown, no prose, no code fences):",
+  '  {',
+  '    "verdicts": [ { "match": true|false, "confidence": 0..1, "reason": "<≤80 chars>" }, ... ],',
+  '    "refinedQuery": "<a more precise search query, or empty string>"',
+  '  }',
+  "",
+  "Rules:",
+  "- verdicts MUST be an array with exactly the same number of objects as candidates, in candidate order.",
+  "- match=true ONLY if it is literally the same product. Same printed name on packaging, same model name, same sculpt pose / character. Same series with a different name → match=false.",
+  "- confidence: 0.9+ when matching product text/SKU is visible on packaging in BOTH images; 0.6-0.8 when the visual match is strong but no text confirms; <0.5 means uncertain.",
+  "- reason: brief evidence — e.g. 'same product name visible on box', 'different sculpt: arm position differs', 'same series but different character'.",
+  "- refinedQuery: when ANY verdict is match=false, READ THE PRINTED TEXT on the reference image (product name, SKU, edition number, artist signature) and synthesise a better Google search query. ALWAYS quote the exact product name (e.g. `\"Majestic Perch\" Ashley Wood UnderVerse`). Include any visible SKU. Append `official product photo`. The query MUST be different from the one that produced these candidates. Empty string ONLY when every verdict already matches OR you can read no useful identifying text on the reference.",
+].join("\n");
+
+export const DEFAULT_VISION_PROMPT_NO_REFINE = [
+  "You compare a user's reference photo against candidate images to identify the EXACT same product (not just similar items from the same brand or series).",
+  "",
+  "The FIRST image is the REFERENCE — what the user actually has. The remaining images are CANDIDATES from a Google Image search.",
+  "",
+  "For each candidate, decide whether it depicts the SAME PHYSICAL PRODUCT as the reference. Manufacturers ship many similar-looking products in the same series — identical-looking sculpts and packaging styles are common between different SKUs. A different SKU = NOT a match, even if visually close.",
+  "",
+  "Output STRICT JSON in this shape (no markdown, no prose, no code fences):",
+  '  {',
+  '    "verdicts": [ { "match": true|false, "confidence": 0..1, "reason": "<≤80 chars>" }, ... ],',
+  '    "refinedQuery": ""',
+  '  }',
+  "",
+  "Rules:",
+  "- verdicts MUST be an array with exactly the same number of objects as candidates, in candidate order.",
+  "- match=true ONLY if it is literally the same product. Same printed name on packaging, same model name, same sculpt pose / character. Same series with a different name → match=false.",
+  "- confidence: 0.9+ when matching product text/SKU is visible on packaging in BOTH images; 0.6-0.8 when the visual match is strong but no text confirms; <0.5 means uncertain.",
+  "- reason: brief evidence — e.g. 'same product name visible on box', 'different sculpt: arm position differs', 'same series but different character'.",
+  "- refinedQuery: leave as empty string; we are not searching again.",
+].join("\n");
+
+type ResolvedKnobs = {
+  serpUrl: string;
+  serpEngine: string;
+  serpMinWidth: number;
+  watermarkPattern: RegExp;
+  visionMinConfidence: number;
+  visionMatchBoost: number;
+  visionMissPenalty: number;
+  visionPromptWithRefine: string;
+  visionPromptNoRefine: string;
+};
+
+function resolveKnobs(config: Record<string, unknown>): ResolvedKnobs {
+  const promptsObj =
+    config.prompts && typeof config.prompts === "object" && !Array.isArray(config.prompts)
+      ? (config.prompts as Record<string, unknown>)
+      : {};
+  const pickStr = (raw: unknown, fb: string): string =>
+    typeof raw === "string" && raw.trim().length > 0 ? raw : fb;
+  const pickNum = (raw: unknown, fb: number): number =>
+    typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : fb;
+  const watermarkSource = pickStr(config.watermarkPattern, DEFAULT_WATERMARK_PATTERN);
+  let watermarkPattern: RegExp;
+  try {
+    watermarkPattern = new RegExp(watermarkSource, "i");
+  } catch (e) {
+    console.warn(
+      `[smart-image-pick] invalid watermarkPattern "${watermarkSource}", using default:`,
+      e,
+    );
+    watermarkPattern = new RegExp(DEFAULT_WATERMARK_PATTERN, "i");
+  }
+  return {
+    serpUrl: pickStr(config.serpUrl, DEFAULT_SERP_URL),
+    serpEngine: pickStr(config.serpEngine, DEFAULT_SERP_ENGINE),
+    serpMinWidth: pickNum(config.serpMinWidth, DEFAULT_SERP_MIN_WIDTH),
+    watermarkPattern,
+    visionMinConfidence: pickNum(config.visionMinConfidence, DEFAULT_VISION_MIN_CONFIDENCE),
+    visionMatchBoost: pickNum(config.visionMatchBoost, DEFAULT_VISION_MATCH_BOOST),
+    visionMissPenalty: pickNum(config.visionMissPenalty, DEFAULT_VISION_MISS_PENALTY),
+    visionPromptWithRefine: pickStr(promptsObj.visionFilterWithRefine, DEFAULT_VISION_PROMPT_WITH_REFINE),
+    visionPromptNoRefine: pickStr(promptsObj.visionFilterNoRefine, DEFAULT_VISION_PROMPT_NO_REFINE),
+  };
+}
 const VISION_IMAGE_MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -192,6 +304,11 @@ async function visionCompareCandidates(opts: {
   // When true, the prompt asks for a refinedQuery on unmatched results.
   // When false (round 2), the field is ignored (we're not searching again).
   askForRefinedQuery: boolean;
+  // Phase 2.4.3: prompts come from caller-resolved handlerConfig so admin
+  // can edit them without commit. Both variants supplied; we pick by
+  // askForRefinedQuery.
+  promptWithRefine: string;
+  promptNoRefine: string;
 }): Promise<VisionResult | null> {
   const refPart = await loadInlinePart(opts.referenceAbs, VISION_MAX_REF_BYTES);
   if (!refPart) return null;
@@ -204,46 +321,7 @@ async function visionCompareCandidates(opts: {
   }
   if (candParts.length === 0) return { verdicts: [], refinedQuery: "" };
 
-  const sysLines = [
-    "You compare a user's reference photo against candidate images to identify the EXACT same product (not just similar items from the same brand or series).",
-    "",
-    "The FIRST image is the REFERENCE — what the user actually has. The remaining images are CANDIDATES from a Google Image search.",
-    "",
-    "For each candidate, decide whether it depicts the SAME PHYSICAL PRODUCT as the reference. Manufacturers ship many similar-looking products in the same series — identical-looking sculpts and packaging styles are common between different SKUs. A different SKU = NOT a match, even if visually close.",
-    "",
-  ];
-  if (opts.askForRefinedQuery) {
-    sysLines.push(
-      "Output STRICT JSON in this shape (no markdown, no prose, no code fences):",
-      '  {',
-      '    "verdicts": [ { "match": true|false, "confidence": 0..1, "reason": "<≤80 chars>" }, ... ],',
-      '    "refinedQuery": "<a more precise search query, or empty string>"',
-      '  }',
-      "",
-      "Rules:",
-      "- verdicts MUST be an array with exactly the same number of objects as candidates, in candidate order.",
-      "- match=true ONLY if it is literally the same product. Same printed name on packaging, same model name, same sculpt pose / character. Same series with a different name → match=false.",
-      "- confidence: 0.9+ when matching product text/SKU is visible on packaging in BOTH images; 0.6-0.8 when the visual match is strong but no text confirms; <0.5 means uncertain.",
-      "- reason: brief evidence — e.g. 'same product name visible on box', 'different sculpt: arm position differs', 'same series but different character'.",
-      "- refinedQuery: when ANY verdict is match=false, READ THE PRINTED TEXT on the reference image (product name, SKU, edition number, artist signature) and synthesise a better Google search query. ALWAYS quote the exact product name (e.g. `\"Majestic Perch\" Ashley Wood UnderVerse`). Include any visible SKU. Append `official product photo`. The query MUST be different from the one that produced these candidates. Empty string ONLY when every verdict already matches OR you can read no useful identifying text on the reference.",
-    );
-  } else {
-    sysLines.push(
-      "Output STRICT JSON in this shape (no markdown, no prose, no code fences):",
-      '  {',
-      '    "verdicts": [ { "match": true|false, "confidence": 0..1, "reason": "<≤80 chars>" }, ... ],',
-      '    "refinedQuery": ""',
-      '  }',
-      "",
-      "Rules:",
-      "- verdicts MUST be an array with exactly the same number of objects as candidates, in candidate order.",
-      "- match=true ONLY if it is literally the same product. Same printed name on packaging, same model name, same sculpt pose / character. Same series with a different name → match=false.",
-      "- confidence: 0.9+ when matching product text/SKU is visible on packaging in BOTH images; 0.6-0.8 when the visual match is strong but no text confirms; <0.5 means uncertain.",
-      "- reason: brief evidence — e.g. 'same product name visible on box', 'different sculpt: arm position differs', 'same series but different character'.",
-      "- refinedQuery: leave as empty string; we are not searching again.",
-    );
-  }
-  const sys = sysLines.join("\n");
+  const sys = opts.askForRefinedQuery ? opts.promptWithRefine : opts.promptNoRefine;
 
   const user: Part[] = [
     { text: "REFERENCE IMAGE (image 1, the user's photo):" },
@@ -313,6 +391,8 @@ async function runSearchRound(opts: {
   visionEnabled: boolean;
   askForRefinedQuery: boolean;
   referenceAbs: string | null;
+  // Phase 2.4.3 admin-tunable knobs (resolved by caller from handlerConfig).
+  knobs: ResolvedKnobs;
 }): Promise<{
   attempted: boolean;
   newCandidatesCount: number;
@@ -340,8 +420,8 @@ async function runSearchRound(opts: {
 
   attempted = true;
   try {
-    const url = new URL("https://serpapi.com/search.json");
-    url.searchParams.set("engine", "google_images");
+    const url = new URL(opts.knobs.serpUrl);
+    url.searchParams.set("engine", opts.knobs.serpEngine);
     url.searchParams.set("q", opts.query);
     url.searchParams.set("api_key", opts.serpKey);
     url.searchParams.set("ijn", "0");
@@ -354,8 +434,8 @@ async function runSearchRound(opts: {
         failureReason = `SerpAPI: ${sjson.error}`;
       } else {
         const results = (sjson.images_results ?? [])
-          .filter((r) => typeof r.original === "string" && !WATERMARK_HINTS.test(r.original ?? ""))
-          .filter((r) => typeof r.original_width === "number" && (r.original_width ?? 0) >= 600)
+          .filter((r) => typeof r.original === "string" && !opts.knobs.watermarkPattern.test(r.original ?? ""))
+          .filter((r) => typeof r.original_width === "number" && (r.original_width ?? 0) >= opts.knobs.serpMinWidth)
           .sort(
             (a, b) =>
               (b.original_width ?? 0) * (b.original_height ?? 0) -
@@ -420,6 +500,8 @@ async function runSearchRound(opts: {
       candidateAbsPaths: fetched.map((n) => n.abs),
       currentQuery: opts.query,
       askForRefinedQuery: opts.askForRefinedQuery,
+      promptWithRefine: opts.knobs.visionPromptWithRefine,
+      promptNoRefine: opts.knobs.visionPromptNoRefine,
     });
     if (result) {
       visionApplied = true;
@@ -429,17 +511,17 @@ async function runSearchRound(opts: {
         if (!v) continue;
         const c = opts.candidates[fetched[i].idx];
         if (!c) continue;
-        const accepted = v.match && v.confidence >= VISION_MIN_CONFIDENCE;
+        const accepted = v.match && v.confidence >= opts.knobs.visionMinConfidence;
         if (accepted) {
           visionMatches += 1;
           // Boost matched candidates so the recommended primary lands on
           // a verified network image, not a user snapshot.
-          c.score += 50;
+          c.score += opts.knobs.visionMatchBoost;
         } else {
           // Hide by default; admin can restore from the "deleted" panel
           // if the model misjudged.
           c.deleted = true;
-          c.score = Math.max(0, c.score - 30);
+          c.score = Math.max(0, c.score - opts.knobs.visionMissPenalty);
         }
       }
     }
@@ -498,6 +580,7 @@ export const smartImagePicker: SkillHandler = async (input, config) => {
       ? config.visionModel
       : DEFAULT_VISION_MODEL;
   const enableVisionFilter = config.enableVisionFilter !== false; // default true
+  const knobs = resolveKnobs(config);
 
   if (!isObject(input)) {
     throw new HandlerError("relic-smart-image-pick: input must be an object", "INVALID_CONFIG");
@@ -611,6 +694,7 @@ export const smartImagePicker: SkillHandler = async (input, config) => {
       visionEnabled: enableVisionFilter,
       askForRefinedQuery: true,
       referenceAbs: refAbs,
+      knobs,
     });
     if (round1.attempted) networkFetchAttempted = true;
     if (round1.failureReason) networkFetchFailureReason = round1.failureReason;
@@ -646,6 +730,7 @@ export const smartImagePicker: SkillHandler = async (input, config) => {
         // Round 2 doesn't ask for another refinement — hard cap is two rounds.
         askForRefinedQuery: false,
         referenceAbs: refAbs,
+        knobs,
       });
       if (round2.attempted) networkFetchAttempted = true;
       // Surface a round-2 failure only if round 1 didn't have its own.

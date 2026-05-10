@@ -5,6 +5,25 @@ import { runRelicPipeline } from "@/lib/relics/pipeline";
 import { runDraftPipeline } from "@/lib/relics/pipeline/draft/runner";
 import { runFinalizePipeline } from "@/lib/relics/pipeline/finalize/runner";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
+import { getInternalServiceToken } from "@/lib/internal-token";
+// Side-effect import: triggers each module's scenes.ts → registerScene
+// calls at module-init time so the agent-service registry is populated
+// before the first dispatchScene call. See lib/scenes-init.ts.
+import "@/lib/scenes-init";
+
+// Auto-populate INTERNAL_SERVICE_TOKEN from SAFETY_SECRET on boot so
+// HTTP_API skills can use `authEnv: "INTERNAL_SERVICE_TOKEN"` without
+// admin maintaining an extra env. We don't crash on derivation errors
+// (SAFETY_SECRET unset in some dev situations) — we just skip; the
+// /api/internal/* endpoints will reject with 503 if the token isn't
+// available, which is the correct behavior anyway.
+try {
+  if (!process.env.INTERNAL_SERVICE_TOKEN) {
+    process.env.INTERNAL_SERVICE_TOKEN = getInternalServiceToken();
+  }
+} catch (e) {
+  console.warn("[server-init] could not derive INTERNAL_SERVICE_TOKEN:", e);
+}
 
 const STALE_MS = 10 * 60 * 1000;
 

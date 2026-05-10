@@ -3,29 +3,50 @@
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
-import type { AgentRow, SkillRow, EquipRow } from "./types";
+import type {
+  AgentRow,
+  SkillRow,
+  EquipRow,
+  SceneBindingRow,
+  SerializableSceneDef,
+  AgentPickerOption,
+} from "./types";
 import CyberPanel from "./components/CyberPanel";
 import AgentListItem from "./components/AgentListItem";
 import AgentEditor from "./components/AgentEditor";
+import AgentImportModal from "./components/AgentImportModal";
 import SkillLibrary from "./components/SkillLibrary";
+import ScenesPanel from "./components/ScenesPanel";
 import AgentFilterChips, { type ModeFilter } from "./components/AgentFilterChips";
 import MechanicalDetailView from "./components/MechanicalDetailView";
 import AutonomousDetailView from "./components/AutonomousDetailView";
 import AgentJobDrawer from "./components/AgentJobDrawer";
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: AgentRow | null };
-type TabKey = "agents" | "skills";
+type TabKey = "agents" | "skills" | "scenes";
+
+const TAB_KEYS = ["agents", "skills", "scenes"] as const satisfies readonly TabKey[];
+
+function tabFromQuery(value: string | null): TabKey {
+  return TAB_KEYS.includes(value as TabKey) ? (value as TabKey) : "agents";
+}
 
 export default function AgentClient({
   agents,
   isAdmin,
   skills,
   equipsByAgentId,
+  sceneBindings,
+  sceneDefs,
+  agentOptions,
 }: {
   agents: AgentRow[];
   isAdmin: boolean;
   skills: SkillRow[];
   equipsByAgentId: Record<string, EquipRow[]>;
+  sceneBindings: SceneBindingRow[];
+  sceneDefs: SerializableSceneDef[];
+  agentOptions: AgentPickerOption[];
 }) {
   const t = useT();
   const router = useRouter();
@@ -35,13 +56,20 @@ export default function AgentClient({
   const [editor, setEditor] = useState<EditorState>({ open: false, mode: "create", initial: null });
   const [filter, setFilter] = useState<ModeFilter>("ALL");
   const [jobsOpen, setJobsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
-  const activeTab: TabKey = searchParams.get("tab") === "skills" ? "skills" : "agents";
+  const activeTab: TabKey = tabFromQuery(searchParams.get("tab"));
 
   function switchTab(tab: TabKey) {
     const p = new URLSearchParams(searchParams.toString());
     p.set("tab", tab);
     router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+  }
+
+  function tabLabel(tab: TabKey): string {
+    if (tab === "agents") return t.agentControl.tabAgents;
+    if (tab === "skills") return t.agentControl.tabSkillLibrary;
+    return t.agentControl.tabScenes;
   }
 
   const counts = useMemo(
@@ -83,7 +111,7 @@ export default function AgentClient({
     <main className="flex-1 min-h-0 flex flex-col w-full max-w-[1440px] mx-auto px-4 lg:px-8 py-3 gap-3 lg:overflow-hidden">
       <div className="shrink-0 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2 self-end border-b border-primary/20">
-          {(["agents", "skills"] as const).map((tab) => (
+          {TAB_KEYS.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -95,7 +123,7 @@ export default function AgentClient({
                   : "text-on-surface-variant border-transparent hover:text-primary/70",
               ].join(" ")}
             >
-              {tab === "agents" ? t.agentControl.tabAgents : t.agentControl.tabSkillLibrary}
+              {tabLabel(tab)}
             </button>
           ))}
         </div>
@@ -104,7 +132,17 @@ export default function AgentClient({
         ) : null}
       </div>
 
-      {activeTab === "skills" ? (
+      {activeTab === "scenes" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <ScenesPanel
+            scenes={sceneDefs}
+            bindings={sceneBindings}
+            agents={agentOptions}
+            isAdmin={isAdmin}
+            onSaved={onSaved}
+          />
+        </div>
+      ) : activeTab === "skills" ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
           <SkillLibrary
             skills={skills}
@@ -138,16 +176,46 @@ export default function AgentClient({
                 </div>
               )}
               {isAdmin ? (
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className="mt-2 shrink-0 min-h-[44px] w-full rounded-md border border-dashed border-primary/40 bg-primary/[0.04] hover:bg-primary/[0.12] text-primary font-label text-[10px] tracking-[0.3em] uppercase transition-colors flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-base" aria-hidden>
-                    add_circle
-                  </span>
-                  {t.agentControl.ordainAgent}
-                </button>
+                <div className="mt-2 shrink-0 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={openCreate}
+                    className="min-h-[44px] w-full rounded-md border border-dashed border-primary/40 bg-primary/[0.04] hover:bg-primary/[0.12] text-primary font-label text-[10px] tracking-[0.3em] uppercase transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden>
+                      add_circle
+                    </span>
+                    {t.agentControl.ordainAgent}
+                  </button>
+                  {/* Phase 4: Export current / Import new — both rely on
+                      the agent-export-v1 JSON envelope. Export only shows
+                      when there's a selected agent to export. */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeId) window.open(`/api/agents/${activeId}/export`, "_blank");
+                      }}
+                      disabled={!activeId}
+                      className="min-h-[36px] rounded-md border border-secondary/40 bg-secondary/[0.04] hover:bg-secondary/[0.12] text-secondary font-label text-[10px] tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-[14px]" aria-hidden>
+                        download
+                      </span>
+                      {t.agentControl.exportAgent}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportOpen(true)}
+                      className="min-h-[36px] rounded-md border border-secondary/40 bg-secondary/[0.04] hover:bg-secondary/[0.12] text-secondary font-label text-[10px] tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-[14px]" aria-hidden>
+                        upload
+                      </span>
+                      {t.agentControl.importAgent}
+                    </button>
+                  </div>
+                </div>
               ) : null}
             </div>
           </CyberPanel>
@@ -200,6 +268,13 @@ export default function AgentClient({
           agentCodename={activeAgent.codename}
           isAdmin={isAdmin}
           onClose={() => setJobsOpen(false)}
+        />
+      ) : null}
+
+      {importOpen && isAdmin ? (
+        <AgentImportModal
+          onClose={() => setImportOpen(false)}
+          onSaved={onSaved}
         />
       ) : null}
     </main>
