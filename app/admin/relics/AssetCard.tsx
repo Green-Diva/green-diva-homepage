@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Dictionary } from "@/lib/i18n/types";
+import Meshy3dConfigModal, { type Meshy3dOptions } from "./Meshy3dConfigModal";
 
 type JobState =
   | { kind: "idle" }
@@ -60,6 +61,9 @@ export default function AssetCard({
 }: Props) {
   const [enhanceJob, setEnhanceJob] = useState<JobState>({ kind: "idle" });
   const [modelJob, setModelJob] = useState<JobState>({ kind: "idle" });
+  // Pre-flight 3D config dialog. Clicking the 3D row's "Start" button opens
+  // it; the actual /create-3d POST only fires from inside its onConfirm.
+  const [showMeshyConfig, setShowMeshyConfig] = useState(false);
 
   const enhanceJobRef = useRef(enhanceJob);
   const modelJobRef = useRef(modelJob);
@@ -156,12 +160,15 @@ export default function AssetCard({
     }
   }
 
-  async function startCreate3d() {
+  async function startCreate3d(opts: Meshy3dOptions) {
+    setShowMeshyConfig(false);
     setModelJob({ kind: "running", jobId: "...", startedAt: Date.now() });
     try {
       const r = await fetch(`/api/relics/${resourceId}/create-3d`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
       });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
@@ -176,6 +183,13 @@ export default function AssetCard({
         message: err instanceof Error ? err.message : "request failed",
       });
     }
+  }
+
+  // Idle entry: opens the config dialog. Re-trigger from the error state's
+  // "retry" button also goes through here so admin can adjust options after
+  // a Meshy failure (e.g. drop polycount, switch model_type).
+  function openCreate3dDialog() {
+    setShowMeshyConfig(true);
   }
 
   const isDraft = mode === "draft";
@@ -220,7 +234,6 @@ export default function AssetCard({
           <AssetRow
             label={t.relicCollection.tabOriginal}
             done={hasPrimary}
-            t={t}
           >
             <StatusText
               text={hasPrimary ? t.relicCollection.assetReady : t.relicCollection.assetMissing}
@@ -234,7 +247,6 @@ export default function AssetCard({
             done={hasEnhanced}
             running={enhanceJob.kind === "running"}
             errored={enhanceJob.kind === "error"}
-            t={t}
           >
             <AssetRowAction
               isDraft={isDraft}
@@ -256,14 +268,13 @@ export default function AssetCard({
             done={hasModel}
             running={modelJob.kind === "running"}
             errored={modelJob.kind === "error"}
-            t={t}
           >
             <AssetRowAction
               isDraft={isDraft}
               isAdmin={isAdmin}
               hasIt={hasModel}
               jobState={modelJob}
-              onStart={startCreate3d}
+              onStart={openCreate3dDialog}
               etaText={t.relicCollection.create3dEta}
               startLabel={t.relicCollection.create3dStart}
               runningLabel={t.relicCollection.create3dRunning}
@@ -279,6 +290,14 @@ export default function AssetCard({
           </AssetRow>
         </ul>
       </div>
+
+      {showMeshyConfig ? (
+        <Meshy3dConfigModal
+          t={t}
+          onCancel={() => setShowMeshyConfig(false)}
+          onConfirm={(opts) => void startCreate3d(opts)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -290,14 +309,12 @@ function AssetRow({
   running,
   errored,
   children,
-  t: _t,
 }: {
   label: string;
   done: boolean;
   running?: boolean;
   errored?: boolean;
   children: React.ReactNode;
-  t: Dictionary;
 }) {
   let icon: React.ReactNode;
   if (errored) {

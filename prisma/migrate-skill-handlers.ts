@@ -15,17 +15,21 @@ import { PrismaClient } from "@prisma/client";
 async function main() {
   const prisma = new PrismaClient();
   try {
+    // Detect "Phase 1 handler columns already added" — this used to check
+    // for `handlerKind`, but after the 2026-05-10 collapse that column is
+    // renamed to `kind`. handlerConfig was added in the same phase and is
+    // unaffected by the rename, so use it as the marker.
     const exists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
       `SELECT EXISTS (
          SELECT 1 FROM information_schema.columns
-         WHERE table_name = 'Skill' AND column_name = 'handlerKind'
+         WHERE table_name = 'Skill' AND column_name = 'handlerConfig'
        ) AS exists`,
     );
     if (exists[0]?.exists) {
-      console.log("[migrate-skill-handlers] handlerKind column already present — skip");
+      console.log("[migrate-skill-handlers] handler columns already present — skip");
       return;
     }
-    console.log("[migrate-skill-handlers] handlerKind column absent — running first-time backfill");
+    console.log("[migrate-skill-handlers] handler columns absent — running first-time backfill");
 
     // Skill table may not exist yet on a brand-new DB; in that case
     // there are no rows to update and db push will create it cleanly.

@@ -14,6 +14,24 @@ import { inferContentType } from "@/lib/relicStorage";
 
 const HEIC_EXTS = new Set([".heic", ".heif"]);
 
+// HEIC/HEIF files are ISOBMFF containers: the first box is `ftyp`, with the
+// major brand at bytes 8-11. Without this guard, a misnamed `.heic` file
+// (e.g. a renamed PNG) reaches heic-convert and surfaces as a generic
+// `TypeError: input buffer is not a HEIC image` with no file context.
+// AVIF (`avif`/`avis`) is intentionally excluded — a file claiming the
+// `.heic` extension with AVIF contents is exactly the input we want to reject.
+const HEIF_BRANDS = new Set([
+  "heic", "heix", "heim", "heis",
+  "hevc", "hevx", "hevm", "hevs",
+  "mif1", "msf1",
+]);
+
+function isHeifContainer(buf: Buffer): boolean {
+  if (buf.length < 12) return false;
+  if (buf.toString("ascii", 4, 8) !== "ftyp") return false;
+  return HEIF_BRANDS.has(buf.toString("ascii", 8, 12));
+}
+
 // `Buffer<ArrayBuffer>` (a.k.a. NonSharedBuffer) is the type fs.readFile
 // resolves to and the only Buffer flavour BodyInit accepts. The default
 // `Buffer` alias is `Buffer<ArrayBufferLike>` which includes
@@ -31,6 +49,9 @@ export async function serveImageFile(abs: string): Promise<ServedImage> {
       // cache miss — fall through to convert
     }
     const heicBuf = await fs.readFile(abs);
+    if (!isHeifContainer(heicBuf)) {
+      throw new Error(`[serveImage] not a HEIC/HEIF container: ${abs}`);
+    }
     // heic-convert is CJS with module.exports = fn. Dynamic import keeps
     // its sizable WASM out of bundles that don't serve images.
     const heicConvert = (await import("heic-convert")).default;

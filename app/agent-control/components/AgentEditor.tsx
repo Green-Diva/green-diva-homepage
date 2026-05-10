@@ -128,6 +128,8 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
   const [values, setValues] = useState(() => blankFromInitial(initial));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -153,14 +155,10 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
     ? "mt-1 w-full rounded-md border border-secondary/20 bg-surface-container text-sm text-on-surface focus:border-secondary/60 focus:outline-none transition-colors"
     : "mt-1 w-full rounded-md border border-primary/20 bg-surface-container text-sm text-on-surface focus:border-primary/60 focus:outline-none transition-colors";
   const inputCls = `${inputBase} h-10 px-3.5`;
-  const selectCls = `${inputCls} appearance-none pr-9 cursor-pointer`;
   const textareaCls = `${inputBase} min-h-[96px] px-3.5 py-2.5 leading-relaxed`;
   const labelCls = isMech
     ? "text-[11px] font-label uppercase tracking-[0.25em] text-secondary/70"
     : "text-[11px] font-label uppercase tracking-[0.25em] text-primary/60";
-  const chevronCls = isMech
-    ? "absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none material-symbols-outlined text-base text-secondary/60"
-    : "absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none material-symbols-outlined text-base text-primary/60";
   const headingCls = isMech ? "text-secondary" : "text-primary";
   const dashedCls = values.avatarUrl
     ? (isMech ? "border-secondary/30 hover:border-secondary/60" : "border-primary/30 hover:border-primary/60")
@@ -172,9 +170,6 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
   function update<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((s) => ({ ...s, [key]: v }));
   }
-
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   function onAvatarPick(file: File) {
     setErr(null);

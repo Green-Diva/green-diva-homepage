@@ -159,7 +159,7 @@ async function dropObsoleteSkills(prisma: PrismaClient): Promise<void> {
   // alone (they're INTERNAL with handlerConfig.handler set).
   const rows = await prisma.$queryRawUnsafe<{ id: string; slug: string | null; nameEn: string }[]>(
     `SELECT id, slug, "nameEn" FROM "Skill"
-     WHERE "handlerKind" = 'INTERNAL'
+     WHERE "kind" = 'INTERNAL'
        AND "handlerConfig"->>'handler' = ANY($1::text[])`,
     obsoleteHandlers,
   );

@@ -51,12 +51,28 @@ async function pickFreshSlug(
   return `${root}-imp-${randomBytes(4).toString("hex")}`.slice(0, 64);
 }
 
+// Resolve the runtime kind from a payload that may have come from either
+// pre-2026-05-10 envelopes (separate decorative `kind` + runtime
+// `handlerKind`) or current envelopes (single runtime `kind`). The validator
+// accepts both fields as optional, so this picks whichever is set; legacy
+// envelopes with only the decorative kind fall back to MCP_SERVER (admin
+// re-edits post-import). INTERNAL was retired 2026-05-11.
+function normalizeKind(s: ImportSkill): "HTTP_API" | "LLM_PROMPT" | "MCP_SERVER" {
+  // Pre-retirement exports may carry `kind: "INTERNAL"` — translate to
+  // MCP_SERVER on the way in. handlerConfig is preserved verbatim, but
+  // the runtime won't dispatch INTERNAL anymore so admin must rebuild
+  // the skill as HTTP_API/LLM_PROMPT after import.
+  const raw = s.handlerKind ?? s.kind ?? "MCP_SERVER";
+  return raw === "INTERNAL" ? "MCP_SERVER" : raw;
+}
+
 async function resolveSkillEquip(
   tx: Pick<PrismaClient, "skill">,
   s: ImportSkill,
   policy: "reuse" | "rename",
   createdById: string | null,
 ): Promise<{ skillId: string; reused: boolean }> {
+  const kind = normalizeKind(s);
   const existing = await tx.skill.findUnique({ where: { slug: s.slug } });
   if (existing) {
     if (policy === "reuse") {
@@ -71,12 +87,11 @@ async function resolveSkillEquip(
         icon: s.icon,
         nameEn: s.nameEn,
         nameZh: s.nameZh,
-        kind: s.kind,
+        kind,
         costAp: s.costAp,
         descriptionEn: s.descriptionEn,
         descriptionZh: s.descriptionZh,
         status: s.status,
-        handlerKind: s.handlerKind,
         handlerConfig: jsonOrNull(s.handlerConfig),
         inputSchema: jsonOrNull(s.inputSchema),
         outputSchema: jsonOrNull(s.outputSchema),
@@ -94,12 +109,11 @@ async function resolveSkillEquip(
       icon: s.icon,
       nameEn: s.nameEn,
       nameZh: s.nameZh,
-      kind: s.kind,
+      kind,
       costAp: s.costAp,
       descriptionEn: s.descriptionEn,
       descriptionZh: s.descriptionZh,
       status: s.status,
-      handlerKind: s.handlerKind,
       handlerConfig: jsonOrNull(s.handlerConfig),
       inputSchema: jsonOrNull(s.inputSchema),
       outputSchema: jsonOrNull(s.outputSchema),

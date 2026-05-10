@@ -17,16 +17,15 @@ import AgentEditor from "./components/AgentEditor";
 import AgentImportModal from "./components/AgentImportModal";
 import SkillLibrary from "./components/SkillLibrary";
 import ScenesPanel from "./components/ScenesPanel";
-import ActivityPanel from "./components/ActivityPanel";
 import AgentFilterChips, { type ModeFilter } from "./components/AgentFilterChips";
 import MechanicalDetailView from "./components/MechanicalDetailView";
 import AutonomousDetailView from "./components/AutonomousDetailView";
 import AgentJobDrawer from "./components/AgentJobDrawer";
 
 type EditorState = { open: boolean; mode: "create" | "edit"; initial: AgentRow | null };
-type TabKey = "agents" | "skills" | "scenes" | "activity";
+type TabKey = "agents" | "skills" | "scenes";
 
-const TAB_KEYS = ["agents", "skills", "scenes", "activity"] as const satisfies readonly TabKey[];
+const TAB_KEYS = ["agents", "skills", "scenes"] as const satisfies readonly TabKey[];
 
 function tabFromQuery(value: string | null): TabKey {
   return TAB_KEYS.includes(value as TabKey) ? (value as TabKey) : "agents";
@@ -70,8 +69,7 @@ export default function AgentClient({
   function tabLabel(tab: TabKey): string {
     if (tab === "agents") return t.agentControl.tabAgents;
     if (tab === "skills") return t.agentControl.tabSkillLibrary;
-    if (tab === "scenes") return t.agentControl.tabScenes;
-    return t.agentControl.tabActivity;
+    return t.agentControl.tabScenes;
   }
 
   const counts = useMemo(
@@ -134,11 +132,7 @@ export default function AgentClient({
         ) : null}
       </div>
 
-      {activeTab === "activity" ? (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <ActivityPanel isAdmin={isAdmin} />
-        </div>
-      ) : activeTab === "scenes" ? (
+      {activeTab === "scenes" ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
           <ScenesPanel
             scenes={sceneDefs}

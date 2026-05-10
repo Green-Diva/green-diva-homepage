@@ -1,4 +1,8 @@
-export type AgentSkillKind = "PASSIVE" | "ACTIVE" | "ULTIMATE";
+// Skill.kind values — runtime routing field. Was named HandlerKind pre-rename
+// (2026-05-10). The decorative AgentSkillKind (PASSIVE/ACTIVE/ULTIMATE) and
+// the INTERNAL runtime-injection kind (retired 2026-05-11 after picker-forge
+// decomposition) have both been removed.
+export type AgentSkillKind = "HTTP_API" | "LLM_PROMPT" | "MCP_SERVER";
 
 export type AgentSkillLevel = 1 | 2 | 3 | 4 | 5 | 6;
 

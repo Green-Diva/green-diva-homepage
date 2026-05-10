@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { recordRelicLog } from "@/lib/relicLog";
 import { dispatchScene, SceneError } from "@/lib/agent-service";
+import { readRelicImageAsDataUri, ReadImageError } from "@/lib/relics/readImageAsDataUri";
 
 // Body schema for the pre-flight 3D config dialog. All fields optional —
 // missing keys fall back to the meshy3d handler's defaults (PBR / HD /
@@ -73,6 +74,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
+  // Pipeline-layer read: pull the enhanced PNG off disk and base64-
+  // encode it here so the agent DAG never has to. Replaces the slot-0
+  // image-to-data-uri INTERNAL skill that used to live inside
+  // MESHY-FORGE-001.
+  let imageDataUri: string;
+  try {
+    const enc = await readRelicImageAsDataUri(relic.enhancedImagePath);
+    imageDataUri = enc.dataUri;
+  } catch (e) {
+    if (e instanceof ReadImageError) {
+      const status = e.code === "NOT_FOUND" ? 404 : e.code === "TOO_LARGE" ? 413 : 400;
+      return NextResponse.json({ error: `image read failed: ${e.message}` }, { status });
+    }
+    console.error("[api/relics/create-3d] image read threw", e);
+    return NextResponse.json({ error: "image read failed" }, { status: 500 });
+  }
+
   let dispatch;
   try {
     dispatch = await dispatchScene(
@@ -80,7 +98,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       {
         relicId: relic.id,
         relicSlug: relic.slug,
-        enhancedImagePath: relic.enhancedImagePath,
+        imageDataUri,
         opts,
       },
       { actor: { userId: me.id, level: me.level, name: me.name } },

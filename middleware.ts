@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// PROJECT POLICY: Every route requires login by default. This whitelist is
-// the entire set of public paths — exact match only. Do NOT add a route
-// here without the user's explicit approval; if you think a new route
-// should be public, ask first. PUBLIC_PREFIXES is intentionally empty for
-// the same reason — never re-introduce wildcards.
+// Product policy: this is a members-only community. Only the login page,
+// terms, and privacy notice are public; everything else requires a session.
+// Add new public routes here as exact matches and confirm with the user
+// first. PUBLIC_PREFIXES stays empty — wildcards have caused accidental
+// data exposure in the past.
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/api/auth/login",

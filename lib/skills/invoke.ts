@@ -94,11 +94,11 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
     };
   }
 
-  const handler = handlerRegistry[skill.handlerKind];
+  const handler = handlerRegistry[skill.kind];
   if (!handler) {
     return {
       ok: false,
-      errors: [`no handler registered for ${skill.handlerKind}`],
+      errors: [`no handler registered for ${skill.kind}`],
       errorCode: "INVALID_CONFIG",
     };
   }
@@ -109,7 +109,7 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
     output = await handler(input, cfg, { skillId: skill.id });
   } catch (e) {
     if (e instanceof HandlerError) {
-      console.error(`[skill:invoke] ${skill.id} (${skill.handlerKind}) ${e.code}:`, e.message);
+      console.error(`[skill:invoke] ${skill.id} (${skill.kind}) ${e.code}:`, e.message);
       return { ok: false, errors: [e.message], errorCode: e.code };
     }
     console.error(`[skill:invoke] ${skill.id} unexpected error:`, e);

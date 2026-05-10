@@ -3,14 +3,23 @@
 //     method?: string,                     // default "POST"
 //     url: string,                         // can contain {{vars}} (input scope)
 //     authEnv?: string,                    // env name; resolved server-side
-//     authScheme?: "Bearer"|"ApiKey"|"Key"|"Basic"|"Header",  // default "Bearer"
+//     authScheme?: "Bearer"|"ApiKey"|"Key"|"Basic"|"Header"|"QueryParam",
+//                                          // default "Bearer"
 //     authHeader?: string,                 // for scheme=Header (default "X-API-Key")
+//     authQueryParam?: string,             // for scheme=QueryParam (default "api_key");
+//                                          //   appended to the resolved URL as ?<param>=<envvalue>.
+//                                          //   Used by APIs like SerpAPI that authenticate via query.
 //     headers?: Record<string,string>,
 //     queryTemplate?: Record<string,string>, // values may contain {{vars}}
 //     bodyTemplate?: unknown,              // any JSON; strings get {{var}} interpolation.
 //                                          // If absent, raw `input` is sent as JSON body.
 //     timeoutMs?: number,                  // default 30_000
-//     responseType?: "json" | "text",      // default "json"
+//     responseType?: "json" | "text" | "binary",
+//                                          // default "json"; "binary" returns
+//                                          //   { base64, contentType, bytes, url }
+//                                          //   for direct image / blob fetches
+//                                          //   (forEach-over-URLs flows). Polling
+//                                          //   is incompatible with binary mode.
 //
 //     // — Phase 2.2 additions — — — — — — — — — — — — — — — — — — — — —
 //
@@ -115,11 +124,18 @@ async function sleep(ms: number): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-// Resolve auth headers from handlerConfig + process.env. Reused by initial
-// fetch + polling fetch so both carry the same Authorization scheme.
-function resolveAuthHeaders(config: Record<string, unknown>): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (typeof config.authEnv !== "string" || !config.authEnv) return headers;
+// Resolved auth — either an Authorization-style header or a query
+// parameter to append. Polling reuses the headers piece so iterations
+// stay authenticated; query-param auth is initial-request-only because
+// every poll target redefines its own URL via `polling.url`.
+type ResolvedAuth = {
+  headers: Record<string, string>;
+  queryParam?: { name: string; value: string };
+};
+
+function resolveAuth(config: Record<string, unknown>): ResolvedAuth {
+  const out: ResolvedAuth = { headers: {} };
+  if (typeof config.authEnv !== "string" || !config.authEnv) return out;
   const key = process.env[config.authEnv];
   if (!key) {
     throw new HandlerError(`HTTP_API: env "${config.authEnv}" not set on server`, "MISSING_ENV");
@@ -129,18 +145,22 @@ function resolveAuthHeaders(config: Record<string, unknown>): Record<string, str
     | "ApiKey"
     | "Key"
     | "Basic"
-    | "Header";
-  if (scheme === "Bearer") headers["Authorization"] = `Bearer ${key}`;
-  else if (scheme === "ApiKey") headers["Authorization"] = `ApiKey ${key}`;
+    | "Header"
+    | "QueryParam";
+  if (scheme === "Bearer") out.headers["Authorization"] = `Bearer ${key}`;
+  else if (scheme === "ApiKey") out.headers["Authorization"] = `ApiKey ${key}`;
   // "Key" is the fal.ai convention (`Authorization: Key <key>`). Distinct
   // from "ApiKey" because the literal prefix word differs.
-  else if (scheme === "Key") headers["Authorization"] = `Key ${key}`;
-  else if (scheme === "Basic") headers["Authorization"] = `Basic ${key}`;
+  else if (scheme === "Key") out.headers["Authorization"] = `Key ${key}`;
+  else if (scheme === "Basic") out.headers["Authorization"] = `Basic ${key}`;
   else if (scheme === "Header") {
     const h = typeof config.authHeader === "string" ? config.authHeader : "X-API-Key";
-    headers[h] = key;
+    out.headers[h] = key;
+  } else if (scheme === "QueryParam") {
+    const name = typeof config.authQueryParam === "string" ? config.authQueryParam : "api_key";
+    out.queryParam = { name, value: key };
   }
-  return headers;
+  return out;
 }
 
 // Single fetch with timeout + JSON-or-text decode. Used by both initial
@@ -151,7 +171,10 @@ async function fetchOnce(opts: {
   headers: Record<string, string>;
   body?: string;
   timeoutMs: number;
-  responseType: "json" | "text";
+  responseType: "json" | "text" | "binary";
+  // Binary mode caps response size to keep memory bounded. Defaulted by
+  // caller; required when responseType === "binary".
+  binaryMaxBytes?: number;
 }): Promise<unknown> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), opts.timeoutMs);
@@ -185,6 +208,22 @@ async function fetchOnce(opts: {
   }
 
   if (opts.responseType === "text") return await res.text();
+  if (opts.responseType === "binary") {
+    const buf = Buffer.from(await res.arrayBuffer());
+    const cap = opts.binaryMaxBytes ?? DEFAULT_DOWNLOAD_MAX_BYTES;
+    if (buf.byteLength > cap) {
+      throw new HandlerError(
+        `HTTP_API: binary response exceeded maxBytes (${buf.byteLength} > ${cap})`,
+        "OUTPUT_PARSE",
+      );
+    }
+    return {
+      base64: buf.toString("base64"),
+      contentType: res.headers.get("content-type") || "application/octet-stream",
+      bytes: buf.byteLength,
+      url: opts.url,
+    };
+  }
   try {
     return await res.json();
   } catch {
@@ -340,8 +379,8 @@ export const httpApi: SkillHandler = async (input, config) => {
     ? Object.fromEntries(Object.entries(config.headers).map(([k, v]) => [k, String(v)]))
     : {};
 
-  const authHeaders = resolveAuthHeaders(config);
-  Object.assign(headers, authHeaders);
+  const auth = resolveAuth(config);
+  Object.assign(headers, auth.headers);
 
   // URL with optional query template — uses raw input scope (legacy convention).
   let resolvedUrl = String(applyTemplate(url, input));
@@ -353,6 +392,17 @@ export const httpApi: SkillHandler = async (input, config) => {
     }
     const s = qs.toString();
     if (s) resolvedUrl += (resolvedUrl.includes("?") ? "&" : "?") + s;
+  }
+  // QueryParam-scheme auth: append the env-resolved key as a query parameter.
+  // Done after queryTemplate so handlerConfig admins can't accidentally
+  // override it with a literal value.
+  if (auth.queryParam) {
+    const sep = resolvedUrl.includes("?") ? "&" : "?";
+    resolvedUrl +=
+      sep +
+      encodeURIComponent(auth.queryParam.name) +
+      "=" +
+      encodeURIComponent(auth.queryParam.value);
   }
 
   // Body (legacy: raw input scope)
@@ -369,7 +419,24 @@ export const httpApi: SkillHandler = async (input, config) => {
   }
 
   const timeoutMs = typeof config.timeoutMs === "number" ? config.timeoutMs : DEFAULT_TIMEOUT_MS;
-  const responseType: "json" | "text" = config.responseType === "text" ? "text" : "json";
+  const responseType: "json" | "text" | "binary" =
+    config.responseType === "text"
+      ? "text"
+      : config.responseType === "binary"
+        ? "binary"
+        : "json";
+  // Binary mode and polling are mutually exclusive: polling needs a JSON
+  // status field to read, and the success/failure conditions don't make
+  // sense over a raw blob. Catch this at the boundary so admins don't
+  // get confusing errors mid-poll.
+  if (responseType === "binary" && isObject(config.polling)) {
+    throw new HandlerError(
+      "HTTP_API: responseType=\"binary\" cannot be combined with polling",
+      "INVALID_CONFIG",
+    );
+  }
+  const binaryMaxBytes =
+    typeof config.binaryMaxBytes === "number" ? config.binaryMaxBytes : undefined;
 
   // Initial request.
   const initialResponse = await fetchOnce({
@@ -379,15 +446,18 @@ export const httpApi: SkillHandler = async (input, config) => {
     body,
     timeoutMs,
     responseType,
+    binaryMaxBytes,
   });
 
-  // Polling (no-op if not configured).
+  // Polling (no-op if not configured). Binary + polling combo was
+  // rejected at the boundary above, so responseType narrows to text/json
+  // here; cast keeps the pollUntilDone signature simple.
   const settled = await pollUntilDone({
     initialResponse,
     input,
     config,
-    authHeaders,
-    responseType,
+    authHeaders: auth.headers,
+    responseType: responseType === "binary" ? "json" : responseType,
     perRequestTimeoutMs: timeoutMs,
   });
 

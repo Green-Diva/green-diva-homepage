@@ -6,6 +6,11 @@ import type {
   DispatcherConfig,
 } from "@/lib/agentTypes";
 
+// Public alias kept for callers that still import "HandlerKind" from this
+// module — the underlying values are identical to AgentSkillKind after the
+// 2026-05-10 collapse.
+export type HandlerKind = AgentSkillKind;
+
 export type AgentStatus = "ONLINE" | "STANDBY" | "OFFLINE";
 export type AgentMode = "MECHANICAL" | "AUTONOMOUS";
 
@@ -41,8 +46,6 @@ export type SkillLevel = AgentSkillLevel;
 
 export type SkillStatus = "ONLINE" | "OFFLINE";
 
-export type HandlerKind = "HTTP_API" | "LLM_PROMPT" | "MCP_SERVER" | "INTERNAL";
-
 export interface SkillRow {
   id: string;
   slug: string | null;
@@ -55,7 +58,6 @@ export interface SkillRow {
   costAp: number;
   descriptionEn: string;
   descriptionZh: string;
-  handlerKind: HandlerKind;
   handlerConfig: Record<string, unknown>;
   inputSchema: Record<string, unknown> | null;
   outputSchema: Record<string, unknown> | null;
@@ -90,8 +92,6 @@ export interface SceneBindingRow {
   outputMap: unknown;
   enabled: boolean;
   notes: string | null;
-  rolloutPct: number;
-  fallbackAgentId: string | null;
   createdAt: string;
   updatedAt: string;
 }

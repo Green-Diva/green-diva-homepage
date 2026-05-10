@@ -28,6 +28,7 @@
 
 import "server-only";
 import type { Prisma } from "@prisma/client";
+import jsonata from "jsonata";
 import { prisma } from "@/lib/db";
 import { invokeSkill } from "@/lib/skills/invoke";
 import type { AgentRunResult, AgentRunLogEntry } from "@/lib/agents/invoke";
@@ -75,7 +76,32 @@ type LoopNode = {
   aggregate?: "last" | "concat-array";
 };
 
-type DagNode = SkillNode | BranchNode | LoopNode;
+// forEach node — runs body sub-DAG once per item in the inputFrom-resolved
+// array. Body input shape: { item, index, total } — body reads
+// agent.input.item etc. Same depth budget as loop (counts toward
+// MAX_LOOP_DEPTH). Aggregate default = "concat-array" (forEach is the
+// natural shape for "process N items, collect outputs").
+type ForEachNode = {
+  id: string;
+  type: "forEach";
+  inputFrom: SourceRef;
+  maxItems: number;
+  body: { nodes: DagNode[]; edges: DagEdge[] };
+  aggregate?: "last" | "concat-array";
+};
+
+// transform node — pure JSONata evaluation, no external calls. Lets DAGs
+// do array zip / map / filter / reduce without an INTERNAL helper. The
+// expression is parsed once (cached) and evaluated against the
+// inputFrom-resolved value.
+type TransformNode = {
+  id: string;
+  type: "transform";
+  inputFrom: SourceRef;
+  expression: string;
+};
+
+type DagNode = SkillNode | BranchNode | LoopNode | ForEachNode | TransformNode;
 type DagEdge = { from: string; to: string; when?: string };
 type DagConfig = { version: 2; nodes: DagNode[]; edges: DagEdge[] };
 
@@ -259,6 +285,56 @@ function validateAndNormalize(cfg: unknown): ValidationOk | ValidationFail {
         body: bodyValidated.config,
         aggregate,
       });
+    } else if (raw.type === "forEach") {
+      const maxItems = raw.maxItems;
+      if (typeof maxItems !== "number" || !Number.isInteger(maxItems) || maxItems < 1 || maxItems > 50) {
+        return { ok: false, code: "PIPELINE_INVALID", message: `forEach "${id}".maxItems must be 1-50` };
+      }
+      if (!isObject(raw.body) || !Array.isArray(raw.body.nodes) || !Array.isArray(raw.body.edges)) {
+        return { ok: false, code: "PIPELINE_INVALID", message: `forEach "${id}".body must have nodes[] + edges[]` };
+      }
+      const bodyValidated = validateAndNormalize({
+        version: 2,
+        nodes: raw.body.nodes,
+        edges: raw.body.edges,
+      });
+      if (!bodyValidated.ok) {
+        return {
+          ok: false,
+          code: "PIPELINE_INVALID",
+          message: `forEach "${id}".body invalid: ${bodyValidated.message}`,
+        };
+      }
+      // Default to concat-array — forEach's natural shape is "process N
+      // items, collect N outputs". Admin can override to "last" if only
+      // the final iteration's output matters (e.g. reduction-style fold).
+      const aggregate = raw.aggregate === "last" ? "last" : "concat-array";
+      nodes.push({
+        id,
+        type: "forEach",
+        inputFrom: inputRef,
+        maxItems,
+        body: bodyValidated.config,
+        aggregate,
+      });
+    } else if (raw.type === "transform") {
+      const expression = typeof raw.expression === "string" ? raw.expression.trim() : "";
+      if (!expression) {
+        return { ok: false, code: "PIPELINE_INVALID", message: `transform "${id}".expression required` };
+      }
+      // Parse-once check — JSONata throws on malformed expressions.
+      // We catch and surface the parse error instead of waiting for
+      // runtime to blow up mid-DAG.
+      try {
+        jsonata(expression);
+      } catch (e) {
+        return {
+          ok: false,
+          code: "PIPELINE_INVALID",
+          message: `transform "${id}".expression parse failed: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      }
+      nodes.push({ id, type: "transform", inputFrom: inputRef, expression });
     } else if (raw.type === "branch") {
       if (!Array.isArray(raw.cases) || raw.cases.length === 0) {
         return { ok: false, code: "PIPELINE_INVALID", message: `branch "${id}" must have ≥1 case` };
@@ -287,7 +363,7 @@ function validateAndNormalize(cfg: unknown): ValidationOk | ValidationFail {
       return {
         ok: false,
         code: "PIPELINE_INVALID",
-        message: `node "${id}".type must be "skill" | "branch" | "loop"`,
+        message: `node "${id}".type must be "skill" | "branch" | "loop" | "forEach" | "transform"`,
       };
     }
   }
@@ -662,8 +738,8 @@ export async function runBackbone(opts: {
         if (e.from === id && e.when === chosenLabel) liveEdges.add(edgeKey(e));
       }
       await emitProgress();
-    } else {
-      // node.type === "loop" — Phase 8.
+    } else if (node.type === "loop") {
+      // Phase 8.
       if (depth >= MAX_LOOP_DEPTH) {
         return failNode(
           id,
@@ -682,10 +758,6 @@ export async function runBackbone(opts: {
       let abortMessage = "";
       for (let i = 0; i < node.maxIterations; i++) {
         iterCount = i + 1;
-        // Recurse into the same backbone executor with the body sub-DAG
-        // as pipelineConfig + the outer equip map preserved + this
-        // iteration's input as agent.input. The runLog is shared (entries
-        // append directly to outer trace, prefixed with "<id>#<n>/").
         const sub = await runBackbone({
           agentId: opts.agentId,
           input: iterInput,
@@ -715,7 +787,6 @@ export async function runBackbone(opts: {
             break;
           }
         }
-        // Feed forward — next iteration's input is this iteration's output.
         iterInput = iterOutput;
       }
       const endedAt = new Date();
@@ -742,6 +813,113 @@ export async function runBackbone(opts: {
         durationMs: endedAt.getTime() - startMs,
         ok: true,
         output: { iterations: iterCount, exitedBy, finalOutput: finalOut },
+      });
+      for (const e of config.edges) if (e.from === id) liveEdges.add(edgeKey(e));
+      await emitProgress();
+    } else if (node.type === "forEach") {
+      // forEach — body sub-DAG runs once per item. Counts toward
+      // MAX_LOOP_DEPTH (forEach + loop share the recursion budget).
+      if (depth >= MAX_LOOP_DEPTH) {
+        return failNode(
+          id,
+          "LOOP_TOO_DEEP",
+          `forEach "${id}" exceeds MAX_LOOP_DEPTH=${MAX_LOOP_DEPTH}`,
+        );
+      }
+      const inputArr = resolveRef(node.inputFrom);
+      if (!Array.isArray(inputArr)) {
+        return failNode(
+          id,
+          "FOREACH_INPUT_NOT_ARRAY",
+          `forEach "${id}".inputFrom must resolve to an array, got ${typeof inputArr}`,
+        );
+      }
+      const items = inputArr.slice(0, node.maxItems);
+      const truncated = inputArr.length > node.maxItems;
+      const aggregateMode = node.aggregate ?? "concat-array";
+      const aggregated: unknown[] = [];
+      let lastOutput: unknown = undefined;
+      let aborted = false;
+      let abortCode = "";
+      let abortMessage = "";
+      let processed = 0;
+      for (let i = 0; i < items.length; i++) {
+        const sub = await runBackbone({
+          agentId: opts.agentId,
+          input: { item: items[i], index: i, total: items.length },
+          pipelineConfig: { version: 2, nodes: node.body.nodes, edges: node.body.edges },
+          onProgress: opts.onProgress,
+          _internalEquips: equipBySlot,
+          _depth: depth + 1,
+          _runLog: runLog,
+          _stepIdPrefix: `${stepIdPrefix}${id}#${i + 1}/`,
+        });
+        if (!sub.ok) {
+          aborted = true;
+          abortCode = sub.errorCode;
+          abortMessage = `forEach "${id}" item ${i}: ${sub.errorMessage}`;
+          break;
+        }
+        processed = i + 1;
+        lastOutput = sub.output;
+        if (aggregateMode === "concat-array" && Array.isArray(sub.output)) {
+          aggregated.push(...sub.output);
+        } else {
+          aggregated.push(sub.output);
+        }
+      }
+      const endedAt = new Date();
+      if (aborted) {
+        runLog.push({
+          stepId: stepIdPrefix + id,
+          startedAt: startedAt.toISOString(),
+          endedAt: endedAt.toISOString(),
+          durationMs: endedAt.getTime() - startMs,
+          ok: false,
+          errorCode: abortCode,
+          errorMessage: abortMessage,
+          output: { processed, totalItems: items.length, partialAggregate: aggregated },
+        });
+        return { ok: false, errorCode: abortCode, errorMessage: abortMessage, runLog };
+      }
+      const finalOut = aggregateMode === "concat-array" ? aggregated : lastOutput;
+      outputs.set(id, finalOut);
+      liveNodes.add(id);
+      runLog.push({
+        stepId: stepIdPrefix + id,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+        durationMs: endedAt.getTime() - startMs,
+        ok: true,
+        output: { processed, totalItems: items.length, truncated, finalOutput: finalOut },
+      });
+      for (const e of config.edges) if (e.from === id) liveEdges.add(edgeKey(e));
+      await emitProgress();
+    } else {
+      // node.type === "transform" — JSONata expression on inputFrom.
+      const transformInput = resolveRef(node.inputFrom);
+      let transformOutput: unknown;
+      try {
+        const expr = jsonata(node.expression);
+        transformOutput = await expr.evaluate(transformInput);
+      } catch (e) {
+        return failNode(
+          id,
+          "TRANSFORM_FAILED",
+          `transform "${id}" evaluation failed: ${e instanceof Error ? e.message : String(e)}`,
+          { output: transformInput },
+        );
+      }
+      const endedAt = new Date();
+      outputs.set(id, transformOutput);
+      liveNodes.add(id);
+      runLog.push({
+        stepId: stepIdPrefix + id,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+        durationMs: endedAt.getTime() - startMs,
+        ok: true,
+        output: transformOutput,
       });
       for (const e of config.edges) if (e.from === id) liveEdges.add(edgeKey(e));
       await emitProgress();

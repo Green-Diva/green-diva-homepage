@@ -1,11 +1,18 @@
 "use client";
 
-// Backbone DAG editor (Phase 5, 2026-05-09).
+// Backbone DAG editor (Phase 5, 2026-05-09; Phase 8 R2 — loop UI 2026-05-10).
 //
 // React Flow canvas for editing pipelineConfig v2. Replaces the linear-list
-// BackboneEditor. Supports two node types — skill (run a Skill from a slot)
-// and branch (route by condition on prior output) — and edges that may carry
-// a `when` label when their source is a branch.
+// BackboneEditor. Supports three node types — skill (run a Skill from a
+// slot), branch (route by condition on prior output), loop (run a body
+// sub-DAG up to maxIterations) — and edges that may carry a `when` label
+// when their source is a branch.
+//
+// Loop / forEach bodies are edited in a nested modal sub-canvas (BodySubCanvasEditor) —
+// the body is persisted as schema-shape `{ nodes, edges }` on the loop
+// node's data, opened on demand. UI does not allow nesting a loop inside
+// a loop body (runtime allows depth 2 but admin must use Advanced raw
+// JSON for that — keeps the editor simple).
 //
 // On open: v1 configs are upconverted to a linear v2 graph for editing; on
 // save we always write v2. v1 → v2 happens both here (for the canvas) and
@@ -65,7 +72,42 @@ type BranchNodeData = {
   defaultLabel?: string;
 };
 
-type NodeData = SkillNodeData | BranchNodeData;
+// Persisted body shape, mirrors lib/skills/runtime/backbone.ts loop body.
+// Body nodes only ever store skill / branch — UI doesn't allow nested
+// loops here (runtime supports depth 2 via Advanced raw JSON only).
+// Body sub-DAG can contain skill / branch / transform — but NOT loop or
+// forEach (UI doesn't show nested sub-canvases; runtime supports
+// MAX_LOOP_DEPTH=2 only via raw-JSON Advanced editor).
+type BodyNodeData = SkillNodeData | BranchNodeData | TransformNodeData;
+type BodyEdge = { from: string; to: string; when?: string };
+
+type LoopNodeData = {
+  type: "loop";
+  nodeId: string;
+  inputFrom: SourceRef;
+  maxIterations: number;
+  exitWhen: BranchCase[];
+  aggregate: "last" | "concat-array";
+  body: { nodes: BodyNodeData[]; edges: BodyEdge[]; positions?: Record<string, { x: number; y: number }> };
+};
+
+type ForEachNodeData = {
+  type: "forEach";
+  nodeId: string;
+  inputFrom: SourceRef;
+  maxItems: number;
+  aggregate: "last" | "concat-array";
+  body: { nodes: BodyNodeData[]; edges: BodyEdge[]; positions?: Record<string, { x: number; y: number }> };
+};
+
+type TransformNodeData = {
+  type: "transform";
+  nodeId: string;
+  inputFrom: SourceRef;
+  expression: string;
+};
+
+type NodeData = SkillNodeData | BranchNodeData | LoopNodeData | ForEachNodeData | TransformNodeData;
 type FlowNode = Node<NodeData>;
 
 type EdgeData = { when?: string };
@@ -159,21 +201,44 @@ function loadConfig(cfg: unknown): {
         const slot = typeof raw.equipSlot === "number" ? raw.equipSlot : 0;
         nodeData.push({ type: "skill", nodeId: id, equipSlot: slot, inputFrom });
       } else if (raw.type === "branch") {
-        const cases = Array.isArray(raw.cases)
-          ? (raw.cases.filter(isObject).map((c) => ({
-              path: typeof c.path === "string" ? c.path : "",
-              op: typeof c.op === "string" ? (c.op as BranchCase["op"]) : "eq",
-              value: c.value,
-              label: typeof c.label === "string" ? c.label : "match",
-            })) as BranchCase[])
-          : [];
         nodeData.push({
           type: "branch",
           nodeId: id,
           inputFrom,
-          cases,
+          cases: parseCases(raw.cases),
           defaultLabel: typeof raw.defaultLabel === "string" ? raw.defaultLabel : undefined,
         });
+      } else if (raw.type === "loop") {
+        const max = typeof raw.maxIterations === "number" ? raw.maxIterations : 3;
+        const aggregate: LoopNodeData["aggregate"] =
+          raw.aggregate === "concat-array" ? "concat-array" : "last";
+        const exitWhen = Array.isArray(raw.exitWhen) ? parseCases(raw.exitWhen) : [];
+        const body = parseBody(raw.body);
+        nodeData.push({
+          type: "loop",
+          nodeId: id,
+          inputFrom,
+          maxIterations: max,
+          aggregate,
+          exitWhen,
+          body,
+        });
+      } else if (raw.type === "forEach") {
+        const max = typeof raw.maxItems === "number" ? raw.maxItems : 10;
+        const aggregate: ForEachNodeData["aggregate"] =
+          raw.aggregate === "last" ? "last" : "concat-array";
+        const body = parseBody(raw.body);
+        nodeData.push({
+          type: "forEach",
+          nodeId: id,
+          inputFrom,
+          maxItems: max,
+          aggregate,
+          body,
+        });
+      } else if (raw.type === "transform") {
+        const expression = typeof raw.expression === "string" ? raw.expression : "$";
+        nodeData.push({ type: "transform", nodeId: id, inputFrom, expression });
       }
       if (isObject(raw.position) && typeof raw.position.x === "number" && typeof raw.position.y === "number") {
         positions.set(id, { x: raw.position.x, y: raw.position.y });
@@ -213,7 +278,16 @@ function loadConfig(cfg: unknown): {
   );
   const nodes: FlowNode[] = v2.nodes.map((nd) => ({
     id: nd.nodeId,
-    type: nd.type === "skill" ? "skillNode" : "branchNode",
+    type:
+      nd.type === "skill"
+        ? "skillNode"
+        : nd.type === "branch"
+          ? "branchNode"
+          : nd.type === "loop"
+            ? "loopNode"
+            : nd.type === "forEach"
+              ? "forEachNode"
+              : "transformNode",
     position: positions.get(nd.nodeId) ?? { x: 0, y: 0 },
     data: nd,
   }));
@@ -226,6 +300,71 @@ function loadConfig(cfg: unknown): {
     label: e.when,
   }));
   return { nodes, edges, warning: null };
+}
+
+function parseCases(raw: unknown): BranchCase[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isObject).map((c) => ({
+    path: typeof c.path === "string" ? c.path : "",
+    op: typeof c.op === "string" ? (c.op as BranchCase["op"]) : "eq",
+    value: c.value,
+    label: typeof c.label === "string" ? c.label : "match",
+  }));
+}
+
+function parseBody(raw: unknown): LoopNodeData["body"] {
+  const empty: LoopNodeData["body"] = { nodes: [], edges: [], positions: {} };
+  if (!isObject(raw)) return empty;
+  const positions: Record<string, { x: number; y: number }> = {};
+  const nodes: BodyNodeData[] = [];
+  if (Array.isArray(raw.nodes)) {
+    for (const n of raw.nodes) {
+      if (!isObject(n)) continue;
+      const id = typeof n.id === "string" ? n.id : null;
+      if (!id) continue;
+      const inputFrom = parseInputFrom(n.inputFrom) ?? "agent.input";
+      if (n.type === "skill") {
+        nodes.push({
+          type: "skill",
+          nodeId: id,
+          equipSlot: typeof n.equipSlot === "number" ? n.equipSlot : 0,
+          inputFrom,
+        });
+      } else if (n.type === "branch") {
+        nodes.push({
+          type: "branch",
+          nodeId: id,
+          inputFrom,
+          cases: parseCases(n.cases),
+          defaultLabel: typeof n.defaultLabel === "string" ? n.defaultLabel : undefined,
+        });
+      } else if (n.type === "transform") {
+        nodes.push({
+          type: "transform",
+          nodeId: id,
+          inputFrom,
+          expression: typeof n.expression === "string" ? n.expression : "$",
+        });
+      }
+      // loop / forEach nodes inside body are silently dropped — UI can't
+      // render nested sub-canvases; admin who wants them must use the
+      // Advanced raw-JSON editor (runtime still supports MAX_LOOP_DEPTH=2).
+      if (isObject(n.position) && typeof n.position.x === "number" && typeof n.position.y === "number") {
+        positions[id] = { x: n.position.x, y: n.position.y };
+      }
+    }
+  }
+  const edges: BodyEdge[] = [];
+  if (Array.isArray(raw.edges)) {
+    for (const e of raw.edges) {
+      if (!isObject(e)) continue;
+      const from = typeof e.from === "string" ? e.from : "";
+      const to = typeof e.to === "string" ? e.to : "";
+      if (!from || !to) continue;
+      edges.push({ from, to, when: typeof e.when === "string" ? e.when : undefined });
+    }
+  }
+  return { nodes, edges, positions };
 }
 
 function parseInputFrom(raw: unknown): SourceRef | null {
@@ -249,27 +388,110 @@ function parseDep(fromStr: string): string | null {
   return m ? m[1] : null;
 }
 
+function serializeBody(body: LoopNodeData["body"]): {
+  nodes: unknown[];
+  edges: unknown[];
+} {
+  const positions = body.positions ?? {};
+  return {
+    nodes: body.nodes.map((nd) => {
+      const pos = positions[nd.nodeId];
+      const base = pos
+        ? { position: { x: Math.round(pos.x), y: Math.round(pos.y) } }
+        : {};
+      if (nd.type === "skill") {
+        return {
+          id: nd.nodeId,
+          type: "skill" as const,
+          equipSlot: nd.equipSlot,
+          inputFrom: nd.inputFrom,
+          ...base,
+        };
+      }
+      if (nd.type === "branch") {
+        return {
+          id: nd.nodeId,
+          type: "branch" as const,
+          inputFrom: nd.inputFrom,
+          cases: nd.cases,
+          defaultLabel: nd.defaultLabel,
+          ...base,
+        };
+      }
+      // transform
+      return {
+        id: nd.nodeId,
+        type: "transform" as const,
+        inputFrom: nd.inputFrom,
+        expression: nd.expression,
+        ...base,
+      };
+    }),
+    edges: body.edges.map((e) => ({
+      from: e.from,
+      to: e.to,
+      ...(e.when ? { when: e.when } : {}),
+    })),
+  };
+}
+
 function buildConfig(nodes: FlowNode[], edges: FlowEdge[]) {
   return {
     version: 2 as const,
     nodes: nodes.map((n) => {
       const d = n.data;
+      const pos = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
       if (d.type === "skill") {
         return {
           id: d.nodeId,
           type: "skill" as const,
           equipSlot: d.equipSlot,
           inputFrom: d.inputFrom,
-          position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+          position: pos,
         };
       }
+      if (d.type === "branch") {
+        return {
+          id: d.nodeId,
+          type: "branch" as const,
+          inputFrom: d.inputFrom,
+          cases: d.cases,
+          defaultLabel: d.defaultLabel,
+          position: pos,
+        };
+      }
+      if (d.type === "loop") {
+        const body = serializeBody(d.body);
+        return {
+          id: d.nodeId,
+          type: "loop" as const,
+          inputFrom: d.inputFrom,
+          maxIterations: d.maxIterations,
+          ...(d.exitWhen.length > 0 ? { exitWhen: d.exitWhen } : {}),
+          ...(d.aggregate !== "last" ? { aggregate: d.aggregate } : {}),
+          body,
+          position: pos,
+        };
+      }
+      if (d.type === "forEach") {
+        const body = serializeBody(d.body);
+        return {
+          id: d.nodeId,
+          type: "forEach" as const,
+          inputFrom: d.inputFrom,
+          maxItems: d.maxItems,
+          ...(d.aggregate !== "concat-array" ? { aggregate: d.aggregate } : {}),
+          body,
+          position: pos,
+        };
+      }
+      // transform
       return {
         id: d.nodeId,
-        type: "branch" as const,
+        type: "transform" as const,
         inputFrom: d.inputFrom,
-        cases: d.cases,
-        defaultLabel: d.defaultLabel,
-        position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+        expression: d.expression,
+        position: pos,
       };
     }),
     edges: edges.map((e) => ({
@@ -326,6 +548,36 @@ function BranchNodeView({ data, selected }: NodeProps<FlowNode>) {
   );
 }
 
+// Loop node — visually distinct (violet, double border) so admins
+// recognize "this is a black box that runs a sub-DAG up to N times".
+// Body is opaque on the main canvas; click panel "Edit loop body" to
+// open the nested sub-canvas modal.
+function LoopNodeView({ data, selected }: NodeProps<FlowNode>) {
+  const d = data as LoopNodeData;
+  const bodyCount = d.body.nodes.length;
+  return (
+    <div
+      className={[
+        "min-w-[180px] px-3 py-2 rounded-md bg-surface-container/95 shadow-md",
+        "border-2 border-double",
+        selected ? "border-violet-300" : "border-violet-300/50",
+      ].join(" ")}
+      style={{ boxShadow: selected ? "0 0 0 1px rgb(196 181 253 / 0.4)" : undefined }}
+    >
+      <Handle type="target" position={Position.Left} className="!bg-violet-300 !border-violet-300" />
+      <div className="font-label text-[9px] tracking-[0.25em] uppercase mb-1" style={{ color: "rgb(196 181 253)" }}>
+        Loop · iter≤{d.maxIterations}
+      </div>
+      <div className="text-[12px] text-on-surface truncate">{d.nodeId}</div>
+      <div className="text-[10px] text-on-surface-variant truncate">
+        body: {bodyCount} node{bodyCount === 1 ? "" : "s"}
+        {d.exitWhen.length > 0 ? ` · exitWhen ×${d.exitWhen.length}` : ""}
+      </div>
+      <Handle type="source" position={Position.Right} className="!bg-violet-300 !border-violet-300" />
+    </div>
+  );
+}
+
 function LabeledEdge({
   id,
   sourceX,
@@ -373,8 +625,434 @@ function LabeledEdge({
   );
 }
 
-const nodeTypes = { skillNode: SkillNodeView, branchNode: BranchNodeView };
+// forEach node — sky-blue, body sub-DAG runs once per item in input array.
+function ForEachNodeView({ data, selected }: NodeProps<FlowNode>) {
+  const d = data as ForEachNodeData;
+  const bodyCount = d.body.nodes.length;
+  return (
+    <div
+      className={[
+        "min-w-[180px] px-3 py-2 rounded-md bg-surface-container/95 shadow-md",
+        "border-2",
+        selected ? "border-sky-400" : "border-sky-400/50",
+      ].join(" ")}
+      style={{ boxShadow: selected ? "0 0 0 1px rgb(56 189 248 / 0.4)" : undefined }}
+    >
+      <Handle type="target" position={Position.Left} className="!bg-sky-400 !border-sky-400" />
+      <div className="font-label text-[9px] tracking-[0.25em] uppercase mb-1" style={{ color: "rgb(56 189 248)" }}>
+        forEach · max {d.maxItems}
+      </div>
+      <div className="text-[12px] text-on-surface truncate">{d.nodeId}</div>
+      <div className="text-[10px] text-on-surface-variant truncate">
+        body: {bodyCount} node{bodyCount === 1 ? "" : "s"} · {d.aggregate}
+      </div>
+      <Handle type="source" position={Position.Right} className="!bg-sky-400 !border-sky-400" />
+    </div>
+  );
+}
+
+// transform node — emerald, JSONata expression, no sub-DAG.
+function TransformNodeView({ data, selected }: NodeProps<FlowNode>) {
+  const d = data as TransformNodeData;
+  // Show first ~32 chars of expression so admins can sanity-check at a glance.
+  const preview = d.expression.replace(/\s+/g, " ").slice(0, 32);
+  return (
+    <div
+      className={[
+        "min-w-[180px] px-3 py-2 rounded-md bg-surface-container/95 shadow-md",
+        "border-2",
+        selected ? "border-emerald-400" : "border-emerald-400/50",
+      ].join(" ")}
+      style={{ boxShadow: selected ? "0 0 0 1px rgb(52 211 153 / 0.4)" : undefined }}
+    >
+      <Handle type="target" position={Position.Left} className="!bg-emerald-400 !border-emerald-400" />
+      <div className="font-label text-[9px] tracking-[0.25em] uppercase mb-1" style={{ color: "rgb(52 211 153)" }}>
+        transform · jsonata
+      </div>
+      <div className="text-[12px] text-on-surface truncate">{d.nodeId}</div>
+      <div className="text-[10px] text-on-surface-variant font-mono truncate">{preview || "$"}</div>
+      <Handle type="source" position={Position.Right} className="!bg-emerald-400 !border-emerald-400" />
+    </div>
+  );
+}
+
+const nodeTypes = {
+  skillNode: SkillNodeView,
+  branchNode: BranchNodeView,
+  loopNode: LoopNodeView,
+  forEachNode: ForEachNodeView,
+  transformNode: TransformNodeView,
+};
 const edgeTypes = { labeled: LabeledEdge };
+
+// — — Body sub-canvas editor (nested modal) — — — — — — — — — — — — — —
+//
+// Used by both loop and forEach nodes — same ReactFlow canvas, different
+// header copy / iteration semantics. Reuses Skill / Branch / Transform
+// node views + panels from the main canvas. Disallows nesting loop /
+// forEach further (UI keeps depth bounded; runtime supports
+// MAX_LOOP_DEPTH=2 only via the Advanced raw-JSON editor).
+//
+// Body source-ref scope is independent — `agent.input` inside the body
+// resolves at runtime to:
+//   - loop:    the iteration's input (first pass = loop's inputFrom;
+//              subsequent passes = previous iteration's leaf output)
+//   - forEach: { item, index, total } where item is the current array
+//              element. Body reads agent.input.item.
+
+type BodySubCanvasKind = "loop" | "forEach";
+
+type BodySubCanvasEditorProps = {
+  parentNodeId: string;
+  kind: BodySubCanvasKind;
+  initialBody: LoopNodeData["body"];
+  equipBySlot: Map<number, EquipRow>;
+  onCommit: (body: LoopNodeData["body"]) => void;
+  onCancel: () => void;
+};
+
+function bodyToFlow(body: LoopNodeData["body"]): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const positionsRecord = body.positions ?? {};
+  const positionsMap = new Map<string, { x: number; y: number }>();
+  for (const [id, pos] of Object.entries(positionsRecord)) positionsMap.set(id, pos);
+  const layout = autoLayout(
+    body.nodes.map((n) => ({ id: n.nodeId, data: n, storedPos: positionsMap.get(n.nodeId) })),
+    body.edges.map((e) => ({ from: e.from, to: e.to })),
+  );
+  const nodes: FlowNode[] = body.nodes.map((nd) => ({
+    id: nd.nodeId,
+    type:
+      nd.type === "skill"
+        ? "skillNode"
+        : nd.type === "branch"
+          ? "branchNode"
+          : "transformNode",
+    position: layout.get(nd.nodeId) ?? { x: 0, y: 0 },
+    data: nd,
+  }));
+  const edges: FlowEdge[] = body.edges.map((e, i) => ({
+    id: `be${i}-${e.from}-${e.to}-${e.when ?? "_"}`,
+    source: e.from,
+    target: e.to,
+    type: "labeled",
+    data: { when: e.when },
+    label: e.when,
+  }));
+  return { nodes, edges };
+}
+
+function flowToBody(nodes: FlowNode[], edges: FlowEdge[]): LoopNodeData["body"] {
+  const positions: Record<string, { x: number; y: number }> = {};
+  const bodyNodes: BodyNodeData[] = [];
+  for (const n of nodes) {
+    // belt-and-suspenders — UI prevents nesting loop / forEach inside body
+    if (n.data.type === "loop" || n.data.type === "forEach") continue;
+    bodyNodes.push(n.data as BodyNodeData);
+    positions[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
+  }
+  const bodyEdges: BodyEdge[] = edges.map((e) => ({
+    from: e.source,
+    to: e.target,
+    ...(e.data?.when ? { when: e.data.when } : {}),
+  }));
+  return { nodes: bodyNodes, edges: bodyEdges, positions };
+}
+
+function BodySubCanvasEditor(props: BodySubCanvasEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <BodySubCanvasEditorInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function BodySubCanvasEditorInner({
+  parentNodeId,
+  kind,
+  initialBody,
+  equipBySlot,
+  onCommit,
+  onCancel,
+}: BodySubCanvasEditorProps) {
+  const initial = useMemo(() => bodyToFlow(initialBody), [initialBody]);
+  const [nodes, setNodes] = useState<FlowNode[]>(initial.nodes);
+  const [edges, setEdges] = useState<FlowEdge[]>(initial.edges);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    closeBtnRef.current?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds) as FlowNode[]),
+    [],
+  );
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds) as FlowEdge[]),
+    [],
+  );
+  const onConnect = useCallback(
+    (conn: Connection) => {
+      if (!conn.source || !conn.target) return;
+      const sourceNode = nodes.find((n) => n.id === conn.source);
+      let when: string | undefined;
+      if (sourceNode?.data.type === "branch") {
+        when = sourceNode.data.cases[0]?.label ?? sourceNode.data.defaultLabel;
+      }
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...conn,
+            type: "labeled",
+            data: { when },
+            label: when,
+            id: `be${Date.now()}-${conn.source}-${conn.target}`,
+          } as FlowEdge,
+          eds,
+        ) as FlowEdge[],
+      );
+    },
+    [nodes],
+  );
+
+  function addSkillNode() {
+    const id = nextNodeId(nodes, "b");
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "skillNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: { type: "skill", nodeId: id, equipSlot: 0, inputFrom: "agent.input" },
+      },
+    ]);
+    setSelectedId(id);
+  }
+  function addBranchNode() {
+    const id = nextNodeId(nodes, "bbr");
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "branchNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: {
+          type: "branch",
+          nodeId: id,
+          inputFrom: "agent.input",
+          cases: [{ path: "kind", op: "eq", value: "done", label: "done" }],
+          defaultLabel: undefined,
+        },
+      },
+    ]);
+    setSelectedId(id);
+  }
+  function addTransformNode() {
+    const id = nextNodeId(nodes, "btx");
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "transformNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: { type: "transform", nodeId: id, inputFrom: "agent.input", expression: "$" },
+      },
+    ]);
+    setSelectedId(id);
+  }
+  function deleteSelected() {
+    if (selectedEdgeId) {
+      setEdges((eds) => eds.filter((e) => e.id !== selectedEdgeId));
+      setSelectedEdgeId(null);
+      return;
+    }
+    if (!selectedId) return;
+    setNodes((nds) => nds.filter((n) => n.id !== selectedId));
+    setEdges((eds) => eds.filter((e) => e.source !== selectedId && e.target !== selectedId));
+    setSelectedId(null);
+  }
+  function patchNode(id: string, patch: Partial<NodeData>) {
+    setNodes((nds) =>
+      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } as NodeData } : n)),
+    );
+  }
+  function patchEdge(id: string, when: string | undefined) {
+    setEdges((eds) =>
+      eds.map((e) => (e.id === id ? { ...e, data: { ...e.data, when }, label: when } : e)),
+    );
+  }
+  function renameNode(oldId: string, newId: string) {
+    if (!newId || newId === oldId) return;
+    if (nodes.some((n) => n.id === newId)) return;
+    if (!/^[a-zA-Z0-9_-]+$/.test(newId)) return;
+    setNodes((nds) =>
+      nds.map((n) => (n.id === oldId ? { ...n, id: newId, data: { ...n.data, nodeId: newId } } : n)),
+    );
+    setEdges((eds) =>
+      eds.map((e) => ({
+        ...e,
+        source: e.source === oldId ? newId : e.source,
+        target: e.target === oldId ? newId : e.target,
+      })),
+    );
+    setSelectedId(newId);
+  }
+
+  const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
+  const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
+
+  function commit() {
+    onCommit(flowToBody(nodes, edges));
+  }
+
+  const portal = typeof document !== "undefined" ? document.body : null;
+  if (!portal) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[210] bg-black/85 backdrop-blur-sm flex flex-col">
+      <div
+        className={`border-b ${kind === "forEach" ? "border-sky-400/40" : "border-violet-300/40"} bg-surface-container/95 px-4 py-3 flex items-center justify-between gap-4`}
+      >
+        <div>
+          <div
+            className="font-label text-[10px] tracking-[0.3em] uppercase"
+            style={{ color: kind === "forEach" ? "rgb(56 189 248)" : "rgb(196 181 253)" }}
+          >
+            {kind === "forEach" ? "forEach Body" : "Loop Body"} · {parentNodeId}
+          </div>
+          <div className="text-[12px] text-on-surface-variant">
+            {nodes.length} nodes · {edges.length} edges ·{" "}
+            {kind === "forEach"
+              ? "`agent.input` = { item, index, total }"
+              : "`agent.input` = iteration state (loop input on first pass, prior leaf output after)"}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={commit}
+            className="px-4 py-1.5 font-label text-[10px] tracking-[0.25em] uppercase"
+            style={{
+              background: kind === "forEach" ? "rgb(56 189 248)" : "rgb(196 181 253)",
+              color: "rgb(30 27 75)",
+            }}
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            ref={closeBtnRef}
+            onClick={onCancel}
+            className="px-4 py-1.5 border border-on-surface-variant/40 text-on-surface-variant font-label text-[10px] tracking-[0.25em] uppercase hover:text-on-surface"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex min-h-0">
+        <div className="flex-1 relative">
+          <div className="absolute top-2 left-2 z-10 flex gap-2">
+            <button
+              type="button"
+              onClick={addSkillNode}
+              className="px-3 py-1.5 bg-secondary/[0.15] border border-secondary/60 text-secondary font-label text-[10px] tracking-[0.25em] uppercase"
+            >
+              + Skill
+            </button>
+            <button
+              type="button"
+              onClick={addBranchNode}
+              className="px-3 py-1.5 bg-tertiary/[0.15] border border-tertiary/60 text-tertiary font-label text-[10px] tracking-[0.25em] uppercase"
+            >
+              + Branch
+            </button>
+            <button
+              type="button"
+              onClick={addTransformNode}
+              className="px-3 py-1.5 border-2 font-label text-[10px] tracking-[0.25em] uppercase"
+              style={{ borderColor: "rgb(52 211 153 / 0.6)", color: "rgb(52 211 153)", background: "rgb(52 211 153 / 0.12)" }}
+            >
+              + Transform
+            </button>
+            <button
+              type="button"
+              onClick={deleteSelected}
+              disabled={!selectedId && !selectedEdgeId}
+              className="px-3 py-1.5 border border-error/60 text-error font-label text-[10px] tracking-[0.25em] uppercase disabled:opacity-40"
+            >
+              Delete
+            </button>
+          </div>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, n) => {
+              setSelectedId(n.id);
+              setSelectedEdgeId(null);
+            }}
+            onEdgeClick={(_, e) => {
+              setSelectedEdgeId(e.id);
+              setSelectedId(null);
+            }}
+            onPaneClick={() => {
+              setSelectedId(null);
+              setSelectedEdgeId(null);
+            }}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            colorMode="dark"
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background gap={18} size={1} color="rgba(196,181,253,0.12)" />
+            <Controls className="!bg-surface-container !border-violet-300/40" />
+            <MiniMap
+              className="!bg-surface-container !border-violet-300/40"
+              nodeColor={(n) => (n.type === "branchNode" ? "rgba(255,180,140,0.6)" : "rgba(233,193,118,0.6)")}
+            />
+          </ReactFlow>
+        </div>
+
+        <aside className="w-[360px] border-l border-violet-300/40 bg-surface-container/95 overflow-y-auto p-4 space-y-4">
+          {selectedNode ? (
+            <NodePanel
+              key={selectedNode.id}
+              node={selectedNode}
+              allNodes={nodes}
+              equipBySlot={equipBySlot}
+              onPatch={(patch) => patchNode(selectedNode.id, patch)}
+              onRename={(newId) => renameNode(selectedNode.id, newId)}
+              onOpenLoopBody={null}
+            />
+          ) : selectedEdge ? (
+            <EdgePanel
+              edge={selectedEdge}
+              sourceNode={nodes.find((n) => n.id === selectedEdge.source) ?? null}
+              onChangeWhen={(when) => patchEdge(selectedEdge.id, when)}
+            />
+          ) : (
+            <div className="text-[12px] text-on-surface-variant">
+              Click a node or edge to edit. <code>agent.input</code> inside the body resolves to the
+              current iteration state at runtime.
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>,
+    portal,
+  );
+}
 
 // — — Editor shell — — — — — — — — — — — — — — — — — — — — — — — — — —
 
@@ -429,6 +1107,7 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
   const [topErr, setTopErr] = useState<string | null>(initial.warning);
   const [test, setTest] = useState<TestResult>({ kind: "idle" });
   const [sampleInput, setSampleInput] = useState('{ "prompt": "hello" }');
+  const [bodyEditorFor, setBodyEditorFor] = useState<string | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -514,6 +1193,76 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
           cases: [{ path: "kind", op: "eq", value: "2D", label: "twoD" }],
           defaultLabel: undefined,
         },
+      },
+    ]);
+    setSelectedId(id);
+  }
+
+  function addLoopNode() {
+    const id = nextNodeId(nodes, "loop");
+    const firstSlot = equipBySlot.keys().next().value ?? 0;
+    const seedBodyId = "step1";
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "loopNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: {
+          type: "loop",
+          nodeId: id,
+          inputFrom: "agent.input",
+          maxIterations: 3,
+          aggregate: "last",
+          exitWhen: [],
+          body: {
+            nodes: [{ type: "skill", nodeId: seedBodyId, equipSlot: firstSlot, inputFrom: "agent.input" }],
+            edges: [],
+            positions: { [seedBodyId]: { x: 100, y: 100 } },
+          },
+        },
+      },
+    ]);
+    setSelectedId(id);
+  }
+
+  function addForEachNode() {
+    const id = nextNodeId(nodes, "fe");
+    const firstSlot = equipBySlot.keys().next().value ?? 0;
+    // Body reads agent.input.item — seed a skill so admin can dry-run.
+    const seedBodyId = "process";
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "forEachNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: {
+          type: "forEach",
+          nodeId: id,
+          inputFrom: "agent.input",
+          maxItems: 10,
+          aggregate: "concat-array",
+          body: {
+            nodes: [{ type: "skill", nodeId: seedBodyId, equipSlot: firstSlot, inputFrom: "agent.input" }],
+            edges: [],
+            positions: { [seedBodyId]: { x: 100, y: 100 } },
+          },
+        },
+      },
+    ]);
+    setSelectedId(id);
+  }
+
+  function addTransformNode() {
+    const id = nextNodeId(nodes, "tx");
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "transformNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: { type: "transform", nodeId: id, inputFrom: "agent.input", expression: "$" },
       },
     ]);
     setSelectedId(id);
@@ -638,6 +1387,15 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
 
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
+  // The selected sub-canvas target — either a loop or forEach node. The
+  // sub-canvas modal opens for both; kind drives header copy + accent color.
+  const editingBodyNode =
+    bodyEditorFor !== null
+      ? (nodes.find(
+          (n) =>
+            n.id === bodyEditorFor && (n.data.type === "loop" || n.data.type === "forEach"),
+        ) ?? null)
+      : null;
   const portal = typeof document !== "undefined" ? document.body : null;
   if (!portal) return null;
 
@@ -695,6 +1453,30 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
               className="px-3 py-1.5 bg-tertiary/[0.15] border border-tertiary/60 text-tertiary font-label text-[10px] tracking-[0.25em] uppercase"
             >
               + Branch
+            </button>
+            <button
+              type="button"
+              onClick={addLoopNode}
+              className="px-3 py-1.5 border-2 border-double font-label text-[10px] tracking-[0.25em] uppercase"
+              style={{ borderColor: "rgb(196 181 253 / 0.6)", color: "rgb(196 181 253)", background: "rgb(196 181 253 / 0.12)" }}
+            >
+              + Loop
+            </button>
+            <button
+              type="button"
+              onClick={addForEachNode}
+              className="px-3 py-1.5 border-2 font-label text-[10px] tracking-[0.25em] uppercase"
+              style={{ borderColor: "rgb(56 189 248 / 0.6)", color: "rgb(56 189 248)", background: "rgb(56 189 248 / 0.12)" }}
+            >
+              + ForEach
+            </button>
+            <button
+              type="button"
+              onClick={addTransformNode}
+              className="px-3 py-1.5 border-2 font-label text-[10px] tracking-[0.25em] uppercase"
+              style={{ borderColor: "rgb(52 211 153 / 0.6)", color: "rgb(52 211 153)", background: "rgb(52 211 153 / 0.12)" }}
+            >
+              + Transform
             </button>
             <button
               type="button"
@@ -766,6 +1548,7 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
                 );
                 setSelectedId(newId);
               }}
+              onOpenLoopBody={(nodeId) => setBodyEditorFor(nodeId)}
             />
           ) : selectedEdge ? (
             <EdgePanel
@@ -821,6 +1604,28 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
           </div>
         </aside>
       </div>
+      {editingBodyNode &&
+      (editingBodyNode.data.type === "loop" || editingBodyNode.data.type === "forEach") ? (
+        <BodySubCanvasEditor
+          parentNodeId={editingBodyNode.id}
+          kind={editingBodyNode.data.type}
+          initialBody={editingBodyNode.data.body}
+          equipBySlot={equipBySlot}
+          onCommit={(body) => {
+            const targetId = editingBodyNode.id;
+            setNodes((nds) =>
+              nds.map((n) => {
+                if (n.id !== targetId) return n;
+                if (n.data.type === "loop") return { ...n, data: { ...n.data, body } };
+                if (n.data.type === "forEach") return { ...n, data: { ...n.data, body } };
+                return n;
+              }),
+            );
+            setBodyEditorFor(null);
+          }}
+          onCancel={() => setBodyEditorFor(null)}
+        />
+      ) : null}
     </div>,
     portal,
   );
@@ -834,12 +1639,16 @@ function NodePanel({
   equipBySlot,
   onPatch,
   onRename,
+  onOpenLoopBody,
 }: {
   node: FlowNode;
   allNodes: FlowNode[];
   equipBySlot: Map<number, EquipRow>;
   onPatch: (patch: Partial<NodeData>) => void;
   onRename: (newId: string) => void;
+  // null => disable the "Edit loop body" button (used inside the body
+  // editor itself, where loop nodes can't appear anyway — defensive).
+  onOpenLoopBody: ((nodeId: string) => void) | null;
 }) {
   const otherNodeIds = allNodes.map((n) => n.id).filter((id) => id !== node.id);
   const sourceOptions = ["agent.input", ...otherNodeIds.map((id) => `${id}.output`)];
@@ -864,8 +1673,28 @@ function NodePanel({
           sourceOptions={sourceOptions}
           onPatch={onPatch}
         />
-      ) : (
+      ) : node.data.type === "branch" ? (
         <BranchNodePanel
+          data={node.data}
+          sourceOptions={sourceOptions}
+          onPatch={onPatch}
+        />
+      ) : node.data.type === "loop" ? (
+        <LoopNodePanel
+          data={node.data}
+          sourceOptions={sourceOptions}
+          onPatch={onPatch}
+          onOpenBody={onOpenLoopBody ? () => onOpenLoopBody(node.id) : null}
+        />
+      ) : node.data.type === "forEach" ? (
+        <ForEachNodePanel
+          data={node.data}
+          sourceOptions={sourceOptions}
+          onPatch={onPatch}
+          onOpenBody={onOpenLoopBody ? () => onOpenLoopBody(node.id) : null}
+        />
+      ) : (
+        <TransformNodePanel
           data={node.data}
           sourceOptions={sourceOptions}
           onPatch={onPatch}
@@ -1020,6 +1849,277 @@ function BranchNodePanel({
           onChange={(e) => onPatch({ defaultLabel: e.target.value || undefined })}
           className="w-full bg-background/60 border border-tertiary/30 px-2 py-1 text-[11px] text-on-surface"
         />
+      </div>
+    </>
+  );
+}
+
+function LoopNodePanel({
+  data,
+  sourceOptions,
+  onPatch,
+  onOpenBody,
+}: {
+  data: LoopNodeData;
+  sourceOptions: string[];
+  onPatch: (patch: Partial<LoopNodeData>) => void;
+  onOpenBody: (() => void) | null;
+}) {
+  function patchExitWhen(idx: number, patch: Partial<BranchCase>) {
+    const next = data.exitWhen.map((c, i) => (i === idx ? { ...c, ...patch } : c));
+    onPatch({ exitWhen: next });
+  }
+  function addExitCase() {
+    onPatch({
+      exitWhen: [
+        ...data.exitWhen,
+        { path: "", op: "exists", value: undefined, label: `exit${data.exitWhen.length + 1}` },
+      ],
+    });
+  }
+  function removeExitCase(idx: number) {
+    onPatch({ exitWhen: data.exitWhen.filter((_, i) => i !== idx) });
+  }
+  return (
+    <>
+      <InputFromEditor
+        value={data.inputFrom}
+        sourceOptions={sourceOptions}
+        onChange={(inputFrom) => onPatch({ inputFrom })}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(196 181 253)" }}>
+            Max Iter
+          </div>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={data.maxIterations}
+            onChange={(e) => {
+              const n = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+              onPatch({ maxIterations: n });
+            }}
+            className="w-full bg-background/60 border border-violet-300/30 px-2 py-1 text-[12px] text-on-surface"
+          />
+        </div>
+        <div>
+          <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(196 181 253)" }}>
+            Aggregate
+          </div>
+          <select
+            value={data.aggregate}
+            onChange={(e) => onPatch({ aggregate: e.target.value as LoopNodeData["aggregate"] })}
+            className="w-full bg-background/60 border border-violet-300/30 px-2 py-1 text-[12px] text-on-surface"
+          >
+            <option value="last">last</option>
+            <option value="concat-array">concat-array</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(196 181 253)" }}>
+          Exit When (optional — match against iteration leaf output)
+        </div>
+        <div className="space-y-2">
+          {data.exitWhen.map((c, i) => (
+            <div key={i} className="border border-violet-300/40 rounded p-2 space-y-1.5">
+              <div className="flex gap-1.5">
+                <input
+                  placeholder="path (e.g. status)"
+                  value={c.path}
+                  onChange={(e) => patchExitWhen(i, { path: e.target.value })}
+                  className="flex-1 min-w-0 bg-background/60 border border-violet-300/30 px-1.5 py-0.5 text-[11px] text-on-surface"
+                />
+                <select
+                  value={c.op}
+                  onChange={(e) => patchExitWhen(i, { op: e.target.value as BranchCase["op"] })}
+                  className="bg-background/60 border border-violet-300/30 px-1 py-0.5 text-[11px] text-on-surface"
+                >
+                  <option value="eq">eq</option>
+                  <option value="ne">ne</option>
+                  <option value="in">in</option>
+                  <option value="exists">exists</option>
+                </select>
+              </div>
+              {c.op !== "exists" ? (
+                <input
+                  placeholder={c.op === "in" ? '["a","b"]' : '"value"'}
+                  value={typeof c.value === "string" ? c.value : JSON.stringify(c.value ?? "")}
+                  onChange={(e) => {
+                    let v: unknown = e.target.value;
+                    try { v = JSON.parse(e.target.value); } catch { /* keep string */ }
+                    patchExitWhen(i, { value: v });
+                  }}
+                  className="w-full bg-background/60 border border-violet-300/30 px-1.5 py-0.5 text-[11px] font-mono text-on-surface"
+                />
+              ) : null}
+              <div className="flex gap-1.5 items-center">
+                <input
+                  placeholder="label (cosmetic — for trace)"
+                  value={c.label}
+                  onChange={(e) => patchExitWhen(i, { label: e.target.value })}
+                  className="flex-1 min-w-0 bg-background/60 border border-violet-300/30 px-1.5 py-0.5 text-[11px] text-on-surface"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeExitCase(i)}
+                  className="text-error/80 hover:text-error text-[10px]"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addExitCase}
+            className="w-full px-2 py-1 border border-violet-300/40 font-label text-[10px] tracking-[0.25em] uppercase hover:bg-violet-300/10"
+            style={{ color: "rgb(196 181 253)" }}
+          >
+            + Exit Case
+          </button>
+        </div>
+      </div>
+      <div>
+        <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(196 181 253)" }}>
+          Body ({data.body.nodes.length} nodes / {data.body.edges.length} edges)
+        </div>
+        <button
+          type="button"
+          onClick={onOpenBody ?? undefined}
+          disabled={!onOpenBody}
+          className="w-full px-3 py-2 font-label text-[10px] tracking-[0.25em] uppercase border-2 border-double disabled:opacity-40"
+          style={{ borderColor: "rgb(196 181 253 / 0.6)", color: "rgb(196 181 253)" }}
+        >
+          ▷ Edit Loop Body
+        </button>
+        <div className="text-[10px] text-on-surface-variant mt-1.5 leading-relaxed">
+          Body is a self-contained sub-DAG. Inside, <code>agent.input</code> resolves to the current
+          iteration state (loop input on first pass, prior leaf output on subsequent passes).
+          Nesting loops further requires the Advanced raw-JSON editor.
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ForEachNodePanel({
+  data,
+  sourceOptions,
+  onPatch,
+  onOpenBody,
+}: {
+  data: ForEachNodeData;
+  sourceOptions: string[];
+  onPatch: (patch: Partial<ForEachNodeData>) => void;
+  onOpenBody: (() => void) | null;
+}) {
+  return (
+    <>
+      <InputFromEditor
+        value={data.inputFrom}
+        sourceOptions={sourceOptions}
+        onChange={(inputFrom) => onPatch({ inputFrom })}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(56 189 248)" }}>
+            Max Items
+          </div>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={data.maxItems}
+            onChange={(e) => {
+              const n = Math.max(1, Math.min(50, Number(e.target.value) || 1));
+              onPatch({ maxItems: n });
+            }}
+            className="w-full bg-background/60 border border-sky-400/30 px-2 py-1 text-[12px] text-on-surface"
+          />
+        </div>
+        <div>
+          <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(56 189 248)" }}>
+            Aggregate
+          </div>
+          <select
+            value={data.aggregate}
+            onChange={(e) => onPatch({ aggregate: e.target.value as ForEachNodeData["aggregate"] })}
+            className="w-full bg-background/60 border border-sky-400/30 px-2 py-1 text-[12px] text-on-surface"
+          >
+            <option value="concat-array">concat-array</option>
+            <option value="last">last</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(56 189 248)" }}>
+          Body ({data.body.nodes.length} nodes / {data.body.edges.length} edges)
+        </div>
+        <button
+          type="button"
+          onClick={onOpenBody ?? undefined}
+          disabled={!onOpenBody}
+          className="w-full px-3 py-2 font-label text-[10px] tracking-[0.25em] uppercase border-2 disabled:opacity-40"
+          style={{ borderColor: "rgb(56 189 248 / 0.6)", color: "rgb(56 189 248)" }}
+        >
+          ▷ Edit forEach Body
+        </button>
+        <div className="text-[10px] text-on-surface-variant mt-1.5 leading-relaxed">
+          Body runs once per item. Inside, <code>agent.input</code> ={" "}
+          <code>{`{ item, index, total }`}</code> — read{" "}
+          <code>agent.input.item</code> to get the current array element. Aggregate{" "}
+          <code>concat-array</code> collects all leaf outputs into one array; <code>last</code> returns
+          only the final iteration&apos;s output.
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TransformNodePanel({
+  data,
+  sourceOptions,
+  onPatch,
+}: {
+  data: TransformNodeData;
+  sourceOptions: string[];
+  onPatch: (patch: Partial<TransformNodeData>) => void;
+}) {
+  return (
+    <>
+      <InputFromEditor
+        value={data.inputFrom}
+        sourceOptions={sourceOptions}
+        onChange={(inputFrom) => onPatch({ inputFrom })}
+      />
+      <div>
+        <div className="font-label text-[9px] tracking-[0.3em] uppercase mb-1" style={{ color: "rgb(52 211 153)" }}>
+          JSONata Expression
+        </div>
+        <textarea
+          value={data.expression}
+          onChange={(e) => onPatch({ expression: e.target.value })}
+          rows={6}
+          spellCheck={false}
+          placeholder={"$    /* identity */\n\n/* zip + apply verdict */\n$map(verdicts, function($v, $i) {\n  candidates[$i] ~> $merge({ score: score + ($v.match ? 50 : -30) })\n})"}
+          className="w-full bg-background/60 border border-emerald-400/30 px-2 py-1 text-[11px] font-mono text-on-surface focus:outline-none focus:border-emerald-400 resize-y"
+        />
+        <div className="text-[10px] text-on-surface-variant mt-1.5 leading-relaxed">
+          Pure JSON-in JSON-out — no FS, no network, no side effects. Use for
+          zip / map / filter / reduce on arrays + objects without writing a
+          dedicated handler. <code>$</code> = whole input.{" "}
+          <a
+            href="https://docs.jsonata.org/overview"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-on-surface"
+          >
+            JSONata reference
+          </a>
+        </div>
       </div>
     </>
   );

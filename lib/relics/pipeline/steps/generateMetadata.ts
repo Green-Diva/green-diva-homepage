@@ -20,21 +20,26 @@ import type { AgentRunLogEntry } from "@/lib/agents/invoke";
 import { callScene, SceneError } from "@/lib/agent-service";
 import { recordRelicLog } from "@/lib/relicLog";
 import type { PipelineContext, StepResult } from "../context";
+import { scanWorkspace } from "../scanWorkspace";
+import { stageUserCandidates } from "../stageUserCandidates";
 
-// Phase 5: pipeline step now reads result.output directly. The bound
-// agent's SceneBinding outputMap is responsible for shaping `output` to
-// expose `research` and `pick` keys (typically by pulling from
-// runLog.byId.<nodeId>.output). This decouples the pipeline from the
-// agent's internal node IDs — admin can swap agents without rewriting
-// the pipeline as long as the new agent's binding produces the same
-// output shape.
+// Phase 5: pipeline step reads result.output from each scene directly.
+// SceneBinding outputMap shapes the runLog into the expected fields.
 //
-// Expected shape of result.output:
-//   {
-//     research: { titleZh, titleEn, subtitleZh, subtitleEn, icon,
-//                 rarity, formKind, decisionReason, loreZh, loreEn },
-//     pick:     { recommendedPrimaryPath, candidates: [...] }
-//   }
+// Phase 8.5 (smart-pick decomposition): the step now calls TWO scenes
+// sequentially:
+//   1. relic.draft-metadata     → research fields + useUserImage/networkImageQuery decision
+//   2. relic.smart-image-pick   → candidates + recommendedPrimaryPath
+// The picker scene is gated on metadata-init's decision; on a failure
+// of either scene we still write whatever shaped fields survive and let
+// the downstream "degraded → PARTIAL" policy apply.
+//
+// Expected shape from draft-metadata:
+//   { research: { titleZh, titleEn, subtitleZh, subtitleEn, icon,
+//                 rarity, formKind, decisionReason, loreZh, loreEn,
+//                 useUserImage, networkImageQuery } }
+// Expected shape from smart-image-pick:
+//   { recommendedPrimaryPath, candidates: [...] }
 
 const RARITY_VALUES: ReadonlyArray<Rarity> = [
   "COMMON",
@@ -137,17 +142,20 @@ function shapeCandidates(raw: unknown): CandidateImage[] | null {
   return out.length > 0 ? out : null;
 }
 
-// Builds the writeback payload from the bound agent's outputMap-shaped
-// output. Each field is independently optional — a partial DAG run still
-// produces a partial payload, the pipeline step's overall `degraded` flag
-// tells the runner whether to mark PARTIAL or AWAITING_REVIEW.
-//
-// Expected shape: { research?: {...}, pick?: {...} }. Whatever doesn't
-// match falls through to FALLBACK.
-function shapeMetadata(output: unknown): GenerateMetadataResult["applied"] {
-  const root = isObject(output) ? output : {};
-  const research = isObject(root.research) ? root.research : null;
-  const pickOut = isObject(root.pick) ? root.pick : null;
+// Builds the writeback payload from two scene outputs:
+//   - metaOutput: { research: {...} } from relic.draft-metadata
+//   - pickOutput: { recommendedPrimaryPath, candidates } from
+//     relic.smart-image-pick (or null when the picker scene was skipped
+//     or failed)
+// Either being null/incomplete falls through to FALLBACK fields; the
+// step's overall `degraded` flag controls PARTIAL vs AWAITING_REVIEW.
+function shapeMetadata(
+  metaOutput: unknown,
+  pickOutput: unknown,
+): GenerateMetadataResult["applied"] {
+  const metaRoot = isObject(metaOutput) ? metaOutput : {};
+  const research = isObject(metaRoot.research) ? metaRoot.research : null;
+  const pickOut = isObject(pickOutput) ? pickOutput : null;
   const meta = research ?? {};
   // Slice caps match cell truncate width budget (with small overshoot buffer).
   const classifZh = pickString(meta.subtitleZh ?? meta.classifZh, FALLBACK.classifZh, 10);
@@ -184,16 +192,6 @@ function shapeMetadata(output: unknown): GenerateMetadataResult["applied"] {
     candidateImages,
   };
 }
-
-const FALLBACK_APPLIED: GenerateMetadataResult["applied"] = {
-  ...FALLBACK,
-  formKind: null,
-  formReason: null,
-  loreZh: null,
-  loreEn: null,
-  primaryImagePath: null,
-  candidateImages: null,
-};
 
 // Heuristic for "the agent really succeeded" — research node produced both
 // title fields. Used by both the step and downstream pipeline finalize.
@@ -236,63 +234,136 @@ export async function runScribeForWorkspace(
     onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
   },
 ): Promise<ScribeRunOutcome> {
-  let result;
+  // Scan + stage at the pipeline layer. Both are pure IO; agents see only
+  // shaped JSON. scanWorkspace prepares lore-writing context;
+  // stageUserCandidates copies user images into derived/ as candidates
+  // and picks a vision-filter reference.
+  const scan = await scanWorkspace(workspaceSlug);
+  const staged = await stageUserCandidates(workspaceSlug, scan.imageAbsPaths);
+
+  // — Phase 1: draft-metadata (lore + 9-field metadata + image-pick decision)
+  const draftRunLog: AgentRunLogEntry[] = [];
+  let metaOutput: unknown = undefined;
+  let metaFailReason: string | undefined;
+  let metaPreRun = false;
+
   try {
-    result = await callScene(
+    const result = await callScene(
       "relic.draft-metadata",
-      { workspaceSlug },
+      {
+        workspaceSlug,
+        userBrief: scan.userBrief,
+        fileSummary: scan.fileSummary,
+        imageAbsPaths: scan.imageAbsPaths,
+        textExcerpts: scan.textExcerpts,
+      },
       {
         onProgress: opts?.onProgress,
-        // Initial mode: grounded research (~30s) + metadata derivation
-        // (~10s) + smart-pick. 5 minutes of headroom; pipeline retry
-        // sits above this for transient failures.
+        // ~30s grounded research + ~10s metadata derivation. 5 min
+        // headroom; pipeline retry sits above for transient failures.
         timeoutMs: 5 * 60_000,
       },
     );
+    if (Array.isArray(result.runLog)) draftRunLog.push(...(result.runLog as AgentRunLogEntry[]));
+    if (result.ok) {
+      metaOutput = result.output;
+    } else {
+      metaFailReason = `draft-metadata failed (${result.errorCode}): ${result.errorMessage}`;
+    }
   } catch (e) {
     if (e instanceof SceneError) {
-      return {
-        applied: { ...FALLBACK_APPLIED },
-        runLog: [],
-        agentInvoked: !PRE_RUN_FAILURE_CODES.has(e.code),
-        degraded: true,
-        degradeReason: `scene dispatch failed (${e.code}): ${e.message}`,
-      };
+      metaPreRun = PRE_RUN_FAILURE_CODES.has(e.code);
+      metaFailReason = `draft-metadata scene dispatch failed (${e.code}): ${e.message}`;
+    } else {
+      metaFailReason = `draft-metadata callScene threw: ${e instanceof Error ? e.message : String(e)}`;
     }
-    return {
-      applied: { ...FALLBACK_APPLIED },
-      runLog: [],
-      agentInvoked: true,
-      degraded: true,
-      degradeReason: `callScene threw: ${e instanceof Error ? e.message : String(e)}`,
+  }
+
+  // — Phase 2: smart-image-pick (gated on metadata succeeding) —
+  // The picker doesn't need lore — just the metadata's image-pick
+  // decision (`useUserImage` + `networkImageQuery`) plus the staged
+  // user candidates. Skip when metadata failed: there's nothing to
+  // dispatch on.
+  let pickOutput: unknown = undefined;
+  let pickFailReason: string | undefined;
+  const research = isObject(metaOutput) && isObject(metaOutput.research) ? metaOutput.research : null;
+  const useUserImage = research && research.useUserImage !== false;
+  const networkImageQuery =
+    research && typeof research.networkImageQuery === "string" ? research.networkImageQuery : "";
+
+  if (research) {
+    try {
+      const pickResult = await callScene(
+        "relic.smart-image-pick",
+        {
+          workspaceSlug,
+          useUserImage: !!useUserImage,
+          networkImageQuery,
+          userCandidates: staged.userCandidates,
+          referenceImageAbs: staged.referenceImageAbs,
+        },
+        {
+          onProgress: opts?.onProgress,
+          timeoutMs: 5 * 60_000,
+        },
+      );
+      if (Array.isArray(pickResult.runLog)) {
+        draftRunLog.push(...(pickResult.runLog as AgentRunLogEntry[]));
+      }
+      if (pickResult.ok) {
+        pickOutput = pickResult.output;
+      } else {
+        pickFailReason = `smart-image-pick failed (${pickResult.errorCode}): ${pickResult.errorMessage}`;
+      }
+    } catch (e) {
+      if (e instanceof SceneError) {
+        pickFailReason = `smart-image-pick scene dispatch failed (${e.code}): ${e.message}`;
+      } else {
+        pickFailReason = `smart-image-pick callScene threw: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+  }
+
+  // Fallback: if picker didn't run / failed but staging produced user
+  // candidates, fall back to "biggest user image is primary". This
+  // matches the historical INTERNAL handler's behaviour when network
+  // search is disabled.
+  if (!pickOutput && staged.userCandidates.length > 0) {
+    const sorted = [...staged.userCandidates].sort((a, b) => b.score - a.score);
+    pickOutput = {
+      candidates: staged.userCandidates,
+      recommendedPrimaryPath: sorted[0].path,
+      networkFetchAttempted: false,
     };
   }
 
-  const runLog = (Array.isArray(result.runLog) ? result.runLog : []) as AgentRunLogEntry[];
-
-  if (!result.ok) {
-    // Salvage whatever fields the failure runLog produced. The output
-    // is undefined on failure — pipeline FALLBACK applies.
-    const salvaged = shapeMetadata(undefined);
-    return {
-      applied: salvaged,
-      runLog,
-      agentInvoked: true,
-      degraded: true,
-      degradeReason: `agent run failed (${result.errorCode}): ${result.errorMessage}`,
-    };
-  }
-
-  const applied = shapeMetadata(result.output);
+  // Build applied payload from whatever made it through.
+  const applied = shapeMetadata(metaOutput, pickOutput);
   const succeeded = lookSuccess(applied);
+
+  if (metaFailReason) {
+    return {
+      applied,
+      runLog: draftRunLog,
+      agentInvoked: !metaPreRun,
+      degraded: true,
+      degradeReason: metaFailReason,
+    };
+  }
+
+  // Metadata succeeded; degrade only if picker had a real failure
+  // (success without picker fallback also possible — see above).
+  const pickerDegraded = !!pickFailReason && applied.candidateImages === null;
   return {
     applied,
-    runLog,
+    runLog: draftRunLog,
     agentInvoked: true,
-    degraded: !succeeded,
-    degradeReason: succeeded
-      ? undefined
-      : "binding outputMap didn't expose research/pick — see SceneBinding for relic.draft-metadata",
+    degraded: !succeeded || pickerDegraded,
+    degradeReason: pickerDegraded
+      ? pickFailReason
+      : succeeded
+        ? undefined
+        : "binding outputMap didn't expose research fields — see SceneBinding for relic.draft-metadata",
   };
 }
 

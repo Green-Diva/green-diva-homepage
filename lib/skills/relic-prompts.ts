@@ -1,11 +1,8 @@
-// Canonical default prompts for the relic-scribe lineage. Lives outside
-// the server-only INTERNAL handler tree so it's importable from migrate
-// scripts (which can't pull `server-only`). Both the legacy
-// geminiResearcher INTERNAL handler and the new LORE-FORGE LLM_PROMPT
-// skills seed from these constants.
-//
-// Admin overrides via SkillLibrary's handlerConfig editor (Phase 1+);
-// these strings are the "reset to default" payload.
+// Canonical default prompts for the relic-scribe lineage. Plain module
+// (no `server-only`) so migrate scripts can import the constants. The
+// LORE-FORGE LLM_PROMPT skills seed from these on first migration; admin
+// overrides via SkillLibrary's handlerConfig editor and these constants
+// are the "reset to default" payload.
 
 export const DEFAULT_LORE_EN_PROMPT = [
   "You are the Relic Scribe — a curatorial researcher writing the canonical 'lore' for a relic enshrined in a private digital vault.",

@@ -96,8 +96,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         outputMap: jsonOrNull(parsed.data.outputMap ?? null),
         enabled: parsed.data.enabled,
         notes: parsed.data.notes ?? null,
-        rolloutPct: parsed.data.rolloutPct ?? 100,
-        fallbackAgentId: parsed.data.fallbackAgentId ?? null,
       },
       update: {
         agentId: parsed.data.agentId,
@@ -105,16 +103,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         outputMap: jsonOrNull(parsed.data.outputMap ?? null),
         enabled: parsed.data.enabled,
         notes: parsed.data.notes ?? null,
-        ...(parsed.data.rolloutPct !== undefined ? { rolloutPct: parsed.data.rolloutPct } : {}),
-        ...(parsed.data.fallbackAgentId !== undefined
-          ? { fallbackAgentId: parsed.data.fallbackAgentId }
-          : {}),
       },
       select: {
         sceneKey: true,
         agentId: true,
         enabled: true,
-        rolloutPct: true,
         updatedAt: true,
       },
     });

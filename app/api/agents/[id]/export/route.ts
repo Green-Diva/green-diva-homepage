@@ -71,7 +71,6 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         descriptionEn: e.skill.descriptionEn,
         descriptionZh: e.skill.descriptionZh,
         status: e.skill.status,
-        handlerKind: e.skill.handlerKind,
         handlerConfig: (e.skill.handlerConfig ?? {}) as Record<string, unknown>,
         inputSchema: (e.skill.inputSchema ?? null) as Record<string, unknown> | null,
         outputSchema: (e.skill.outputSchema ?? null) as Record<string, unknown> | null,

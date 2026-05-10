@@ -131,8 +131,12 @@ export async function POST(req: NextRequest) {
   // is what actually updates the Relic row — this endpoint is pure storage.
   const savedPath = `/${relicSlug}/derived/${filename}`;
   const finalContentType = contentType || inferContentType(absPath);
+  // absPath is returned so downstream agent skills (e.g. vision LLM_PROMPT
+  // with imagePathsField) can read the freshly-saved file without another
+  // round-trip. Server-side only — never leak to public clients.
   return NextResponse.json({
     savedPath,
+    absPath,
     bytes: buf.byteLength,
     contentType: finalContentType,
   });

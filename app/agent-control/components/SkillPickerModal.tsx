@@ -16,10 +16,20 @@ type Props = {
   onClose: () => void;
 };
 
+// Badge palette per Skill.kind (the runtime routing field, was handlerKind
+// pre-2026-05-10). Same neutral border colors as SkillLibrary's chip — chosen
+// so the chip never fights the MECHANICAL/AUTONOMOUS mode color of the
+// hosting agent.
 const KIND_COLOR: Record<string, string> = {
-  PASSIVE: "text-on-surface-variant border-on-surface-variant/30",
-  ACTIVE: "text-primary border-primary/40",
-  ULTIMATE: "text-secondary border-secondary/40",
+  HTTP_API: "text-on-surface-variant border-on-surface-variant/30",
+  LLM_PROMPT: "text-on-surface-variant border-on-surface-variant/30",
+  MCP_SERVER: "text-on-surface-variant border-on-surface-variant/30",
+};
+
+const KIND_LABEL: Record<string, string> = {
+  HTTP_API: "HTTP",
+  LLM_PROMPT: "LLM",
+  MCP_SERVER: "MCP",
 };
 
 export default function SkillPickerModal({
@@ -148,7 +158,7 @@ export default function SkillPickerModal({
                       <span
                         className={`font-label text-[9px] tracking-[0.15em] uppercase border rounded-sm px-1.5 py-0.5 ${KIND_COLOR[skill.kind] ?? ""}`}
                       >
-                        {t.agentControl[`skillKind${skill.kind[0]}${skill.kind.slice(1).toLowerCase()}` as keyof typeof t.agentControl]}
+                        {KIND_LABEL[skill.kind] ?? skill.kind}
                       </span>
                     </div>
                     <p className="text-sm text-on-surface font-medium truncate">

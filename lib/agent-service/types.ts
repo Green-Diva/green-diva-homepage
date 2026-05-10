@@ -44,12 +44,12 @@ export type SceneDefinition<
   contextSchema: TContext;
   // Caller's expected output shape. Enforced for sync invocations; for
   // async invocations it's advisory — used by the binding UI to validate
-  // outputMap and by /api/agent-jobs/[jobId] to shape the response.
+  // outputMap and by the domain job-status endpoint to shape the response.
   outputSchema: TOutput;
   // sync  → callScene awaits the run, returns {ok,output}. Capped by
   //         timeoutMs (default 30s); long jobs should be async.
-  // async → dispatchScene returns {jobId} immediately; caller polls
-  //         /api/agent-jobs/[jobId].
+  // async → dispatchScene returns {jobId} immediately; caller polls the
+  //         domain job-status endpoint (e.g. /api/relics/[id]/asset-job/[jobId]).
   invocation: "sync" | "async";
   // Tags used by the binding UI to filter agent candidates. An agent is
   // a candidate iff its declared capabilities ⊇ these.

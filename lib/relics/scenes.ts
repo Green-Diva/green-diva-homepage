@@ -34,13 +34,62 @@ export const relicDraftMetadataScene = registerScene({
   },
   contextSchema: z.object({
     // Workspace-relative slug. For drafts: "_drafts/<draftId>".
-    // For legacy direct-to-Relic flows: relic.slug. Passed through to
-    // the relic-files-summary skill which globs the workspace folder.
+    // For legacy direct-to-Relic flows: relic.slug.
     workspaceSlug: z.string().min(1),
+    // Pre-scanned workspace context — populated by runScribeForWorkspace
+    // via scanWorkspace() before callScene. The Lore Forge DAG reads
+    // these from agent.input directly.
+    userBrief: z.string().optional().default(""),
+    fileSummary: z.string().optional().default(""),
+    imageAbsPaths: z.array(z.string()).optional().default([]),
+    textExcerpts: z.string().optional().default(""),
   }),
   outputSchema: z.unknown(),
   invocation: "sync",
-  requiredCapabilities: ["lore-writing", "metadata-derivation", "image-pick"],
+  // image-pick lives in a separate scene (relic.smart-image-pick) since
+  // the Phase 8 picker decomposition. LORE-FORGE no longer claims it.
+  requiredCapabilities: ["lore-writing", "metadata-derivation"],
+});
+
+// — relic.smartImagePick —
+// Sync. Triggered by runScribeForWorkspace AFTER relic.draft-metadata so
+// the picker can use metadata-init's `useUserImage` / `networkImageQuery`
+// decision. Returns the candidate set + recommended primary path.
+//
+// Pipeline-layer staging populates `userCandidates` + `referenceImageAbs`
+// via stageUserCandidates() before callScene; the picker agent never
+// touches the FS for user images.
+export const relicSmartImagePickScene = registerScene({
+  key: "relic.smart-image-pick",
+  module: "relic",
+  label: { en: "Smart Image Pick", zh: "智能选图" },
+  description: {
+    en: "Pick recommended primary image for a relic — user images plus optional SerpAPI search with two-round vision verification.",
+    zh: "为 relic 挑选推荐主图——用户图叠加可选 SerpAPI 搜索，含两轮视觉比对。",
+  },
+  contextSchema: z.object({
+    workspaceSlug: z.string().min(1),
+    useUserImage: z.boolean(),
+    networkImageQuery: z.string().optional().default(""),
+    // Pre-staged by stageUserCandidates() — paths are already in derived/,
+    // dimensions probed, score seeded.
+    userCandidates: z.array(z.unknown()).default([]),
+    // Abs path to the largest user image — vision filter reference.
+    // null when there were no usable user images.
+    referenceImageAbs: z.string().nullable().default(null),
+  }),
+  outputSchema: z.object({
+    candidates: z.array(z.unknown()),
+    recommendedPrimaryPath: z.string(),
+    networkFetchAttempted: z.boolean().optional(),
+    networkFetchFailureReason: z.string().optional(),
+    visionFilterApplied: z.boolean().optional(),
+    visionFilterMatches: z.number().optional(),
+    visionFilterRounds: z.number().optional(),
+    refinedQueryUsed: z.string().optional(),
+  }),
+  invocation: "sync",
+  requiredCapabilities: ["image-pick"],
 });
 
 // — relic.regenMetadata —
@@ -84,7 +133,11 @@ export const relicEnhance2dScene = registerScene({
   contextSchema: z.object({
     relicId: z.string().min(1),
     relicSlug: z.string().min(1),
-    primaryImagePath: z.string().min(1),
+    // Pre-encoded by the trigger endpoint (lib/relics/readImageAsDataUri).
+    // Replaces the old `primaryImagePath` field — agent DAG no longer needs
+    // an INTERNAL slot-0 image-to-data-uri node. New bindings should
+    // forward this straight into agent.input via inputMap.
+    imageDataUri: z.string().regex(/^data:image\/[a-z+.-]+;base64,/, "expected image data URI"),
   }),
   outputSchema: z.object({
     enhancedImagePath: z.string().min(1),
@@ -110,7 +163,10 @@ export const relicCreate3dScene = registerScene({
   contextSchema: z.object({
     relicId: z.string().min(1),
     relicSlug: z.string().min(1),
-    enhancedImagePath: z.string().min(1),
+    // Pre-encoded by the trigger endpoint (lib/relics/readImageAsDataUri).
+    // Replaces the old `enhancedImagePath` field — agent DAG no longer
+    // needs an INTERNAL slot-0 image-to-data-uri node.
+    imageDataUri: z.string().regex(/^data:image\/[a-z+.-]+;base64,/, "expected image data URI"),
     // Mirrors the Body schema in app/api/relics/[id]/create-3d/route.ts.
     // Plumbed from admin's pre-flight config dialog (Meshy3dConfigModal).
     // The default binding's inputMap fans these out to flat input fields

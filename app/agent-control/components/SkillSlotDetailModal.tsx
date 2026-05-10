@@ -85,7 +85,7 @@ export default function SkillSlotDetailModal({ agentId, equip, mode, onClose }: 
         <div className="flex items-center gap-3 text-[10px] font-label tracking-[0.2em] uppercase text-on-surface-variant">
           <span>{format(t.agentControl.skillLevel, { n: skill.level })}</span>
           <span>·</span>
-          <span>{t.agentControl[`skillKind${skill.kind[0]}${skill.kind.slice(1).toLowerCase()}` as keyof typeof t.agentControl]}</span>
+          <span>{skill.kind === "HTTP_API" ? "HTTP" : skill.kind === "LLM_PROMPT" ? "LLM" : "MCP"}</span>
           <span>·</span>
           <span>{format(t.agentControl.skillCostAp, { n: skill.costAp })}</span>
         </div>

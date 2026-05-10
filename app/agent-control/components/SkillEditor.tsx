@@ -14,19 +14,8 @@ type Props = {
   onSaved: () => void;
 };
 
-const HANDLER_KIND_OPTIONS: HandlerKind[] = ["INTERNAL", "HTTP_API", "LLM_PROMPT", "MCP_SERVER"];
+const HANDLER_KIND_OPTIONS: HandlerKind[] = ["HTTP_API", "LLM_PROMPT", "MCP_SERVER"];
 const STATUS_OPTIONS = ["ONLINE", "OFFLINE"] as const;
-
-// Internal handler slugs registered in lib/skills/handlers/internal/index.ts.
-// Hardcoded here on purpose — adding a new internal handler is a code commit
-// (CLAUDE.md "no ZIP plugins"), so the dropdown stays in lockstep manually.
-// Phase 5+6 cleanup removed: meshy-3d, relic-cutout, relic-image-pick,
-// relic-gemini-researcher (all forge'd to LLM_PROMPT/HTTP_API skills).
-const INTERNAL_HANDLER_SLUGS = [
-  "relic-files-summary",
-  "relic-smart-image-pick",
-  "image-to-data-uri",
-] as const;
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 // Phase 2.1 added gemini support — surface it in the structured form.
@@ -137,15 +126,6 @@ const SKILL_PRESETS: SkillPreset[] = [
     },
   },
   {
-    key: "internal",
-    labelEn: "Internal main-app function (advanced)",
-    labelZh: "主站内部函数（高级）",
-    descEn: "Dispatch to a registered in-repo handler. Adding new ones requires a code commit.",
-    descZh: "调度仓库内已注册的处理函数。新增需要 commit。",
-    handlerKind: "INTERNAL",
-    defaultConfig: { handler: "" },
-  },
-  {
     key: "mcp",
     labelEn: "MCP server (Phase 5+)",
     labelZh: "MCP 服务器（Phase 5+）",
@@ -163,7 +143,6 @@ function derivePresetKey(
   config: Record<string, unknown> | null | undefined,
 ): string {
   const cfg = isObject(config) ? config : {};
-  if (kind === "INTERNAL") return "internal";
   if (kind === "MCP_SERVER") return "mcp";
   if (kind === "LLM_PROMPT") {
     const provider = typeof cfg.provider === "string" ? cfg.provider : "anthropic";
@@ -202,7 +181,7 @@ function blank(initial?: SkillRow | null) {
     status: (initial?.status ?? "OFFLINE") as "ONLINE" | "OFFLINE",
     descriptionEn: initial?.descriptionEn ?? "",
     descriptionZh: initial?.descriptionZh ?? "",
-    handlerKind: (initial?.handlerKind ?? "INTERNAL") as HandlerKind,
+    handlerKind: (initial?.kind ?? "MCP_SERVER") as HandlerKind,
     inputSchema: initial?.inputSchema ? JSON.stringify(initial.inputSchema, null, 2) : "",
     outputSchema: initial?.outputSchema ? JSON.stringify(initial.outputSchema, null, 2) : "",
   };
@@ -245,7 +224,7 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
   // selector (or via the Advanced raw kind dropdown) keep this in sync.
   const [presetKey, setPresetKey] = useState<string>(() =>
     derivePresetKey(
-      (initial?.handlerKind ?? "INTERNAL") as HandlerKind,
+      (initial?.kind ?? "MCP_SERVER") as HandlerKind,
       initial?.handlerConfig ?? null,
     ),
   );
@@ -420,7 +399,7 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
       status: v.status,
       descriptionEn: v.descriptionEn.trim(),
       descriptionZh: v.descriptionZh.trim(),
-      handlerKind: v.handlerKind,
+      kind: v.handlerKind,
       handlerConfig: finalConfig,
       inputSchema: inSchema.value,
       outputSchema: outSchema.value,
@@ -778,28 +757,6 @@ function StructuredHandlerFields({
   labelCls: string;
   helpCls: string;
 }) {
-  if (kind === "INTERNAL") {
-    return (
-      <div>
-        <label className={labelCls}>Internal Handler</label>
-        <select
-          value={s(config, "handler")}
-          onChange={(e) => setField("handler", e.target.value)}
-          className={inputCls}
-          required
-        >
-          <option value="">— select —</option>
-          {INTERNAL_HANDLER_SLUGS.map((slug) => (
-            <option key={slug} value={slug}>
-              {slug}
-            </option>
-          ))}
-        </select>
-        <p className={helpCls}>Handler must be registered in lib/skills/handlers/internal/index.ts.</p>
-      </div>
-    );
-  }
-
   if (kind === "HTTP_API") {
     return (
       <div className="flex flex-col gap-3">

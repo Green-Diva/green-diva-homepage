@@ -1,21 +1,23 @@
-// Phase 5 R2 — provisions LORE-FORGE-001, the third forge agent. Replaces
-// the SCRIBE-bound metadata path (slot 1 = relic-gemini-researcher) with
-// a config-driven 5-skill chain:
+// Provisions LORE-FORGE-001 — bilingual lore + metadata generator.
 //
-//   summary (INTERNAL, reused) → loreEn (LLM_PROMPT, gemini grounding+vision)
-//                              → loreZh (LLM_PROMPT, gemini text)
-//                              → metadata-init (LLM_PROMPT, gemini json+vision)
-//                              → pick (INTERNAL, smart-image-picker reused)
+// Final shape (post-picker-extraction, 2026-05-11):
+//   mode-branch → loreEn (LLM_PROMPT, Gemini grounding+vision)
+//                → loreZh (LLM_PROMPT, Gemini text)
+//                → metadata-init (LLM_PROMPT, Gemini json+vision)
+//   mode-branch → metadata-regen (LLM_PROMPT, same skill as init)
 //
-// Plus a regen-only branch:
-//   mode-router → metadata-regen (LLM_PROMPT, same skill as metadata-init)
+// Image-pick is a SEPARATE scene (relic.smart-image-pick → PICKER-FORGE-001)
+// the pipeline step calls AFTER LORE-FORGE; the legacy slot-4 INTERNAL
+// pick has been removed.
 //
-// Once this migration runs, the SceneBindings for relic.draft-metadata
-// and relic.regen-metadata route to LORE-FORGE-001 instead of SCRIBE,
-// and the legacy relic-gemini-researcher INTERNAL handler can be safely
-// deleted in a follow-up commit (no live agent will reference it).
+// All "context-prep" work (Prisma draftNote read + workspace FS scan +
+// listing format) is done at the pipeline layer
+// (lib/relics/pipeline/scanWorkspace.ts) BEFORE callScene, and arrives
+// via SceneBinding ctx → agent.input.{userBrief,fileSummary,
+// imageAbsPaths,textExcerpts}.
 //
-// Idempotent.
+// Idempotent — heals stale shape from earlier-version environments
+// (3-slot pre-picker-split + 4-slot pick-bundled).
 
 import { Prisma, PrismaClient } from "@prisma/client";
 import { randomBytes } from "node:crypto";
@@ -29,10 +31,6 @@ const NEW_AGENT_CODENAME = "LORE-FORGE-001";
 
 // — — Skill specs — — — — — — — — — — — — — — — — — — — — — — — — — —
 
-// Pass 1: English lore with grounded research. The DEFAULT_LORE_EN_PROMPT
-// constant (still in source for now) is the canonical baseline copied
-// from the legacy geminiResearcher. Admin can edit it via SkillLibrary
-// once the agent is live.
 const SKILL_LORE_EN = {
   slug: "gemini-lore-en",
   nameEn: "Gemini Lore (EN, grounded)",
@@ -41,8 +39,8 @@ const SKILL_LORE_EN = {
   descriptionEn:
     "Pass 1 of the lore chain. Gemini 2.5 with Google Search grounding + vision; produces ≤110-word English markdown lore from user images + file summary. Prompt admin-editable in handlerConfig.",
   descriptionZh:
-    "圣记链第一步。Gemini 2.5 启用 Google Search grounding + 视觉，根据用户图与文件摘要写 ≤110 词英文 markdown 圣记。Prompt 在 handlerConfig 可改。",
-  handlerKind: "LLM_PROMPT" as const,
+    "圣记链第一步。Gemini 2.5 启用 Google Search grounding + 视觉,根据用户图与文件摘要写 ≤110 词英文 markdown 圣记。Prompt 在 handlerConfig 可改。",
+  kind: "LLM_PROMPT" as const,
   handlerConfig: {
     provider: "gemini",
     model: "gemini-2.5-flash",
@@ -64,8 +62,8 @@ const SKILL_LORE_ZH = {
   descriptionEn:
     "Pass 2 of the lore chain. Gemini 2.5 (no grounding, no vision) — translates the English lore into a literary ≤140-字 Chinese version, applying the editorial style rules in the prompt.",
   descriptionZh:
-    "圣记链第二步。Gemini 2.5（无 grounding、无视觉）—— 把英文圣记意译为 ≤140 字的中文版本,按 prompt 的文风规约削减虚词。",
-  handlerKind: "LLM_PROMPT" as const,
+    "圣记链第二步。Gemini 2.5(无 grounding、无视觉)—— 把英文圣记意译为 ≤140 字的中文版本,按 prompt 的文风规约削减虚词。",
+  kind: "LLM_PROMPT" as const,
   handlerConfig: {
     provider: "gemini",
     model: "gemini-2.5-flash",
@@ -86,7 +84,7 @@ const SKILL_METADATA = {
     "Reads bilingual lore + reference images and emits the 9-field metadata JSON (title/subtitle/icon/rarity/formKind + image-pick decision). Used by both initial and regen modes.",
   descriptionZh:
     "读双语圣记 + 参考图,输出 9 字段元数据 JSON(title/subtitle/icon/rarity/formKind + 选图决策)。initial 与 regen 两种 mode 都用。",
-  handlerKind: "LLM_PROMPT" as const,
+  kind: "LLM_PROMPT" as const,
   handlerConfig: {
     provider: "gemini",
     model: "gemini-2.5-flash",
@@ -103,17 +101,14 @@ const SKILL_METADATA = {
 
 // — — DAG — — — — — — — — — — — — — — — — — — — — — — — — — — — — — —
 //
-// Branch on input.mode. "initial" walks the full lore chain; "regenMetadata"
-// jumps straight to the metadata node with existingLore wired in.
+// Final shape (3-slot, agent.input pre-populated by scanWorkspace):
 //
-// Slot layout:
-//   0: relic-files-summary (INTERNAL — reused)
-//   1: gemini-lore-en (LLM_PROMPT)
-//   2: gemini-lore-zh (LLM_PROMPT)
-//   3: gemini-metadata (LLM_PROMPT — both metadata-init and metadata-regen
-//      reference the SAME equipSlot; backbone runtime instantiates the
-//      skill with the per-node inputFrom merge each time)
-//   4: relic-smart-image-pick (INTERNAL — reused)
+//   Slot layout:
+//     1: gemini-lore-en (LLM_PROMPT)
+//     2: gemini-lore-zh (LLM_PROMPT)
+//     3: gemini-metadata (LLM_PROMPT — both metadata-init and
+//        metadata-regen reference the SAME equipSlot)
+
 const FORGE_PIPELINE = {
   version: 2 as const,
   nodes: [
@@ -128,32 +123,25 @@ const FORGE_PIPELINE = {
       position: { x: 60, y: 200 },
     },
     {
-      id: "summary",
-      type: "skill" as const,
-      equipSlot: 0,
-      inputFrom: "agent.input",
-      position: { x: 280, y: 100 },
-    },
-    {
       id: "loreEn",
       type: "skill" as const,
       equipSlot: 1,
       inputFrom: {
         merge: {
           userBrief: "agent.input.userBrief",
-          fileSummary: "summary.output.fileSummary",
-          imageAbsPaths: "summary.output.imageAbsPaths",
-          textExcerpts: "summary.output.textExcerpts",
+          fileSummary: "agent.input.fileSummary",
+          imageAbsPaths: "agent.input.imageAbsPaths",
+          textExcerpts: "agent.input.textExcerpts",
         },
       },
-      position: { x: 480, y: 100 },
+      position: { x: 280, y: 100 },
     },
     {
       id: "loreZh",
       type: "skill" as const,
       equipSlot: 2,
       inputFrom: { merge: { loreEn: "loreEn.output.text" } },
-      position: { x: 680, y: 100 },
+      position: { x: 480, y: 100 },
     },
     {
       id: "metadata-init",
@@ -163,24 +151,10 @@ const FORGE_PIPELINE = {
         merge: {
           loreEn: "loreEn.output.text",
           loreZh: "loreZh.output.text",
-          imageAbsPaths: "summary.output.imageAbsPaths",
+          imageAbsPaths: "agent.input.imageAbsPaths",
         },
       },
-      position: { x: 880, y: 100 },
-    },
-    {
-      id: "pick",
-      type: "skill" as const,
-      equipSlot: 4,
-      inputFrom: {
-        merge: {
-          relicSlug: "agent.input.relicSlug",
-          imageAbsPaths: "summary.output.imageAbsPaths",
-          useUserImage: "metadata-init.output.useUserImage",
-          networkImageQuery: "metadata-init.output.networkImageQuery",
-        },
-      },
-      position: { x: 1080, y: 100 },
+      position: { x: 680, y: 100 },
     },
     {
       id: "metadata-regen",
@@ -193,24 +167,40 @@ const FORGE_PIPELINE = {
           feedback: "agent.input.feedback",
         },
       },
-      position: { x: 480, y: 320 },
+      position: { x: 280, y: 320 },
     },
   ],
   edges: [
-    { from: "mode", to: "summary", when: "init" },
-    { from: "summary", to: "loreEn" },
+    { from: "mode", to: "loreEn", when: "init" },
     { from: "loreEn", to: "loreZh" },
     { from: "loreZh", to: "metadata-init" },
-    { from: "metadata-init", to: "pick" },
     { from: "mode", to: "metadata-regen", when: "regen" },
   ],
 };
 
-// — — outputMap updates — — — — — — — — — — — — — — — — — — — — — — — —
+// SceneBinding inputMap for relic.draft-metadata.
+// scanWorkspace pre-fills userBrief / fileSummary / imageAbsPaths /
+// textExcerpts on ctx; we forward them straight into agent.input.
+const DRAFT_INPUT_MAP = {
+  mode: "initial",
+  relicSlug: "{{ctx.workspaceSlug}}",
+  userBrief: "{{ctx.userBrief}}",
+  fileSummary: "{{ctx.fileSummary}}",
+  imageAbsPaths: "{{ctx.imageAbsPaths}}",
+  textExcerpts: "{{ctx.textExcerpts}}",
+};
 
-// Pipeline step (lib/relics/pipeline/steps/generateMetadata.ts) reads
-// result.output.research.* and result.output.pick.*. Build that shape
-// from the new node IDs.
+// SceneBinding inputMap for relic.regen-metadata.
+const REGEN_INPUT_MAP = {
+  mode: "regenMetadata",
+  relicSlug: "{{ctx.relicSlug}}",
+  existingLore: "{{ctx.existingLore}}",
+  feedback: "{{ctx.feedback}}",
+};
+
+// outputMap for draft: pipeline step (generateMetadata.ts) reads
+// result.output.research.* — and ALSO consumes useUserImage /
+// networkImageQuery to dispatch the picker scene afterwards.
 const DRAFT_METADATA_OUTPUT_MAP = {
   research: {
     titleZh: "{{runLog.byId.metadata-init.output.titleZh}}",
@@ -221,15 +211,15 @@ const DRAFT_METADATA_OUTPUT_MAP = {
     rarity: "{{runLog.byId.metadata-init.output.rarity}}",
     formKind: "{{runLog.byId.metadata-init.output.formKind}}",
     decisionReason: "{{runLog.byId.metadata-init.output.decisionReason}}",
+    useUserImage: "{{runLog.byId.metadata-init.output.useUserImage}}",
+    networkImageQuery: "{{runLog.byId.metadata-init.output.networkImageQuery}}",
     loreEn: "{{runLog.byId.loreEn.output.text}}",
     loreZh: "{{runLog.byId.loreZh.output.text}}",
   },
-  pick: "{{runLog.byId.pick.output}}",
 };
 
-// regen-metadata endpoint reads result.output.{titleZh, titleEn, ...}.
-// metadata-regen node returns the LLM_PROMPT JSON parse result directly,
-// so we expose its fields at the root.
+// outputMap for regen: regen-metadata endpoint reads metadata fields
+// at result.output root.
 const REGEN_METADATA_OUTPUT_MAP = {
   titleZh: "{{runLog.byId.metadata-regen.output.titleZh}}",
   titleEn: "{{runLog.byId.metadata-regen.output.titleEn}}",
@@ -263,7 +253,7 @@ async function ensureSkill(
       icon: spec.icon,
       descriptionEn: spec.descriptionEn,
       descriptionZh: spec.descriptionZh,
-      handlerKind: spec.handlerKind,
+      kind: spec.kind,
       handlerConfig: spec.handlerConfig,
       status: "ONLINE",
     },
@@ -273,35 +263,51 @@ async function ensureSkill(
   return created.id;
 }
 
-// Look up an INTERNAL skill row by its handlerConfig.handler slug. Used
-// to find the existing relic-files-summary and relic-smart-image-pick
-// rows that LORE-FORGE will share with SCRIBE.
-async function lookupInternalSkillByHandler(
-  prisma: PrismaClient,
-  handlerSlug: string,
-): Promise<string> {
-  const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-    `SELECT id FROM "Skill"
-     WHERE "handlerKind" = 'INTERNAL'
-       AND "handlerConfig"->>'handler' = $1
-     LIMIT 1`,
-    handlerSlug,
-  );
-  if (rows.length === 0) {
-    throw new Error(
-      `[migrate-lore-forge] expected INTERNAL skill with handler="${handlerSlug}" to exist (run earlier migrations first)`,
-    );
-  }
-  return rows[0].id;
-}
-
 async function ensureForgeAgent(
   prisma: PrismaClient,
-  skillIds: { summary: string; loreEn: string; loreZh: string; metadata: string; pick: string },
+  skillIds: { loreEn: string; loreZh: string; metadata: string },
 ): Promise<string> {
   const existing = await prisma.agent.findUnique({ where: { codename: NEW_AGENT_CODENAME } });
   if (existing) {
-    console.log(`[migrate-lore-forge] agent ${NEW_AGENT_CODENAME} already exists (${existing.id}); skipping creation`);
+    // Heal stale shape: drop slot-0 (legacy summary node) and slot-4
+    // (legacy INTERNAL pick node, picker logic moved to PICKER-FORGE-001).
+    // Force final shape.
+    await prisma.agent.update({
+      where: { id: existing.id },
+      data: { pipelineConfig: FORGE_PIPELINE as unknown as Prisma.InputJsonValue },
+    });
+    const stale = await prisma.agentSkillEquip.deleteMany({
+      where: { agentId: existing.id, slotIndex: { in: [0, 4] } },
+    });
+    if (stale.count > 0) {
+      console.log(`[migrate-lore-forge] healed ${NEW_AGENT_CODENAME}: removed ${stale.count} stale equip(s) (slot 0/4)`);
+    }
+    for (const [slotIndex, skillId] of [
+      [1, skillIds.loreEn],
+      [2, skillIds.loreZh],
+      [3, skillIds.metadata],
+    ] as const) {
+      const eq = await prisma.agentSkillEquip.findFirst({
+        where: { agentId: existing.id, slotIndex },
+      });
+      if (!eq) {
+        await prisma.agentSkillEquip.create({
+          data: { agentId: existing.id, skillId, slotIndex, unlocked: true },
+        });
+        console.log(`[migrate-lore-forge] re-equipped ${NEW_AGENT_CODENAME} slot ${slotIndex}`);
+      }
+    }
+    // Drop image-pick capability — it now lives on PICKER-FORGE-001.
+    if (existing.capabilities.includes("image-pick")) {
+      await prisma.agent.update({
+        where: { id: existing.id },
+        data: {
+          capabilities: existing.capabilities.filter((c) => c !== "image-pick"),
+        },
+      });
+      console.log(`[migrate-lore-forge] dropped image-pick capability from ${NEW_AGENT_CODENAME}`);
+    }
+    console.log(`[migrate-lore-forge] agent ${NEW_AGENT_CODENAME} already exists (${existing.id}); ensured final shape`);
     return existing.id;
   }
 
@@ -318,10 +324,10 @@ async function ensureForgeAgent(
         status: "ONLINE",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
         descriptionEn:
-          "Bilingual lore + metadata generator. Branch DAG: initial mode runs summary → loreEn(grounded) → loreZh → metadata → pick; regenMetadata mode jumps to metadata with existingLore.",
+          "Bilingual lore + metadata generator. Branch DAG: initial mode runs loreEn(grounded) → loreZh → metadata; regenMetadata mode jumps straight to metadata with existingLore. Workspace context pre-scanned at pipeline layer; image-pick handled by PICKER-FORGE-001 via a separate scene.",
         descriptionZh:
-          "双语圣记 + 元数据生成器。分支 DAG：initial 模式跑 summary → loreEn(grounded) → loreZh → metadata → pick；regenMetadata 模式直接跳到 metadata,使用 existingLore。",
-        capabilities: ["lore-writing", "metadata-derivation", "image-pick"],
+          "双语圣记 + 元数据生成器。分支 DAG：initial 模式跑 loreEn(grounded) → loreZh → metadata；regenMetadata 模式直接跳到 metadata,使用 existingLore。工作目录上下文由 pipeline 层预扫描;选图由 PICKER-FORGE-001 通过独立 scene 完成。",
+        capabilities: ["lore-writing", "metadata-derivation"],
         pipelineConfig: FORGE_PIPELINE as unknown as Prisma.InputJsonValue,
         deployedAt: new Date(),
       },
@@ -329,16 +335,14 @@ async function ensureForgeAgent(
     });
     await tx.agentSkillEquip.createMany({
       data: [
-        { agentId: agent.id, skillId: skillIds.summary, slotIndex: 0, unlocked: true },
         { agentId: agent.id, skillId: skillIds.loreEn, slotIndex: 1, unlocked: true },
         { agentId: agent.id, skillId: skillIds.loreZh, slotIndex: 2, unlocked: true },
         { agentId: agent.id, skillId: skillIds.metadata, slotIndex: 3, unlocked: true },
-        { agentId: agent.id, skillId: skillIds.pick, slotIndex: 4, unlocked: true },
       ],
     });
     return agent;
   });
-  console.log(`[migrate-lore-forge] created agent ${NEW_AGENT_CODENAME} (${result.id}) + 5 equips`);
+  console.log(`[migrate-lore-forge] created agent ${NEW_AGENT_CODENAME} (${result.id}) + 3 equips`);
   return result.id;
 }
 
@@ -346,6 +350,7 @@ async function rebindScene(
   prisma: PrismaClient,
   sceneKey: string,
   forgeId: string,
+  inputMap: Record<string, unknown>,
   outputMap: Record<string, unknown>,
   notes: string,
 ): Promise<void> {
@@ -354,26 +359,17 @@ async function rebindScene(
     console.log(`[migrate-lore-forge] no SceneBinding for ${sceneKey} — skip`);
     return;
   }
-  if (binding.agentId === forgeId) {
-    // Refresh outputMap in case the prior R1 outputMap is now stale (it
-    // referenced "research"/"pick" or "research-regen" node IDs that no
-    // longer exist in LORE-FORGE).
-    await prisma.sceneBinding.update({
-      where: { sceneKey },
-      data: { outputMap: outputMap as unknown as Prisma.InputJsonValue, notes },
-    });
-    console.log(`[migrate-lore-forge] ${sceneKey} already bound to LORE-FORGE; refreshed outputMap`);
-    return;
-  }
+  // Always write — heals stale legacy inputMap/outputMap shapes.
   await prisma.sceneBinding.update({
     where: { sceneKey },
     data: {
       agentId: forgeId,
+      inputMap: inputMap as unknown as Prisma.InputJsonValue,
       outputMap: outputMap as unknown as Prisma.InputJsonValue,
       notes,
     },
   });
-  console.log(`[migrate-lore-forge] rebound ${sceneKey} → LORE-FORGE-001`);
+  console.log(`[migrate-lore-forge] rebound ${sceneKey} → LORE-FORGE-001 (final shape)`);
 }
 
 async function main() {
@@ -387,33 +383,31 @@ async function main() {
       return;
     }
 
-    const summaryId = await lookupInternalSkillByHandler(prisma, "relic-files-summary");
-    const pickId = await lookupInternalSkillByHandler(prisma, "relic-smart-image-pick");
     const loreEnId = await ensureSkill(prisma, SKILL_LORE_EN);
     const loreZhId = await ensureSkill(prisma, SKILL_LORE_ZH);
     const metadataId = await ensureSkill(prisma, SKILL_METADATA);
 
     const forgeId = await ensureForgeAgent(prisma, {
-      summary: summaryId,
       loreEn: loreEnId,
       loreZh: loreZhId,
       metadata: metadataId,
-      pick: pickId,
     });
 
     await rebindScene(
       prisma,
       "relic.draft-metadata",
       forgeId,
+      DRAFT_INPUT_MAP,
       DRAFT_METADATA_OUTPUT_MAP,
-      "Phase 5 R2: routed to LORE-FORGE-001 (summary → loreEn → loreZh → metadata → pick). outputMap exposes runLog.byId.<node>.output under stable research/pick keys for the pipeline step.",
+      "LORE-FORGE-001 final shape: scanWorkspace pre-fills ctx; agent runs loreEn → loreZh → metadata. Pick handled by separate relic.smart-image-pick scene → PICKER-FORGE-001.",
     );
     await rebindScene(
       prisma,
       "relic.regen-metadata",
       forgeId,
+      REGEN_INPUT_MAP,
       REGEN_METADATA_OUTPUT_MAP,
-      "Phase 5 R2: routed to LORE-FORGE-001 (mode-router → metadata-regen). outputMap surfaces metadata fields at result.output root for the regen endpoint.",
+      "LORE-FORGE-001 final shape: regen mode jumps straight to metadata-regen with existingLore.",
     );
 
     console.log("[migrate-lore-forge] done");

@@ -21,10 +21,9 @@ type EditorState = { open: boolean; mode: "create" | "edit"; initial: SkillRow |
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
 // Compact label per HandlerKind — chip in the card header. Same neutral
-// palette across all four; the textual difference is enough to scan and
+// palette across all three; the textual difference is enough to scan and
 // avoids fighting the MECHANICAL/AUTONOMOUS mode colors.
 const HANDLER_CHIP_LABEL: Record<HandlerKind, string> = {
-  INTERNAL: "INTERNAL",
   HTTP_API: "HTTP",
   LLM_PROMPT: "LLM",
   MCP_SERVER: "MCP",
@@ -187,7 +186,7 @@ export default function SkillLibrary({ skills, equipsByAgentId, activeAgentId, i
                             ].join(" ")}
                             title="Handler type"
                           >
-                            {HANDLER_CHIP_LABEL[skill.handlerKind]}
+                            {HANDLER_CHIP_LABEL[skill.kind]}
                           </span>
                           <span
                             className={[

@@ -96,16 +96,18 @@ export async function runAgentJob(jobId: string): Promise<void> {
           endedAt: new Date(),
         },
       });
-      // Per-mode writeback to Relic. Triggered for relic-bound agent calls
-      // ({ mode: "2dEnhance" | "3dCreate", _relicId, ... }) — pure agent
-      // invocations without `_relicId` are unaffected.
+      // Data-driven writeback to Relic — agent leaf output's
+      // `_relicWriteback: { id, fields }` (produced via SceneBinding
+      // outputMap or skill responseTransform) is applied against an
+      // allowlist. Pure agent invocations without `_relicWriteback` are
+      // no-ops.
       try {
-        await maybeWriteRelicAsset(job.input, result.output);
+        await maybeWriteRelicAsset(result.output);
       } catch (e) {
         console.error(`[agent-job:run] ${jobId} relic writeback failed:`, e);
       }
       try {
-        await recordRelicProcessingLog(job.input, jobId, "SUCCEEDED");
+        await recordRelicProcessingLog(job.input, job.sceneKey, jobId, "SUCCEEDED");
       } catch (e) {
         console.error(`[agent-job:run] ${jobId} relic log (success) failed:`, e);
       }
@@ -151,7 +153,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
       },
     });
     try {
-      await recordRelicProcessingLog(job.input, jobId, "FAILED", message);
+      await recordRelicProcessingLog(job.input, job.sceneKey, jobId, "FAILED", message);
     } catch (e) {
       console.error(`[agent-job:run] ${jobId} relic log (failed) failed:`, e);
     }
@@ -176,21 +178,14 @@ export async function runAgentJob(jobId: string): Promise<void> {
 
 // — Relic writeback hook — — — — — — — — — — — — — — — — — — — — — — —
 //
-// Two paths, tried in order:
+// When the agent's leaf output carries `_relicWriteback: { id, fields }`,
+// each whitelisted field is applied to that Relic row. Skills produce
+// this shape via SceneBinding outputMap or directly in their leaf
+// output, so adding a new writeback target is purely a config change —
+// no runner code edits.
 //
-// 1. Data-driven (preferred — Phase 2.3+): when the agent's leaf output
-//    carries `_relicWriteback: { id, fields }`, apply each whitelisted
-//    field to that Relic row. Skills produce this shape via SceneBinding
-//    outputMap or directly in their leaf output, so adding a new
-//    writeback target is purely a config change — no runner code edits.
-//
-// 2. Legacy hardcoded (Phase 0b → 2.4 transition): when input.mode +
-//    input._relicId match a known shape (2dEnhance / 3dCreate), apply
-//    the per-mode field. Removed after Phase 2.4 finishes migrating all
-//    relic.* scenes to emit `_relicWriteback`.
-//
-// Unknown modes / inputs without `_relicId` and without `_relicWriteback`
-// are no-ops, so general agent invocations are unaffected.
+// Outputs without `_relicWriteback` are no-ops, so general agent
+// invocations are unaffected.
 //
 // Idempotent: re-running the same input writes the same fields. Safe to
 // trigger multiple times (e.g. via retry).
@@ -221,13 +216,13 @@ const ALLOWED_WRITEBACK_FIELDS = new Set<string>([
   "pipelineTrace",
 ]);
 
-async function tryDataDrivenWriteback(rawOutput: unknown): Promise<boolean> {
-  if (!isObject(rawOutput)) return false;
+async function maybeWriteRelicAsset(rawOutput: unknown): Promise<void> {
+  if (!isObject(rawOutput)) return;
   const wb = rawOutput._relicWriteback;
-  if (!isObject(wb)) return false;
+  if (!isObject(wb)) return;
   const id = typeof wb.id === "string" ? wb.id : null;
   const fields = isObject(wb.fields) ? wb.fields : null;
-  if (!id || !fields) return false;
+  if (!id || !fields) return;
 
   const safe: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) {
@@ -239,7 +234,7 @@ async function tryDataDrivenWriteback(rawOutput: unknown): Promise<boolean> {
     }
     safe[k] = v;
   }
-  if (Object.keys(safe).length === 0) return true; // recognized but nothing to write
+  if (Object.keys(safe).length === 0) return;
 
   try {
     await prisma.relic.update({
@@ -247,69 +242,34 @@ async function tryDataDrivenWriteback(rawOutput: unknown): Promise<boolean> {
       data: safe as unknown as Prisma.RelicUpdateInput,
     });
   } catch (e) {
-    console.error(`[agent-job:run] data-driven writeback failed for relic ${id}:`, e);
+    console.error(`[agent-job:run] writeback failed for relic ${id}:`, e);
   }
-  return true;
-}
-
-async function tryLegacyModeWriteback(
-  rawInput: unknown,
-  rawOutput: unknown,
-): Promise<boolean> {
-  if (!isObject(rawInput)) return false;
-  const relicId = typeof rawInput._relicId === "string" ? rawInput._relicId : null;
-  const mode = typeof rawInput.mode === "string" ? rawInput.mode : null;
-  if (!relicId || !mode) return false;
-
-  if (mode === "2dEnhance") {
-    if (!isObject(rawOutput)) return true; // recognized mode, nothing to write
-    const enhancedImagePath =
-      typeof rawOutput.enhancedImagePath === "string" ? rawOutput.enhancedImagePath : null;
-    if (!enhancedImagePath) return true;
-    await prisma.relic.update({ where: { id: relicId }, data: { enhancedImagePath } });
-    return true;
-  }
-
-  if (mode === "3dCreate") {
-    if (!isObject(rawOutput)) return true;
-    const modelPath =
-      typeof rawOutput.modelPath === "string" ? rawOutput.modelPath : null;
-    if (!modelPath) return true;
-    await prisma.relic.update({ where: { id: relicId }, data: { modelPath } });
-    return true;
-  }
-
-  // initial / regenMetadata are sync — pipeline / regen endpoint write
-  // from caller context. Not our problem here.
-  return false;
-}
-
-async function maybeWriteRelicAsset(
-  rawInput: unknown,
-  rawOutput: unknown,
-): Promise<void> {
-  if (await tryDataDrivenWriteback(rawOutput)) return;
-  await tryLegacyModeWriteback(rawInput, rawOutput);
 }
 
 // — RelicLog hook for relic-bound async invocations — — — — — — — — — — —
 //
 // PROCESSING_STARTED is recorded by the trigger endpoint (enhance-2d /
 // create-3d). PROCESSING_SUCCEEDED / PROCESSING_FAILED is recorded here
-// by the runner when the AgentJob terminates. Sync modes (initial /
-// regenMetadata) record their own pipeline events elsewhere — this hook
-// is a no-op for them.
+// by the runner when the AgentJob terminates. Phase classification is
+// driven by the dispatched scene key — sync scenes (relic.draft-metadata
+// / relic.regen-metadata) record their own pipeline events elsewhere,
+// so this hook is a no-op for them.
+const SCENE_TO_RELIC_PHASE: Record<string, string> = {
+  "relic.enhance2d": "enhance2d",
+  "relic.create3d": "3d",
+};
+
 async function recordRelicProcessingLog(
   rawInput: unknown,
+  sceneKey: string | null,
   jobId: string,
   outcome: "SUCCEEDED" | "FAILED",
   errorMessage?: string | null,
 ): Promise<void> {
   if (!isObject(rawInput)) return;
   const relicId = typeof rawInput._relicId === "string" ? rawInput._relicId : null;
-  const mode = typeof rawInput.mode === "string" ? rawInput.mode : null;
-  if (!relicId || !mode) return;
-  const phase = mode === "2dEnhance" ? "enhance2d" : mode === "3dCreate" ? "3d" : null;
+  if (!relicId || !sceneKey) return;
+  const phase = SCENE_TO_RELIC_PHASE[sceneKey];
   if (!phase) return;
 
   const relic = await prisma.relic.findUnique({

@@ -1,21 +1,18 @@
 // One-shot migration: provisions CUTOUT-FORGE-001 — a dedicated cutout
-// agent that replaces RELIC-SCRIBE-001's slot-3 monolithic relic-cutout
-// INTERNAL handler with the same 3-skill chain pattern as MESHY-FORGE
-// (image-to-data-uri → HTTP_API fal-cutout → HTTP_API save-asset). Phase
-// 2.4.2 of the agent service buildout.
+// agent implemented as a 2-skill chain (HTTP_API fal-cutout → HTTP_API
+// save-asset). Image data URI is pre-encoded by the trigger endpoint
+// (lib/relics/readImageAsDataUri.ts) and arrives via SceneBinding ctx →
+// agent.input.imageDataUri.
 //
 // What it creates / does (idempotent):
 //   1. Skill "fal-cutout-http"     (HTTP_API → fal.ai BiRefNet)
 //   2. Skill "save-asset-enhanced" (HTTP_API → /api/internal/save-asset
 //                                    with _relicWriteback into
 //                                    enhancedImagePath)
-//   3. Agent "CUTOUT-FORGE-001"    (MECHANICAL, reuses existing
-//                                    image-to-data-uri-relic skill in slot 0)
-//   4. AgentSkillEquip × 3
+//   3. Agent "CUTOUT-FORGE-001"    (MECHANICAL, 2-slot chain DAG)
+//   4. AgentSkillEquip × 2          (slots 1, 2)
 //   5. SceneBinding update for relic.enhance2d → CUTOUT-FORGE-001
-//
-// Old RELIC-SCRIBE-001.slot[3] (relic-cutout INTERNAL) is LEFT IN PLACE
-// for rollback (admin can flip the SceneBinding back from /agent-control).
+//      (always written so re-runs heal stale legacy inputMap shapes)
 //
 // Required env: DATABASE_URL.
 
@@ -23,7 +20,6 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 
 const NEW_AGENT_CODENAME = "CUTOUT-FORGE-001";
-const SHARED_DATA_URI_SLUG = "image-to-data-uri-relic"; // created by migrate-meshy-forge
 
 const SKILL_FAL_CUTOUT = {
   slug: "fal-cutout-http",
@@ -34,27 +30,23 @@ const SKILL_FAL_CUTOUT = {
     "Submits a data-URI image to fal.ai's BiRefNet endpoint, downloads the resulting transparent PNG. URL / model / timeout are admin-editable in handlerConfig.",
   descriptionZh:
     "把 data URI 图片提交给 fal.ai BiRefNet，下载生成的透明 PNG。URL / 模型 / 超时全在 handlerConfig 可改。",
-  handlerKind: "HTTP_API" as const,
+  kind: "HTTP_API" as const,
   handlerConfig: {
     method: "POST",
     url: "https://fal.run/fal-ai/birefnet/v2",
     authEnv: "FAL_API_KEY",
-    // fal.ai uses "Authorization: Key <key>" (not Bearer / ApiKey) — see
-    // the new "Key" authScheme added to lib/skills/handlers/httpApi.ts.
     authScheme: "Key",
     timeoutMs: 60_000,
     bodyTemplate: {
-      // Input shape (from upstream image-to-data-uri merged with agent.input):
+      // Input shape (from agent.input via inputMap):
       //   { dataUri }
       image_url: "{{dataUri}}",
     },
-    // fal.run is synchronous (~10s) — no polling needed.
     download: {
       urlPath: "image.url",
       field: "_download",
       maxBytes: 25 * 1024 * 1024,
     },
-    // Trim the response so save-asset only sees what it needs.
     responseTransform: {
       _download: "{{response._download}}",
       sourceUrl: "{{response.image.url}}",
@@ -71,7 +63,7 @@ const SKILL_SAVE_ASSET_ENHANCED = {
     "POSTs a base64 blob to /api/internal/save-asset with kind=enhanced, then emits _relicWriteback into Relic.enhancedImagePath so runner persists it. Sibling of save-asset-relic — only difference is the writeback field.",
   descriptionZh:
     "把 base64 blob POST 到 /api/internal/save-asset (kind=enhanced)，再产出 _relicWriteback 让 runner 写回 Relic.enhancedImagePath。跟 save-asset-relic 几乎一样,只是写回字段不同。",
-  handlerKind: "HTTP_API" as const,
+  kind: "HTTP_API" as const,
   handlerConfig: {
     method: "POST",
     url: "http://localhost:3000/api/internal/save-asset",
@@ -79,8 +71,6 @@ const SKILL_SAVE_ASSET_ENHANCED = {
     authScheme: "Header",
     authHeader: "X-Internal-Token",
     timeoutMs: 30_000,
-    // Input merged from agent.input + cutout output:
-    //   { relicSlug, relicId, _download: { base64, contentType } }
     bodyTemplate: {
       relicSlug: "{{relicSlug}}",
       kind: "enhanced",
@@ -93,9 +83,6 @@ const SKILL_SAVE_ASSET_ENHANCED = {
       _relicWriteback: {
         id: "{{input.relicId}}",
         fields: {
-          // Cutout-specific writeback target. The runner allowlist
-          // (lib/skills/runtime/runner.ts ALLOWED_WRITEBACK_FIELDS)
-          // includes enhancedImagePath.
           enhancedImagePath: "{{response.savedPath}}",
         },
       },
@@ -103,28 +90,17 @@ const SKILL_SAVE_ASSET_ENHANCED = {
   } as Prisma.InputJsonValue,
 };
 
-// CUTOUT-FORGE-001 backbone DAG (v2): linear chain identical in shape
-// to MESHY-FORGE-001's, just different middle node.
+// CUTOUT-FORGE-001 backbone DAG (v2 final): 2-node linear chain.
+//   agent.input.imageDataUri → cutout → save
 const FORGE_PIPELINE = {
   version: 2 as const,
   nodes: [
     {
-      id: "toDataUri",
-      type: "skill" as const,
-      equipSlot: 0,
-      inputFrom: "agent.input",
-      position: { x: 60, y: 200 },
-    },
-    {
       id: "cutout",
       type: "skill" as const,
       equipSlot: 1,
-      inputFrom: {
-        merge: {
-          dataUri: "toDataUri.output.dataUri",
-        },
-      },
-      position: { x: 380, y: 200 },
+      inputFrom: { merge: { dataUri: "agent.input.imageDataUri" } },
+      position: { x: 60, y: 200 },
     },
     {
       id: "save",
@@ -137,18 +113,15 @@ const FORGE_PIPELINE = {
           relicId: "agent.input._relicId",
         },
       },
-      position: { x: 700, y: 200 },
+      position: { x: 380, y: 200 },
     },
   ],
-  edges: [
-    { from: "toDataUri", to: "cutout" },
-    { from: "cutout", to: "save" },
-  ],
+  edges: [{ from: "cutout", to: "save" }],
 };
 
 const FORGE_INPUT_MAP_ENHANCE2D = {
   relicSlug: "{{ctx.relicSlug}}",
-  imagePath: "{{ctx.primaryImagePath}}",
+  imageDataUri: "{{ctx.imageDataUri}}",
   _relicId: "{{ctx.relicId}}",
 };
 
@@ -175,7 +148,7 @@ async function ensureSkill(
       icon: spec.icon,
       descriptionEn: spec.descriptionEn,
       descriptionZh: spec.descriptionZh,
-      handlerKind: spec.handlerKind,
+      kind: spec.kind,
       handlerConfig: spec.handlerConfig,
       status: "ONLINE",
     },
@@ -185,23 +158,37 @@ async function ensureSkill(
   return created.id;
 }
 
-async function lookupSharedSkill(prisma: PrismaClient, slug: string): Promise<string> {
-  const row = await prisma.skill.findUnique({ where: { slug }, select: { id: true } });
-  if (!row) {
-    throw new Error(
-      `[migrate-cutout-forge] expected shared skill "${slug}" to exist (run migrate-meshy-forge first)`,
-    );
-  }
-  return row.id;
-}
-
 async function ensureForgeAgent(
   prisma: PrismaClient,
-  skillIds: { dataUri: string; cutout: string; save: string },
+  skillIds: { cutout: string; save: string },
 ): Promise<string> {
   const existing = await prisma.agent.findUnique({ where: { codename: NEW_AGENT_CODENAME } });
   if (existing) {
-    console.log(`[migrate-cutout-forge] agent ${NEW_AGENT_CODENAME} already exists (${existing.id}); skipping creation`);
+    // Heal stale shape: an env that ran the old 3-slot version still has
+    // a slot-0 equip pointing at the now-deleted image-to-data-uri Skill,
+    // and pipelineConfig may be the 3-node form. Force final shape.
+    await prisma.agent.update({
+      where: { id: existing.id },
+      data: { pipelineConfig: FORGE_PIPELINE as unknown as Prisma.InputJsonValue },
+    });
+    const stale = await prisma.agentSkillEquip.deleteMany({
+      where: { agentId: existing.id, slotIndex: 0 },
+    });
+    if (stale.count > 0) {
+      console.log(`[migrate-cutout-forge] healed ${NEW_AGENT_CODENAME}: removed ${stale.count} stale slot-0 equip`);
+    }
+    for (const [slotIndex, skillId] of [[1, skillIds.cutout], [2, skillIds.save]] as const) {
+      const eq = await prisma.agentSkillEquip.findFirst({
+        where: { agentId: existing.id, slotIndex },
+      });
+      if (!eq) {
+        await prisma.agentSkillEquip.create({
+          data: { agentId: existing.id, skillId, slotIndex, unlocked: true },
+        });
+        console.log(`[migrate-cutout-forge] re-equipped ${NEW_AGENT_CODENAME} slot ${slotIndex}`);
+      }
+    }
+    console.log(`[migrate-cutout-forge] agent ${NEW_AGENT_CODENAME} already exists (${existing.id}); ensured final shape`);
     return existing.id;
   }
 
@@ -218,8 +205,8 @@ async function ensureForgeAgent(
         status: "ONLINE",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
         descriptionEn:
-          "Dedicated background-cutout agent. Linear chain: image → fal.ai BiRefNet → save asset.",
-        descriptionZh: "专职抠图代理人。线性链：图片 → fal.ai BiRefNet → 保存资产。",
+          "Dedicated background-cutout agent. Linear chain: fal.ai BiRefNet → save asset. Image data URI pre-encoded by the trigger endpoint.",
+        descriptionZh: "专职抠图代理人。线性链：fal.ai BiRefNet → 保存资产。图片 dataUri 由触发端点预编码。",
         capabilities: ["image-cutout"],
         pipelineConfig: FORGE_PIPELINE as unknown as Prisma.InputJsonValue,
         deployedAt: new Date(),
@@ -228,14 +215,13 @@ async function ensureForgeAgent(
     });
     await tx.agentSkillEquip.createMany({
       data: [
-        { agentId: agent.id, skillId: skillIds.dataUri, slotIndex: 0, unlocked: true },
         { agentId: agent.id, skillId: skillIds.cutout, slotIndex: 1, unlocked: true },
         { agentId: agent.id, skillId: skillIds.save, slotIndex: 2, unlocked: true },
       ],
     });
     return agent;
   });
-  console.log(`[migrate-cutout-forge] created agent ${NEW_AGENT_CODENAME} (${result.id}) + 3 equips`);
+  console.log(`[migrate-cutout-forge] created agent ${NEW_AGENT_CODENAME} (${result.id}) + 2 equips`);
   return result.id;
 }
 
@@ -245,20 +231,16 @@ async function rebindEnhance2dScene(prisma: PrismaClient, forgeAgentId: string):
     console.log('[migrate-cutout-forge] SceneBinding "relic.enhance2d" not found — skipping rebind (run migrate-scene-bindings first)');
     return;
   }
-  if (binding.agentId === forgeAgentId) {
-    console.log('[migrate-cutout-forge] relic.enhance2d already points at CUTOUT-FORGE-001; skipping');
-    return;
-  }
   await prisma.sceneBinding.update({
     where: { sceneKey: "relic.enhance2d" },
     data: {
       agentId: forgeAgentId,
       inputMap: FORGE_INPUT_MAP_ENHANCE2D as unknown as Prisma.InputJsonValue,
       notes:
-        "Phase 2.4.2: routed to CUTOUT-FORGE-001 (image-to-data-uri → HTTP_API fal cutout → save-asset). Old RELIC-SCRIBE-001 slot 3 retained for rollback.",
+        "CUTOUT-FORGE-001 final shape: endpoint pre-encodes imageDataUri; DAG runs cutout → save (no toDataUri).",
     },
   });
-  console.log("[migrate-cutout-forge] rebound relic.enhance2d → CUTOUT-FORGE-001");
+  console.log("[migrate-cutout-forge] rebound relic.enhance2d → CUTOUT-FORGE-001 (final shape)");
 }
 
 async function main() {
@@ -272,11 +254,9 @@ async function main() {
       return;
     }
 
-    const dataUriId = await lookupSharedSkill(prisma, SHARED_DATA_URI_SLUG);
     const cutoutId = await ensureSkill(prisma, SKILL_FAL_CUTOUT);
     const saveId = await ensureSkill(prisma, SKILL_SAVE_ASSET_ENHANCED);
     const forgeId = await ensureForgeAgent(prisma, {
-      dataUri: dataUriId,
       cutout: cutoutId,
       save: saveId,
     });

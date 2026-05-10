@@ -27,7 +27,7 @@ export const agentSkillSchema = z.object({
   icon: z.string().min(1).max(64),
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
-  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]),
+  kind: z.enum(["HTTP_API", "LLM_PROMPT", "MCP_SERVER"]),
   costAp: z.number().int().min(0).max(99),
   descriptionEn: z.string().max(2000),
   descriptionZh: z.string().max(2000),
@@ -151,10 +151,52 @@ const dagLoopNodeSchema: z.ZodTypeAny = z.object({
   position: positionSchema,
 });
 
+// forEach node — like loop, but runs body once per item in the
+// inputFrom-resolved array. Each iteration's body input is
+// `{ item, index, total }` (the body reads `agent.input.item` etc.).
+// Aggregate semantics same as loop: "last" returns the final iteration's
+// leaf output, "concat-array" concatenates all leaf outputs (default for
+// forEach). Use this when smartImagePicker-style "for each candidate URL,
+// download + vision-filter, then merge" is the natural shape.
+const dagForEachNodeSchema: z.ZodTypeAny = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
+  type: z.literal("forEach"),
+  inputFrom: sourceRef,
+  // Cap items per iteration to keep cost + runtime bounded. SerpAPI
+  // 10-image batches sit comfortably under 50; bumping requires PR.
+  maxItems: z.number().int().min(1).max(50),
+  body: z.lazy(() =>
+    z.object({
+      nodes: z.array(dagNodeSchema).min(1).max(20),
+      edges: z.array(dagEdgeSchema).max(40),
+    }),
+  ),
+  aggregate: z.enum(["last", "concat-array"]).optional(),
+  position: positionSchema,
+});
+
+// transform node — pure data shaping, no external calls. Body is a
+// JSONata expression evaluated against the inputFrom-resolved value.
+// Use this for zip / map / filter / reduce on arrays + objects without
+// adding an INTERNAL helper (e.g. "apply vision verdicts onto candidate
+// list" in the smart-image-pick decomposition). JSONata is sandboxed by
+// design — no FS / network / eval; just JSON-in JSON-out.
+const dagTransformNodeSchema = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
+  type: z.literal("transform"),
+  inputFrom: sourceRef,
+  // JSONata source. Capped — admin can store ~half a screen of expression
+  // before having to refactor into multiple transform nodes.
+  expression: z.string().min(1).max(4_000),
+  position: positionSchema,
+});
+
 const dagNodeSchema = z.discriminatedUnion("type", [
   dagSkillNodeSchema,
   dagBranchNodeSchema,
   dagLoopNodeSchema as unknown as typeof dagSkillNodeSchema,
+  dagForEachNodeSchema as unknown as typeof dagSkillNodeSchema,
+  dagTransformNodeSchema as unknown as typeof dagSkillNodeSchema,
 ]);
 
 export const pipelineConfigV2Schema = z.object({
@@ -247,7 +289,12 @@ export type AgentUpdateInput = z.infer<typeof agentUpdateSchema>;
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
-export const handlerKindSchema = z.enum(["HTTP_API", "LLM_PROMPT", "MCP_SERVER", "INTERNAL"]);
+// Skill.kind values — the runtime routing field. Was named handlerKindSchema
+// pre-2026-05-10. The export name is kept for back-compat across importing
+// modules; alias `skillKindSchema` is preferred for new code. INTERNAL was
+// removed 2026-05-11 (picker-forge decomposition retired the last user).
+export const skillKindSchema = z.enum(["HTTP_API", "LLM_PROMPT", "MCP_SERVER"]);
+export const handlerKindSchema = skillKindSchema;
 
 // Reject handlerConfig keys that look like plaintext credentials.
 // Forces "secrets via env only" — admin should pass { authEnv: "MESHY_API_KEY" },
@@ -280,18 +327,17 @@ export const skillSlugSchema = z
 
 export const skillCreateSchema = z.object({
   slug: skillSlugSchema.optional(),
-  // level/kind/costAp kept for back-compat — new UI hides them. Optional so
+  // level/costAp kept for back-compat — new UI hides them. Optional so
   // POST bodies that omit these fall back to schema defaults.
   level: z.number().int().min(1).max(6).optional(),
   icon: z.string().min(1).max(64),
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
-  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]).optional(),
   costAp: z.number().int().min(0).max(99).optional(),
   descriptionEn: z.string().max(2000),
   descriptionZh: z.string().max(2000),
-  // Runtime routing — see prisma/schema.prisma HandlerKind enum.
-  handlerKind: handlerKindSchema.optional(),
+  // Runtime routing — see prisma/schema.prisma SkillKind enum.
+  kind: skillKindSchema.optional(),
   handlerConfig: handlerConfigSchema.optional(),
   inputSchema: jsonSchemaSchema,
   outputSchema: jsonSchemaSchema,
@@ -339,8 +385,6 @@ export const sceneBindingUpdateSchema = z.object({
   outputMap: z.unknown().optional().nullable(),
   enabled: z.boolean().default(true),
   notes: z.string().max(500).nullable().optional(),
-  rolloutPct: z.number().int().min(0).max(100).optional(),
-  fallbackAgentId: z.string().cuid().nullable().optional(),
 });
 export type SceneBindingUpdateInput = z.infer<typeof sceneBindingUpdateSchema>;
 
@@ -365,12 +409,20 @@ const exportSkillSchema = z.object({
   icon: z.string().min(1).max(64),
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
-  kind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]),
+  // Pre-2026-05-10 envelopes carried a separate decorative `kind`
+  // (PASSIVE/ACTIVE/ULTIMATE) alongside `handlerKind`. Both are accepted on
+  // import (decorative kind is dropped on the way in); current exports only
+  // emit the runtime `kind` (HTTP_API/LLM_PROMPT/...). Pre-2026-05-11
+  // exports may carry `kind: "INTERNAL"` — accepted here for back-compat;
+  // the import endpoint translates it to MCP_SERVER (INTERNAL was retired
+  // when picker-forge decomposed the last user).
+  kind: z.enum(["HTTP_API", "LLM_PROMPT", "MCP_SERVER", "INTERNAL"]).optional(),
+  handlerKind: z.enum(["HTTP_API", "LLM_PROMPT", "MCP_SERVER", "INTERNAL"]).optional(),
+  legacyKind: z.enum(["PASSIVE", "ACTIVE", "ULTIMATE"]).optional(),
   costAp: z.number().int().min(0).max(99),
   descriptionEn: z.string().max(2000),
   descriptionZh: z.string().max(2000),
   status: z.enum(["ONLINE", "OFFLINE"]),
-  handlerKind: handlerKindSchema,
   handlerConfig: handlerConfigSchema,
   inputSchema: jsonSchemaSchema,
   outputSchema: jsonSchemaSchema,
@@ -433,7 +485,13 @@ export type AgentImportInput = z.infer<typeof agentImportOptionsSchema>;
 //
 // `ext` is parsed from contentType when omitted, falling back to ".bin".
 // We never trust client-side filenames (path-traversal risk).
-const RELIC_SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
+// Accepts both real Relic slugs ("vault-001-abc") and draft workspace
+// slugs ("_drafts/<cuid>"). The slash is the only special char allowed,
+// and only as the prefix separator — saved files still land under the
+// same private/relics/<slug>/derived/ tree because path.join handles it
+// correctly. Path traversal is blocked downstream by the path.resolve()
+// boundary check in the route handler.
+const RELIC_SLUG_RE = /^(_drafts\/)?[a-zA-Z0-9_-]{1,80}$/;
 const KIND_RE = /^[a-z0-9-]{1,32}$/;
 const EXT_RE = /^\.[a-z0-9]{1,8}$/;
 

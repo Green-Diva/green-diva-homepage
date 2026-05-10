@@ -1,4 +1,4 @@
-// MCP_SERVER handler — placeholder for Phase 5. Skills using this handlerKind
+// MCP_SERVER handler — placeholder for Phase 5. Skills using this kind
 // will throw until the MCP client integration ships.
 
 import { HandlerError, type SkillHandler } from "../types";

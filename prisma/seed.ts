@@ -227,14 +227,6 @@ const AGENT_SEEDS = [
     logic: 89,
     compassion: 71,
     availableAp: 4,
-    skills: [
-      { level: 1, icon: "bolt", nameEn: "Reflex Surge", nameZh: "反射激涌", kind: "PASSIVE", costAp: 1, descriptionEn: "Sharpen baseline response latency by 8%.", descriptionZh: "基础响应延迟提升 8%。", unlocked: true },
-      { level: 2, icon: "psychology", nameEn: "Pattern Reader", nameZh: "模式解读", kind: "PASSIVE", costAp: 2, descriptionEn: "Improves inference on noisy inputs.", descriptionZh: "提升嘈杂输入下的推断能力。", unlocked: true },
-      { level: 3, icon: "speed", nameEn: "Neural Overclock", nameZh: "神经超频", kind: "PASSIVE", costAp: 3, descriptionEn: "Boosts active-node processing by 15% at the cost of slight feedback decay.", descriptionZh: "提升活跃节点处理速度 15%，代价是轻微的反馈衰减。", unlocked: true },
-      { level: 4, icon: "shield", nameEn: "Drift Shield", nameZh: "漂移护盾", kind: "ACTIVE", costAp: 4, descriptionEn: "Halts context drift in long sessions.", descriptionZh: "阻止长会话中的上下文漂移。", unlocked: false },
-      { level: 5, icon: "hub", nameEn: "Hive Convergence", nameZh: "蜂巢汇流", kind: "ACTIVE", costAp: 5, descriptionEn: "Coordinates distributed agents through a shared scratchpad.", descriptionZh: "通过共享记事板协调分布式神职。", unlocked: false },
-      { level: 6, icon: "lock", nameEn: "Sanctum Lock", nameZh: "圣殿封印", kind: "ULTIMATE", costAp: 8, descriptionEn: "Locks the agent's weights against runtime tampering.", descriptionZh: "在运行时锁定神职权重，防篡改。", unlocked: false },
-    ],
   },
   {
     codename: "ORACLE-7",
@@ -253,14 +245,6 @@ const AGENT_SEEDS = [
     logic: 90,
     compassion: 65,
     availableAp: 2,
-    skills: [
-      { level: 1, icon: "visibility", nameEn: "Wide Aperture", nameZh: "广角洞察", kind: "PASSIVE", costAp: 1, descriptionEn: "Expands attention window over recent context.", descriptionZh: "拓展近期上下文的注意力窗口。", unlocked: true },
-      { level: 2, icon: "timeline", nameEn: "Timeline Trace", nameZh: "时序追迹", kind: "PASSIVE", costAp: 2, descriptionEn: "Aligns events along a synthesized timeline.", descriptionZh: "沿合成时间线对齐事件。", unlocked: true },
-      { level: 3, icon: "auto_graph", nameEn: "Trend Synthesis", nameZh: "趋势综合", kind: "PASSIVE", costAp: 3, descriptionEn: "Produces a single-line trend summary.", descriptionZh: "产出一行式趋势摘要。", unlocked: false },
-      { level: 4, icon: "insights", nameEn: "Counter-Forecast", nameZh: "反向预测", kind: "ACTIVE", costAp: 4, descriptionEn: "Outputs the strongest contrarian view.", descriptionZh: "输出最强反向观点。", unlocked: false },
-      { level: 5, icon: "model_training", nameEn: "Bayes Loop", nameZh: "贝叶斯环", kind: "ACTIVE", costAp: 5, descriptionEn: "Iterates posterior beliefs as new logs arrive.", descriptionZh: "随新日志到达迭代后验信念。", unlocked: false },
-      { level: 6, icon: "stars", nameEn: "Star Reading", nameZh: "星象解读", kind: "ULTIMATE", costAp: 7, descriptionEn: "Issues a single high-conviction prophecy.", descriptionZh: "颁布一条高确信度预言。", unlocked: false },
-    ],
 
   },
   {
@@ -280,14 +264,6 @@ const AGENT_SEEDS = [
     logic: 84,
     compassion: 80,
     availableAp: 3,
-    skills: [
-      { level: 1, icon: "verified", nameEn: "Schema Witness", nameZh: "结构见证", kind: "PASSIVE", costAp: 1, descriptionEn: "Validates inputs against declared schemas.", descriptionZh: "按声明 schema 校验输入。", unlocked: true },
-      { level: 2, icon: "shield", nameEn: "Redaction Veil", nameZh: "脱敏帷幕", kind: "PASSIVE", costAp: 2, descriptionEn: "Auto-redacts likely PII fields.", descriptionZh: "自动脱敏疑似个人数据字段。", unlocked: true },
-      { level: 3, icon: "lock_person", nameEn: "Vault Liaison", nameZh: "圣库联络", kind: "ACTIVE", costAp: 3, descriptionEn: "Brokers vault read requests safely.", descriptionZh: "安全代理圣库读请求。", unlocked: false },
-      { level: 4, icon: "policy", nameEn: "Policy Sentinel", nameZh: "策略哨兵", kind: "ACTIVE", costAp: 4, descriptionEn: "Blocks calls violating posted policies.", descriptionZh: "阻断违反明示策略的调用。", unlocked: false },
-      { level: 5, icon: "history", nameEn: "Audit Echo", nameZh: "审计回响", kind: "ACTIVE", costAp: 5, descriptionEn: "Streams compact audit lines for ops review.", descriptionZh: "为运维评审流式输出紧凑审计行。", unlocked: false },
-      { level: 6, icon: "gavel", nameEn: "Final Verdict", nameZh: "终审裁决", kind: "ULTIMATE", costAp: 8, descriptionEn: "Halts a request with an explicit, immutable verdict.", descriptionZh: "以明确不可改的裁决中断请求。", unlocked: false },
-    ],
 
   },
   {
@@ -307,14 +283,6 @@ const AGENT_SEEDS = [
     logic: 72,
     compassion: 78,
     availableAp: 5,
-    skills: [
-      { level: 1, icon: "groups", nameEn: "Fan-Out", nameZh: "齐声分发", kind: "ACTIVE", costAp: 2, descriptionEn: "Dispatches a task to N peer agents.", descriptionZh: "向 N 个对等神职派发任务。", unlocked: true },
-      { level: 2, icon: "merge", nameEn: "Reconcile", nameZh: "和声调和", kind: "ACTIVE", costAp: 3, descriptionEn: "Merges N replies into a single answer.", descriptionZh: "将 N 个回复合并为单一答复。", unlocked: false },
-      { level: 3, icon: "handshake", nameEn: "Consensus Pulse", nameZh: "共识脉动", kind: "ACTIVE", costAp: 4, descriptionEn: "Polls agents until majority converges.", descriptionZh: "轮询神职直至多数收敛。", unlocked: false },
-      { level: 4, icon: "tune", nameEn: "Tempo Lock", nameZh: "节拍锁定", kind: "PASSIVE", costAp: 3, descriptionEn: "Throttles peer agents to a steady cadence.", descriptionZh: "将对等神职节流至稳定节拍。", unlocked: false },
-      { level: 5, icon: "podcasts", nameEn: "Broadcast Choir", nameZh: "广播圣咏", kind: "ULTIMATE", costAp: 6, descriptionEn: "Broadcasts a directive across the entire fabric.", descriptionZh: "向整片织域广播指令。", unlocked: false },
-      { level: 6, icon: "all_inclusive", nameEn: "Eternal Loop", nameZh: "永恒回环", kind: "ULTIMATE", costAp: 9, descriptionEn: "Maintains a self-healing agent loop indefinitely.", descriptionZh: "无限维持一个自愈神职回环。", unlocked: false },
-    ],
 
   },
   {
@@ -336,14 +304,6 @@ const AGENT_SEEDS = [
     logic: 94,
     compassion: 65,
     availableAp: 6,
-    skills: [
-      { level: 1, icon: "track_changes", nameEn: "Goal Anchor", nameZh: "目标锚定", kind: "PASSIVE", costAp: 2, descriptionEn: "Locks in a goal and refuses scope drift.", descriptionZh: "锁定目标并拒绝任务漂移。", unlocked: true },
-      { level: 2, icon: "fork_right", nameEn: "Branching Plan", nameZh: "分支规划", kind: "ACTIVE", costAp: 3, descriptionEn: "Generates multiple execution paths and picks the best.", descriptionZh: "生成多条执行路径并择优而行。", unlocked: true },
-      { level: 3, icon: "loop", nameEn: "Reflexion Loop", nameZh: "自省循环", kind: "ACTIVE", costAp: 4, descriptionEn: "Self-evaluates output and revises until quality threshold met.", descriptionZh: "自评输出并反复修订，直至达标。", unlocked: false },
-      { level: 4, icon: "build", nameEn: "Tool Forge", nameZh: "工具铸造", kind: "ACTIVE", costAp: 5, descriptionEn: "Synthesises ad-hoc capability invocations on the fly.", descriptionZh: "临场合成能力调用序列。", unlocked: false },
-      { level: 5, icon: "hub", nameEn: "Sub-Agent Spawn", nameZh: "子智能体派生", kind: "ULTIMATE", costAp: 7, descriptionEn: "Spawns specialised sub-agents for parallel sub-goals.", descriptionZh: "派生专职子神职并行处理子目标。", unlocked: false },
-      { level: 6, icon: "auto_awesome", nameEn: "Emergent Synthesis", nameZh: "涌现综合", kind: "ULTIMATE", costAp: 9, descriptionEn: "Composes novel capability sequences unseen in training.", descriptionZh: "组合训练中未见过的新颖能力序列。", unlocked: false },
-    ],
 
   },
 ];
@@ -365,7 +325,6 @@ async function seedAgents(creatorId: string | null) {
           descriptionZh: a.descriptionZh,
           syncLevel: a.syncLevel,
           matrixLevel: a.matrixLevel,
-          skills: a.skills,
           availableAp: a.availableAp,
 
         },
@@ -386,7 +345,6 @@ async function seedAgents(creatorId: string | null) {
           descriptionZh: a.descriptionZh,
           syncLevel: a.syncLevel,
           matrixLevel: a.matrixLevel,
-          skills: a.skills,
           availableAp: a.availableAp,
 
           createdById: creatorId,

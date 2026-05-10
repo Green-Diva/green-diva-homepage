@@ -442,25 +442,15 @@ model AgentJob {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  // Phase 7 — telemetry for the cross-module Activity tab. All nullable
-  // because direct /api/agents/[id]/invoke (no scene) keeps these blank.
-  // sceneKey: which registered scene fired this call (e.g. "relic.create3d").
-  // actorUserId / actorName: snapshot of the admin/user who invoked.
-  // routedTo: "primary" or "fallback" when SceneBinding.rolloutPct < 100.
+  // Snapshot of the scene that triggered this job (e.g. "relic.create3d").
+  // Used by runner.ts to derive the relic processing-log phase. NULL for
+  // direct /api/agents/[id]/invoke calls (no scene). Was joined by the
+  // Phase 7 Activity tab telemetry fields (actor / routedTo) — those have
+  // been removed; sceneKey survives because it has a real runtime caller.
   sceneKey     String?
-  actorUserId  String?
-  actorName    String?
-  routedTo     String?
 
   @@index([status, updatedAt])
   @@index([agentId, createdAt])
-  @@index([sceneKey, createdAt])
-}
-
-enum SkillKind {
-  PASSIVE
-  ACTIVE
-  ULTIMATE
 }
 
 enum SkillStatus {
@@ -468,16 +458,17 @@ enum SkillStatus {
   OFFLINE
 }
 
-// HandlerKind routes a Skill to an executor in lib/skills/handlers/.
+// SkillKind routes a Skill to an executor in lib/skills/handlers/. Was named
+// HandlerKind pre-2026-05-10. The prior decorative SkillKind enum
+// (PASSIVE/ACTIVE/ULTIMATE) and the INTERNAL runtime-injection kind
+// (retired 2026-05-11) have both been removed.
 // HTTP_API     → REST endpoint (e.g. Meshy, Stripe). handlerConfig: { method, url, authEnv, headers, bodyTemplate }
 // LLM_PROMPT   → LLM call with prompt template. handlerConfig: { provider, model, systemPrompt, userTemplate, ... }
-// MCP_SERVER   → remote MCP-protocol agent. handlerConfig: { serverUrl, toolName, authEnv } (Phase 5)
-// INTERNAL     → in-repo function, dispatched by slug. handlerConfig: { handler: "<slug>", ...args }
-enum HandlerKind {
+// MCP_SERVER   → remote MCP-protocol agent. handlerConfig: { serverUrl, toolName, authEnv }
+enum SkillKind {
   HTTP_API
   LLM_PROMPT
   MCP_SERVER
-  INTERNAL
 }
 
 model Skill {
@@ -491,17 +482,14 @@ model Skill {
   icon          String             @db.VarChar(64)
   nameEn        String             @db.VarChar(80)
   nameZh        String             @db.VarChar(80)
-  // kind is purely decorative — only SkillLibrary's badge palette reads it.
-  // Kept as a column for backward compat; new admin UI no longer prompts.
-  kind          SkillKind          @default(PASSIVE)
   status        SkillStatus        @default(ONLINE)
   // Legacy AP cost — runtime never reads it. New admin UI hides the field;
   // column kept for back-compat / future quota system.
   costAp        Int                @default(0)
   descriptionEn String             @db.VarChar(2000)
   descriptionZh String             @db.VarChar(2000)
-  // Runtime routing — see HandlerKind comment above.
-  handlerKind   HandlerKind        @default(INTERNAL)
+  // Runtime routing — see SkillKind comment above.
+  kind          SkillKind          @default(MCP_SERVER)
   handlerConfig Json               @default(dbgenerated("'{}'::jsonb"))
   // JSON Schema describing input/output shapes. Used by invoke() for
   // validation and by Orchestrator to expose skills as LLM tools.
@@ -513,10 +501,9 @@ model Skill {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
-  @@index([kind])
   @@index([level])
   @@index([status])
-  @@index([handlerKind])
+  @@index([kind])
 }
 
 model AgentSkillEquip {
@@ -553,8 +540,10 @@ model AgentSkillEquip {
 model SceneBinding {
   id              String   @id @default(cuid())
   // Matches a SceneDefinition.key registered in code. Unique — one
-  // binding per scene. For A/B / staged rollout use rolloutPct +
-  // fallbackAgentId rather than two binding rows.
+  // binding per scene. (A staged-rollout / fallback feature lived here
+  // 2026-05-09 → 2026-05-10 but never had a real caller; if A/B routing
+  // is needed again, design it deliberately rather than restoring the
+  // original two-column shape.)
   sceneKey        String   @unique
   agentId         String
   agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Restrict)
@@ -566,11 +555,6 @@ model SceneBinding {
   outputMap       Json?
   enabled         Boolean  @default(true)
   notes           String?
-  // Phase 5 fields — staged rollout / canary. 100 means "always primary".
-  // fallbackAgentId is intentionally a bare String (no FK relation) so
-  // dropping the fallback agent doesn't cascade-fail the binding.
-  rolloutPct      Int      @default(100)
-  fallbackAgentId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
