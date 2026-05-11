@@ -327,6 +327,7 @@ export interface Dictionary {
     create3dRunning: string;
     generateFailed: string;
     generateRetry: string;
+    generateSlaExceeded: string;
     viewerForging: string;
     assetReady: string;
     assetMissing: string;
@@ -394,6 +395,11 @@ export interface Dictionary {
     deploying: string;
     deploySuccess: string;
     deployFailed: string;
+    deployTakeoverTitle: string;
+    deployTakeoverBody: string;
+    deployTakeoverFromPrefix: string;
+    deployTakeoverLiveBadge: string;
+    deployTakeoverConfirm: string;
     deployedAt: string; // {{when}}
     deployStatusDraft: string;
     deployStatusDeployed: string;
@@ -434,6 +440,7 @@ export interface Dictionary {
     fieldAvatar: string;
     fieldDescriptionEn: string;
     fieldDescriptionZh: string;
+    fieldIntentScenes: string;
     fieldSkillsJson: string;
     fieldSkillsHelp: string;
     save: string;

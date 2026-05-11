@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { AgentRow, AgentStatus, AgentMode } from "../types";
+import type { AgentRow, AgentStatus, AgentMode, SerializableSceneDef, SceneBindingRow } from "../types";
 import AvatarCropModal from "./AvatarCropModal";
 import { themeAccent, themeClass } from "@/lib/agentControl/theme";
 
@@ -13,6 +13,12 @@ type Mode = "create" | "edit";
 type Props = {
   mode: Mode;
   initial: AgentRow | null;
+  // Scene catalog + current bindings — used by the "目标 Scene" multi-select
+  // to render available scenes and "已被 X 占用" hints. Conflicts aren't
+  // blocked here (multiple agents may claim the same scene during drafting);
+  // takeover happens at Deploy time.
+  sceneDefs: SerializableSceneDef[];
+  sceneBindings: SceneBindingRow[];
   onClose: () => void;
   onSaved: () => void;
 };
@@ -111,6 +117,87 @@ function ThemedDropdown({
   );
 }
 
+function SceneClaimList({
+  sceneDefs,
+  sceneBindings,
+  selected,
+  currentAgentId,
+  isMech,
+  onChange,
+}: {
+  sceneDefs: SerializableSceneDef[];
+  sceneBindings: SceneBindingRow[];
+  selected: string[];
+  currentAgentId: string | null;
+  isMech: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const ownerBySceneKey = useMemo(() => {
+    const m = new Map<string, { agentId: string; codename: string | null }>();
+    for (const b of sceneBindings) {
+      m.set(b.sceneKey, { agentId: b.agentId, codename: b.agentCodename });
+    }
+    return m;
+  }, [sceneBindings]);
+
+  function toggle(key: string) {
+    if (selected.includes(key)) onChange(selected.filter((k) => k !== key));
+    else onChange([...selected, key]);
+  }
+
+  const accentBorder = isMech ? "border-secondary/30" : "border-primary/30";
+  const accentText = isMech ? "text-secondary" : "text-primary";
+  const accentBg = isMech ? "bg-secondary/10" : "bg-primary/10";
+
+  if (sceneDefs.length === 0) {
+    return (
+      <p className="mt-1 text-xs text-on-surface-variant/70">
+        no scenes registered
+      </p>
+    );
+  }
+
+  return (
+    <div className={`mt-1 rounded-md border ${accentBorder} bg-surface-container/40 divide-y divide-outline-variant/20`}>
+      {sceneDefs.map((s) => {
+        const isOn = selected.includes(s.key);
+        const owner = ownerBySceneKey.get(s.key);
+        const ownedByOther = owner && owner.agentId !== currentAgentId;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => toggle(s.key)}
+            className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-container/70 ${isOn ? accentBg : ""}`}
+          >
+            <span
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isOn ? `${accentText} border-current` : "border-outline-variant"}`}
+              aria-hidden
+            >
+              {isOn ? <span className="material-symbols-outlined text-[14px] leading-none">check</span> : null}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="flex items-baseline gap-2 flex-wrap">
+                <span className={`text-sm ${isOn ? accentText : "text-on-surface"}`}>{s.label.zh || s.label.en}</span>
+                <span className="text-[10px] tracking-[0.2em] uppercase text-on-surface-variant/60">{s.key}</span>
+              </span>
+              {ownedByOther ? (
+                <span className="mt-0.5 block text-[11px] text-amber-300/80">
+                  已被 {owner!.codename ?? owner!.agentId} 占用 · Deploy 时将抢绑过来
+                </span>
+              ) : owner ? (
+                <span className="mt-0.5 block text-[11px] text-on-surface-variant/60">
+                  当前已绑定到本 agent
+                </span>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function blankFromInitial(initial: AgentRow | null) {
   return {
     codename: initial?.codename ?? "",
@@ -124,10 +211,11 @@ function blankFromInitial(initial: AgentRow | null) {
     avatarUrl: initial?.avatarUrl ?? "",
     descriptionEn: initial?.descriptionEn ?? "",
     descriptionZh: initial?.descriptionZh ?? "",
+    intentSceneKeys: initial?.intentSceneKeys ?? [],
   };
 }
 
-export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) {
+export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, onClose, onSaved }: Props) {
   const t = useT();
   const [values, setValues] = useState(() => blankFromInitial(initial));
   const [busy, setBusy] = useState(false);
@@ -239,6 +327,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
       avatarUrl: values.avatarUrl.trim(),
       descriptionEn: values.descriptionEn.trim() || null,
       descriptionZh: values.descriptionZh.trim() || null,
+      intentSceneKeys: values.intentSceneKeys,
     };
     if (mode === "create" && !body.codename) {
       setBusy(false);
@@ -427,6 +516,21 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
               <span className={labelCls}>{t.agentControl.fieldDescriptionZh}</span>
               <textarea className={textareaCls} value={values.descriptionZh} onChange={(e) => update("descriptionZh", e.target.value)} maxLength={4000} />
             </label>
+
+            {/* Scene-claim multi-select: drives BackboneFlowEditor's contract
+                hints during drafting, and is converted into real SceneBinding
+                rows at deploy time (with takeover from previous owners). */}
+            <div className="block sm:col-span-2">
+              <span className={labelCls}>{t.agentControl.fieldIntentScenes}</span>
+              <SceneClaimList
+                sceneDefs={sceneDefs}
+                sceneBindings={sceneBindings}
+                selected={values.intentSceneKeys}
+                currentAgentId={initial?.id ?? null}
+                isMech={isMech}
+                onChange={(next) => update("intentSceneKeys", next)}
+              />
+            </div>
 
             {/* Form actions inside right column, right-aligned */}
             <div className="sm:col-span-2 flex flex-wrap gap-3 pt-2 border-t border-outline-variant/30 justify-end">

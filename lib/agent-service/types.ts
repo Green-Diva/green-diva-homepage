@@ -58,6 +58,16 @@ export type SceneDefinition<
   // Tags used by the binding UI to filter agent candidates. An agent is
   // a candidate iff its declared capabilities ⊇ these.
   requiredCapabilities: string[];
+  // Business-level SLA for async scenes. The agent itself may keep
+  // running past this window (handler polling can be much longer); the
+  // SLA is what the *consumer* (e.g. the Relic detail page) shows the
+  // user — exceeding it surfaces as "agent didn't return in time" while
+  // a successful late writeback is still honored. No-op for sync scenes.
+  slaMs?: number;
+  // Async-only override for AgentJob.maxAttempts. Defaults to the schema
+  // default (3). Set to 1 for scenes where retrying re-submits an
+  // expensive external task (e.g. Meshy) and would just burn quota.
+  maxAttempts?: number;
 };
 
 // Type-level extractors so callers get full inference from sceneKey.

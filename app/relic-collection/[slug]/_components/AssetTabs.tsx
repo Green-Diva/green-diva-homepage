@@ -36,7 +36,12 @@ type Props = {
 
 type JobState =
   | { kind: "idle" }
-  | { kind: "running"; jobId: string; startedAt: number }
+  // slaMs is the per-scene "agent should be done within this window" budget.
+  // Once `now > startedAt + slaMs` we flip to `error` (kind: "sla-exceeded")
+  // even if the AgentJob is still RUNNING — the user gets a "didn't return
+  // in time" message + retry, the agent keeps polling in the background, and
+  // late writeback (if Meshy ever finishes) still updates the relic.
+  | { kind: "running"; jobId: string; startedAt: number; slaMs: number | null }
   | { kind: "error"; message: string };
 
 const POLL_MS = 3000;
@@ -96,8 +101,8 @@ export default function AssetTabs({
         const r = await fetch(`/api/relics/${relicId}/active-jobs`, { credentials: "include" });
         if (!r.ok || cancelled) return;
         const data = (await r.json()) as {
-          enhance: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null } | null;
-          model: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null } | null;
+          enhance: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null; slaMs: number | null } | null;
+          model: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null; slaMs: number | null } | null;
         };
         const restore = (
           j: typeof data.enhance,
@@ -105,11 +110,15 @@ export default function AssetTabs({
         ) => {
           if (!j) return;
           if (j.status === "RUNNING") {
-            setter({
-              kind: "running",
-              jobId: j.jobId,
-              startedAt: j.startedAt ? new Date(j.startedAt).getTime() : Date.now(),
-            });
+            const startedAt = j.startedAt ? new Date(j.startedAt).getTime() : Date.now();
+            // SLA already blown by the time we restored — surface as
+            // sla-exceeded immediately rather than briefly flashing the
+            // running spinner.
+            if (j.slaMs != null && Date.now() - startedAt > j.slaMs) {
+              setter({ kind: "error", message: t.relicCollection.generateSlaExceeded });
+              return;
+            }
+            setter({ kind: "running", jobId: j.jobId, startedAt, slaMs: j.slaMs });
           } else if (j.status === "FAILED" || j.status === "CANCELLED") {
             setter({ kind: "error", message: j.errorMessage ?? `job ${j.status.toLowerCase()}` });
           }
@@ -123,7 +132,7 @@ export default function AssetTabs({
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, relicId]);
+  }, [isAdmin, relicId, t]);
 
   // Polling driver — one effect handles whichever job is currently running.
   // Refs hold the latest state without resubscribing the effect every render.
@@ -165,6 +174,8 @@ export default function AssetTabs({
           status: string;
           mode?: string | null;
           errorMessage?: string | null;
+          startedAt?: string | null;
+          slaMs?: number | null;
         };
         if (data.status === "SUCCESS") {
           if (e.kind === "running" && e.jobId === running.jobId) setEnhanceJob({ kind: "idle" });
@@ -175,6 +186,18 @@ export default function AssetTabs({
         }
         if (data.status === "FAILED" || data.status === "CANCELLED") {
           const msg = data.errorMessage ?? `job ${data.status.toLowerCase()}`;
+          if (e.kind === "running" && e.jobId === running.jobId) setEnhanceJob({ kind: "error", message: msg });
+          if (m.kind === "running" && m.jobId === running.jobId) setModelJob({ kind: "error", message: msg });
+          return;
+        }
+        // SLA watchdog — agent is still RUNNING but business-level budget is
+        // gone. Trust scene.slaMs (from the API) over the stale value the
+        // running state was created with, so a config change takes effect
+        // without a refresh.
+        const slaMs = data.slaMs ?? running.slaMs;
+        const startedAt = data.startedAt ? new Date(data.startedAt).getTime() : running.startedAt;
+        if (slaMs != null && Date.now() - startedAt > slaMs) {
+          const msg = t.relicCollection.generateSlaExceeded;
           if (e.kind === "running" && e.jobId === running.jobId) setEnhanceJob({ kind: "error", message: msg });
           if (m.kind === "running" && m.jobId === running.jobId) setModelJob({ kind: "error", message: msg });
           return;
@@ -194,10 +217,12 @@ export default function AssetTabs({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [enhanceJob, modelJob, relicId, router]);
+  }, [enhanceJob, modelJob, relicId, router, t]);
 
   async function startEnhance() {
-    setEnhanceJob({ kind: "running", jobId: "...", startedAt: Date.now() });
+    // Optimistic placeholder — slaMs will be filled in from the first
+    // poll response, before any SLA check matters (POLL_MS=3s ≪ 3 min).
+    setEnhanceJob({ kind: "running", jobId: "...", startedAt: Date.now(), slaMs: null });
     try {
       const r = await fetch(`/api/relics/${relicId}/enhance-2d`, {
         method: "POST",
@@ -209,14 +234,14 @@ export default function AssetTabs({
         return;
       }
       const j = (await r.json()) as { jobId: string };
-      setEnhanceJob({ kind: "running", jobId: j.jobId, startedAt: Date.now() });
+      setEnhanceJob({ kind: "running", jobId: j.jobId, startedAt: Date.now(), slaMs: null });
     } catch (e) {
       setEnhanceJob({ kind: "error", message: e instanceof Error ? e.message : "request failed" });
     }
   }
 
   async function startCreate3d() {
-    setModelJob({ kind: "running", jobId: "...", startedAt: Date.now() });
+    setModelJob({ kind: "running", jobId: "...", startedAt: Date.now(), slaMs: null });
     try {
       const r = await fetch(`/api/relics/${relicId}/create-3d`, {
         method: "POST",
@@ -228,7 +253,7 @@ export default function AssetTabs({
         return;
       }
       const j = (await r.json()) as { jobId: string };
-      setModelJob({ kind: "running", jobId: j.jobId, startedAt: Date.now() });
+      setModelJob({ kind: "running", jobId: j.jobId, startedAt: Date.now(), slaMs: null });
     } catch (e) {
       setModelJob({ kind: "error", message: e instanceof Error ? e.message : "request failed" });
     }

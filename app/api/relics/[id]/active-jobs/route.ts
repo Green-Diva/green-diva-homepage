@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
+import "@/lib/scenes-init";
+import { getScene } from "@/lib/agent-service/registry";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -24,6 +26,11 @@ type JobSummary = {
   status: string;
   errorMessage: string | null;
   startedAt: string | null;
+  // Business-level SLA from the scene definition. Frontend treats
+  // `RUNNING` past this window as "agent didn't return in time" and
+  // shows the retry block. Late agent success still writes back via the
+  // runner hook, so the relic eventually picks up the asset on its own.
+  slaMs: number | null;
 };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
@@ -69,6 +76,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       status: r.status,
       errorMessage: r.errorMessage,
       startedAt: r.startedAt?.toISOString() ?? null,
+      slaMs: getScene(key)?.slaMs ?? null,
     };
   }
 

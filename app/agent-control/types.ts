@@ -41,6 +41,10 @@ export interface AgentRow {
   // so admin sees "what comes in from the bound module / what must go
   // back out". Empty array = agent unbound (free invocation only).
   boundScenes: BoundSceneSummary[];
+  // Draft-phase scene claims (non-exclusive). Multiple agents may declare
+  // intent over the same sceneKey. Deploy converts these into SceneBinding
+  // takeovers. Surfaced in AgentEditor's "目标 Scene" multi-select.
+  intentSceneKeys: string[];
   skills: AgentSkill[] | null;
   availableAp: number;
   createdAt: string;
@@ -130,6 +134,12 @@ export interface BoundSceneSummary {
   // input.mode), each scene's BEGIN/END only connects to the branch
   // its inputMap selects, not all leaves.
   inputMap: unknown;
+  // "binding" → real SceneBinding row exists (production-routable).
+  // "intent"  → draft-phase claim via Agent.intentSceneKeys only; no
+  //             traffic flows until the agent is deployed and the binding
+  //             is materialized. Rendered with a distinct style in
+  //             BackboneFlowEditor's BEGIN/END nodes.
+  via: "binding" | "intent";
 }
 
 // Compact agent reference for the scene-binding agent picker (no

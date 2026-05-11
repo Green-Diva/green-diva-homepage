@@ -269,6 +269,10 @@ export const agentCreateSchema = z.object({
   dispatcherConfig: dispatcherConfigSchema.optional(),
   skills: z.array(agentSkillSchema).max(12).optional().nullable(),
   availableAp: z.number().int().min(0).max(999).optional(),
+  // Draft-phase scene claims. Non-exclusive: multiple agents may declare
+  // intent over the same sceneKey. The deploy endpoint converts these
+  // into SceneBinding takeovers when the agent is deployed.
+  intentSceneKeys: z.array(z.string().min(1).max(120)).max(20).optional(),
 });
 
 // Update schema relaxes avatarUrl back to optional — we don't want

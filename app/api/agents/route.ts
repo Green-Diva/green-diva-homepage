@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
               : (data.dispatcherConfig as Prisma.InputJsonValue),
           skills: (data.skills ?? undefined) as Prisma.InputJsonValue | undefined,
           availableAp: data.availableAp ?? 0,
+          intentSceneKeys: data.intentSceneKeys ?? [],
           createdById: me.id,
         },
       });

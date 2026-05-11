@@ -14,6 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ADMIN_LEVEL, getCurrentUser } from "@/lib/auth";
 import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
+import "@/lib/scenes-init";
+import { getScene } from "@/lib/agent-service/registry";
 
 type Ctx = { params: Promise<{ id: string; jobId: string }> };
 
@@ -42,6 +44,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       id: true,
       agentId: true,
       status: true,
+      sceneKey: true,
       input: true,
       output: true,
       runLog: true,
@@ -74,5 +77,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     finishedAt: job.finishedAt,
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,
+    // Business-level SLA from scene definition. Frontend treats RUNNING
+    // past `startedAt + slaMs` as "agent didn't return in time" so the
+    // user isn't stuck staring at a spinner indefinitely. Late writeback
+    // (agent eventually succeeds) is still honored.
+    slaMs: job.sceneKey ? getScene(job.sceneKey)?.slaMs ?? null : null,
   });
 }

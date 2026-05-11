@@ -153,6 +153,13 @@ export async function dispatchScene(
         input: jsonOrNull(resolved.agentInput),
         status: "PENDING",
         sceneKey,
+        // Per-scene retry override (scene.maxAttempts in lib/relics/scenes.ts).
+        // Omit → Prisma schema default (3) applies. Set to 1 for scenes
+        // that submit expensive external tasks (Meshy) — retry would
+        // just burn quota without helping the in-flight task complete.
+        ...(resolved.scene.maxAttempts !== undefined
+          ? { maxAttempts: resolved.scene.maxAttempts }
+          : {}),
       },
       select: { id: true, status: true, createdAt: true },
     });

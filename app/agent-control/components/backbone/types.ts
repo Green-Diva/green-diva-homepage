@@ -80,6 +80,9 @@ export type BeginNodeData = {
   sceneLabel: string;
   invocation: "sync" | "async";
   fields: BeginEndFieldHint[];
+  // "binding" = production-routable SceneBinding row exists.
+  // "intent"  = draft-phase claim only; deploy will materialize.
+  via: "binding" | "intent";
 };
 
 export type EndNodeData = {
@@ -88,6 +91,7 @@ export type EndNodeData = {
   sceneLabel: string;
   invocation: "sync" | "async";
   fields: BeginEndFieldHint[];
+  via: "binding" | "intent";
 };
 
 export type AgentBoundaryData = {

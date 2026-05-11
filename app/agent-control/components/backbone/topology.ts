@@ -147,6 +147,7 @@ export function buildIoNodes(
         sceneLabel,
         invocation: s.invocation,
         fields: s.contextFields,
+        via: s.via,
       } as unknown as NodeData,
     });
     out.push({
@@ -160,6 +161,7 @@ export function buildIoNodes(
         sceneLabel,
         invocation: s.invocation,
         fields: s.outputFields,
+        via: s.via,
       } as unknown as NodeData,
     });
   });

@@ -28,6 +28,11 @@ export default function AgentListItem({
   const status = STATUS_STYLES[agent.status];
   const label = t.agentControl[status.label] as string;
   const mode = MODE_ICON[agent.mode ?? "MECHANICAL"];
+  // Brightness is gated on deploy status, not on selection. Drafts stay
+  // dim (grayscale avatar, muted border) so admin can scan production
+  // agents at a glance. Selection is signaled by the right-edge bar +
+  // subtle bg tint regardless of deploy state.
+  const lit = !!agent.deployedAt;
 
   return (
     <button
@@ -36,9 +41,12 @@ export default function AgentListItem({
       aria-pressed={active}
       className={[
         "group w-full text-left rounded-md border transition-all min-h-[60px] px-3 py-2 flex items-center gap-3 relative overflow-hidden",
+        lit
+          ? "border-primary/60 hover:border-primary/80"
+          : "border-primary/10 hover:border-primary/30 touch:border-primary/30",
         active
-          ? "border-primary/60 bg-primary/[0.07]"
-          : "border-primary/10 bg-surface-container/40 hover:border-primary/30 hover:bg-primary/[0.04] touch:border-primary/30 touch:bg-primary/[0.04]",
+          ? "bg-primary/[0.07]"
+          : "bg-surface-container/40 hover:bg-primary/[0.04] touch:bg-primary/[0.04]",
       ].join(" ")}
     >
       {active ? (
@@ -54,14 +62,14 @@ export default function AgentListItem({
             decoding="async"
             className={[
               "w-11 h-11 rounded-full object-cover border",
-              active ? "border-primary" : "border-outline-variant grayscale group-hover:grayscale-0",
+              lit ? "border-primary" : "border-outline-variant grayscale group-hover:grayscale-0",
             ].join(" ")}
           />
         ) : (
           <div
             className={[
               "w-11 h-11 rounded-full border flex items-center justify-center bg-surface-container",
-              active ? "border-primary text-primary" : "border-outline-variant text-outline",
+              lit ? "border-primary text-primary" : "border-outline-variant text-outline",
             ].join(" ")}
             aria-hidden
           >
@@ -74,7 +82,7 @@ export default function AgentListItem({
         />
       </div>
       <div className="min-w-0 flex-1">
-        <div className={`font-label text-[11px] tracking-[0.2em] flex items-center gap-1.5 ${active ? "text-primary" : "text-on-surface"}`}>
+        <div className={`font-label text-[11px] tracking-[0.2em] flex items-center gap-1.5 ${lit ? "text-primary" : "text-on-surface"}`}>
           <span
             aria-hidden
             className={`material-symbols-outlined text-[11px] leading-none ${themeClass(agent.mode ?? "MECHANICAL", "text")}`}

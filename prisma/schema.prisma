@@ -392,6 +392,13 @@ model Agent {
   // valid candidates for a given scene (an agent matches iff its tags ⊇
   // the scene's requiredCapabilities). Hand-curated by admin.
   capabilities     String[]             @default([])
+  // Draft-phase scene claims. Multiple agents may claim the same sceneKey
+  // here — exclusivity is only enforced at Deploy time, when the deploy
+  // endpoint upserts the corresponding SceneBinding row (which IS unique
+  // on sceneKey) and takes over from whichever agent previously owned it.
+  // The BackboneFlowEditor reads this alongside SceneBinding to surface
+  // scene-contract hints even before the agent is deployed.
+  intentSceneKeys  String[]             @default([])
   skills           Json?
   skillEquips      AgentSkillEquip[]
   agentJobs        AgentJob[]

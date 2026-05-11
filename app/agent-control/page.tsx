@@ -74,11 +74,35 @@ export default async function AgentControlPage() {
         contextFields: def.contextFields,
         outputFields: def.outputFields,
         inputMap: b.inputMap,
+        via: "binding",
       });
       return acc;
     },
     {},
   );
+
+  // Merge in draft-phase intent claims that haven't been deployed yet.
+  // Intent + binding for the same scene de-dupes to the binding entry
+  // (binding is more authoritative — admin has filled inputMap).
+  for (const a of agents) {
+    const list = (boundScenesByAgentId[a.id] ??= []);
+    const haveKeys = new Set(list.map((s) => s.sceneKey));
+    for (const sceneKey of a.intentSceneKeys) {
+      if (haveKeys.has(sceneKey)) continue;
+      const def = sceneBySceneKey.get(sceneKey);
+      if (!def) continue;
+      list.push({
+        sceneKey,
+        module: def.module,
+        invocation: def.invocation,
+        label: def.label,
+        contextFields: def.contextFields,
+        outputFields: def.outputFields,
+        inputMap: null,
+        via: "intent",
+      });
+    }
+  }
 
   const rows: AgentRow[] = agents.map((a) => ({
     id: a.id,
@@ -107,6 +131,7 @@ export default async function AgentControlPage() {
     updatedAt: a.updatedAt.toISOString(),
     createdBy: a.createdBy,
     boundScenes: boundScenesByAgentId[a.id] ?? [],
+    intentSceneKeys: a.intentSceneKeys,
   }));
 
   // Helpers cast Prisma's loose JsonValue to the concrete shape SkillRow expects.

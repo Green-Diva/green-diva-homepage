@@ -44,10 +44,11 @@ function FieldRows({ fields, accent }: { fields: BeginEndFieldHint[]; accent: st
 export function BeginNodeView({ data }: NodeProps<FlowNode>) {
   const d = data as unknown as BeginNodeData;
   const accent = "rgb(96 165 250)"; // sky-400 — distinct from skill/branch/loop/forEach/transform colors
+  const intent = d.via === "intent";
   return (
     <div
       className="min-w-[220px] max-w-[260px] px-3 py-2 rounded-md bg-sky-500/[0.08] shadow-md border-2 border-dashed"
-      style={{ borderColor: accent }}
+      style={{ borderColor: accent, opacity: intent ? 0.7 : 1 }}
     >
       <div
         className="font-label text-[9px] tracking-[0.25em] uppercase mb-1 flex items-center gap-1.5"
@@ -55,6 +56,11 @@ export function BeginNodeView({ data }: NodeProps<FlowNode>) {
       >
         <span>▶ BEGIN</span>
         <span className="text-[8px] tracking-[0.2em] opacity-70">{d.invocation}</span>
+        {intent ? (
+          <span className="text-[8px] tracking-[0.2em] text-amber-300/90 border border-amber-300/40 px-1 rounded">
+            INTENT
+          </span>
+        ) : null}
       </div>
       <div className="text-[11px] font-mono text-on-surface mb-0.5">{d.sceneKey}</div>
       <div className="text-[10px] text-on-surface-variant mb-1.5 truncate">{d.sceneLabel}</div>
@@ -75,10 +81,11 @@ export function BeginNodeView({ data }: NodeProps<FlowNode>) {
 export function EndNodeView({ data }: NodeProps<FlowNode>) {
   const d = data as unknown as EndNodeData;
   const accent = "rgb(244 114 182)"; // pink-400 — distinct
+  const intent = d.via === "intent";
   return (
     <div
       className="min-w-[220px] max-w-[260px] px-3 py-2 rounded-md bg-pink-500/[0.08] shadow-md border-2 border-dashed"
-      style={{ borderColor: accent }}
+      style={{ borderColor: accent, opacity: intent ? 0.7 : 1 }}
     >
       <Handle
         type="target"
@@ -92,6 +99,11 @@ export function EndNodeView({ data }: NodeProps<FlowNode>) {
       >
         <span>■ END</span>
         <span className="text-[8px] tracking-[0.2em] opacity-70">contract</span>
+        {intent ? (
+          <span className="text-[8px] tracking-[0.2em] text-amber-300/90 border border-amber-300/40 px-1 rounded">
+            INTENT
+          </span>
+        ) : null}
       </div>
       <div className="text-[11px] font-mono text-on-surface mb-0.5">{d.sceneKey}</div>
       <div className="text-[10px] text-on-surface-variant mb-1.5 truncate">{d.sceneLabel}</div>

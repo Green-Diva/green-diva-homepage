@@ -230,6 +230,9 @@ export const relicEnhance2dScene = registerScene({
     .passthrough(),
   invocation: "async",
   requiredCapabilities: ["image-cutout"],
+  // 3 min SLA — fal.ai BiRefNet typically returns in <30s; anything
+  // past 3 min means the API is degraded.
+  slaMs: 180_000,
 });
 
 // — relic.create3d —
@@ -286,4 +289,12 @@ export const relicCreate3dScene = registerScene({
     .passthrough(),
   invocation: "async",
   requiredCapabilities: ["model-3d-generation"],
+  // 20 min SLA — Meshy usually returns in 3-10 min, but HD textures
+  // can stretch to 15+. Beyond 20 min it's a queue/API problem the
+  // user shouldn't have to wait through.
+  slaMs: 1_200_000,
+  // No retry — re-running submits a brand new (paid) Meshy task and
+  // discards whatever the previous attempt was doing. Late success
+  // from the original attempt still writes back via the runner hook.
+  maxAttempts: 1,
 });

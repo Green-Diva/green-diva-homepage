@@ -256,6 +256,8 @@ export default function AgentClient({
           key={editor.initial?.id ?? "new"}
           mode={editor.mode}
           initial={editor.initial}
+          sceneDefs={sceneDefs}
+          sceneBindings={sceneBindings}
           onClose={() => setEditor((s) => ({ ...s, open: false }))}
           onSaved={onSaved}
         />

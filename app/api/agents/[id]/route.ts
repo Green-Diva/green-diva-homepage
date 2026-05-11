@@ -42,6 +42,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if ("skills" in data && data.skills === null) {
     delete data.skills;
   }
+  // Prisma scalar-list update requires `{ set: [...] }` shape.
+  if (Array.isArray(parsed.data.intentSceneKeys)) {
+    data.intentSceneKeys = { set: parsed.data.intentSceneKeys };
+  }
 
   try {
     const updated = await prisma.agent.update({
