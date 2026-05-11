@@ -9,15 +9,21 @@
 //   4. agent exists & deployed?
 //   5. applyTemplate(binding.inputMap, {ctx, actor}) → agentInput
 //   6a. dispatchScene: prisma.agentJob.create + void runAgentJob → {jobId}
+//                       (runner validates leaf output against scene.outputSchema)
 //   6b. callScene: invokeAgent inline (timeout-bounded) →
-//                  apply binding.outputMap → outputSchema validate → result
+//                  scene.outputSchema validate → result
+//
+// 2026-05-11 — SceneBinding.outputMap retired. Each agent's leaf node
+// must produce scene-shape output directly (typically via a tail
+// `transform` JSONata node). See scenebinding-outputmap-peaceful-token
+// plan in /Users/lixinhan/.claude/plans/.
 
 import "server-only";
 import { Prisma, type AgentJobStatus, type AgentMode } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ensureServerInit } from "@/lib/server-init";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
-import { invokeAgent, type AgentRunLogEntry } from "@/lib/agents/invoke";
+import { executeAgent, type AgentRunLogEntry } from "@/lib/agents/invoke";
 import { requireScene } from "./registry";
 import { applyTemplate } from "./template";
 import {
@@ -39,7 +45,6 @@ type ResolvedBinding = {
   scene: AnySceneDefinition;
   agent: { id: string; codename: string; mode: AgentMode; deployedAt: Date | null };
   inputMap: unknown;
-  outputMap: unknown;
   agentInput: unknown;
   ctxResolved: unknown;
   actor: SceneActor | null;
@@ -115,7 +120,6 @@ async function resolveBinding(
     scene,
     agent,
     inputMap: binding.inputMap,
-    outputMap: binding.outputMap,
     agentInput,
     ctxResolved: ctxResult.data,
     actor,
@@ -221,7 +225,7 @@ export async function callScene<T = unknown>(
         status: "FAILED",
         errorCode: "AGENT_MISSING",
         errorMessage: "agent vanished between binding and call",
-        endedAt: new Date(),
+        finishedAt: new Date(),
       },
     });
     return {
@@ -241,7 +245,7 @@ export async function callScene<T = unknown>(
     timer = setTimeout(() => resolve({ __timeout: true }), timeoutMs);
   });
   const raced = await Promise.race([
-    invokeAgent({
+    executeAgent({
       agent: fullAgent,
       mode: resolved.agent.mode,
       input: resolved.agentInput,
@@ -258,7 +262,7 @@ export async function callScene<T = unknown>(
         status: "FAILED",
         errorCode: "TIMEOUT",
         errorMessage: `sync call exceeded ${timeoutMs}ms`,
-        endedAt: new Date(),
+        finishedAt: new Date(),
       },
     });
     return {
@@ -277,7 +281,7 @@ export async function callScene<T = unknown>(
         errorCode: raced.errorCode,
         errorMessage: raced.errorMessage.slice(0, 1000),
         runLog: raced.runLog as unknown as Prisma.InputJsonValue,
-        endedAt: new Date(),
+        finishedAt: new Date(),
       },
     });
     return {
@@ -289,56 +293,11 @@ export async function callScene<T = unknown>(
     };
   }
 
-  // Optional outputMap rewriting before schema validation. Lets admin
-  // reshape agent output without changing the agent itself. The template
-  // scope exposes:
-  //   - output       : the agent's leaf output (mode-router last node)
-  //   - runLog       : full runLog array
-  //   - runLog.byId  : keyed by node id for direct {{runLog.byId.<id>.output}}
-  //                    lookups — saves callers from indexing by position
-  //   - ctx, actor   : the original scene call's caller context / identity
-  const runLogArr = Array.isArray(raced.runLog) ? raced.runLog : [];
-  const byId: Record<string, unknown> = {};
-  for (const entry of runLogArr) {
-    if (entry && typeof entry === "object" && "stepId" in entry) {
-      const e = entry as Record<string, unknown>;
-      const id = typeof e.stepId === "string" ? e.stepId : null;
-      if (id) byId[id] = e;
-    }
-  }
-  let mappedOutput: unknown = raced.output;
-  if (resolved.outputMap !== null && resolved.outputMap !== undefined) {
-    try {
-      mappedOutput = applyTemplate(resolved.outputMap, {
-        output: raced.output,
-        runLog: { entries: runLogArr, byId },
-        ctx: resolved.ctxResolved,
-        actor: resolved.actor,
-      } as Record<string, unknown>);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      await prisma.agentJob.update({
-        where: { id: job.id },
-        data: {
-          status: "FAILED",
-          errorCode: "TEMPLATE_ERROR",
-          errorMessage: message.slice(0, 1000),
-          output: jsonOrNull(raced.output),
-          runLog: raced.runLog as unknown as Prisma.InputJsonValue,
-          endedAt: new Date(),
-        },
-      });
-      return {
-        ok: false,
-        jobId: job.id,
-        errorCode: "TEMPLATE_ERROR",
-        errorMessage: `outputMap failed: ${message}`,
-        runLog: raced.runLog,
-      };
-    }
-  }
-
-  const outResult = resolved.scene.outputSchema.safeParse(mappedOutput);
+  // Direct schema validation — agent's leaf node IS the contract surface.
+  // No DB-side reshape; if the agent's tail output doesn't match the
+  // scene's outputSchema, the agent itself needs a tail `transform` node
+  // to fix it (admin edits in BackboneFlowEditor).
+  const outResult = resolved.scene.outputSchema.safeParse(raced.output);
   if (!outResult.success) {
     const detail = outResult.error.issues
       .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
@@ -347,18 +306,18 @@ export async function callScene<T = unknown>(
       where: { id: job.id },
       data: {
         status: "FAILED",
-        errorCode: "OUTPUT_INVALID",
+        errorCode: "SCENE_OUTPUT_INVALID",
         errorMessage: detail.slice(0, 1000),
-        output: jsonOrNull(mappedOutput),
+        output: jsonOrNull(raced.output),
         runLog: raced.runLog as unknown as Prisma.InputJsonValue,
-        endedAt: new Date(),
+        finishedAt: new Date(),
       },
     });
     return {
       ok: false,
       jobId: job.id,
-      errorCode: "OUTPUT_INVALID",
-      errorMessage: `agent output didn't match scene outputSchema: ${detail}`,
+      errorCode: "SCENE_OUTPUT_INVALID",
+      errorMessage: `agent leaf output didn't match scene "${sceneKey}" outputSchema: ${detail}`,
       runLog: raced.runLog,
     };
   }
@@ -369,7 +328,7 @@ export async function callScene<T = unknown>(
       status: "SUCCESS",
       output: jsonOrNull(outResult.data),
       runLog: raced.runLog as unknown as Prisma.InputJsonValue,
-      endedAt: new Date(),
+      finishedAt: new Date(),
     },
   });
 

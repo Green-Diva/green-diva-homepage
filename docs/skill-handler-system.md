@@ -2,6 +2,8 @@
 
 > **状态**：2026-05-07 创建。Phase 1 ✅、Phase 2 ✅、Phase 3 ✅、Phase 4 ✅ 已完成。Phase 5 远期。
 > **范围**：把 `/agent-control` 从"装备 UI 占位"演进为可调用 runtime——skill 真能调外部 API、agent 真能编排 skill。
+>
+> **运行时 pattern 参考**：本文档是历史规划。日常实战看 [docs/canonical-dags/](./canonical-dags/) (3 个最小可运行 DAG 示例) + [docs/pipeline-input-pattern.md](./pipeline-input-pattern.md) (IO 放哪里规则) + [docs/smoke-checklist.md](./smoke-checklist.md) (出问题怎么定位)。INTERNAL handler 已于 2026-05-11 退场，下面 Phase 1-5 中关于 INTERNAL 的描述仅作历史保留。
 
 ---
 
@@ -95,13 +97,13 @@
 {
   "version": 1,
   "steps": [
-    { "id": "s1", "equipSlot": 0, "inputMapping": { "from": "agent.input" } },
-    { "id": "s2", "equipSlot": 2, "inputMapping": { "from": "s1.output" } }
+    { "id": "s1", "slotIndex": 0, "inputMapping": { "from": "agent.input" } },
+    { "id": "s2", "slotIndex": 2, "inputMapping": { "from": "s1.output" } }
   ]
 }
 ```
 
-> `equipSlot` 而非 `skillId`：换装时 pipeline 不会 dangling。
+> `slotIndex` 而非 `skillId`：换装时 pipeline 不会 dangling。
 
 **`Agent.dispatcherConfig`（AUTONOMOUS）**：
 ```json

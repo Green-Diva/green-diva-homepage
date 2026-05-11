@@ -33,6 +33,7 @@ import path from "node:path";
 import { internalSaveAssetSchema } from "@/lib/validators";
 import { verifyInternalServiceToken, INTERNAL_TOKEN_HEADER } from "@/lib/internal-token";
 import { RELIC_STORAGE_ROOT, ensureStorageRoot, inferContentType } from "@/lib/relicStorage";
+import { respondError, respondValidationError } from "@/lib/api-error";
 
 // Map common content-types back to file extensions when admin omits ext.
 // Falls back to ".bin" for unknown types so we never write extension-less
@@ -63,27 +64,24 @@ function extFromContentType(ct: string | undefined | null): string {
 export async function POST(req: NextRequest) {
   const tokenHeader = req.headers.get(INTERNAL_TOKEN_HEADER);
   if (!verifyInternalServiceToken(tokenHeader)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return respondError("AUTH_REQUIRED", "unauthorized", 401);
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    return respondError("INVALID_JSON", "invalid JSON body", 400);
   }
 
   const parsed = internalSaveAssetSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error:
-          "invalid body: " +
-          parsed.error.issues
-            .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-            .join("; "),
-      },
-      { status: 400 },
+    return respondValidationError(
+      parsed.error.flatten(),
+      "invalid body: " +
+        parsed.error.issues
+          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+          .join("; "),
     );
   }
 
@@ -94,13 +92,14 @@ export async function POST(req: NextRequest) {
   try {
     buf = Buffer.from(base64, "base64");
   } catch (e) {
-    return NextResponse.json(
-      { error: `invalid base64: ${e instanceof Error ? e.message : "decode failed"}` },
-      { status: 400 },
+    return respondError(
+      "BASE64_INVALID",
+      `invalid base64: ${e instanceof Error ? e.message : "decode failed"}`,
+      400,
     );
   }
   if (buf.byteLength === 0) {
-    return NextResponse.json({ error: "decoded buffer is empty" }, { status: 400 });
+    return respondError("BUFFER_EMPTY", "decoded buffer is empty", 400);
   }
 
   // private/relics/<slug>/derived/<kind>-<ts>.<ext>
@@ -114,7 +113,7 @@ export async function POST(req: NextRequest) {
   // but verify the resolved path stays inside RELIC_STORAGE_ROOT.
   const root = path.resolve(RELIC_STORAGE_ROOT);
   if (!path.resolve(absPath).startsWith(root + path.sep)) {
-    return NextResponse.json({ error: "path traversal blocked" }, { status: 400 });
+    return respondError("PATH_TRAVERSAL_BLOCKED", "path traversal blocked", 400);
   }
 
   try {
@@ -123,7 +122,7 @@ export async function POST(req: NextRequest) {
     await fs.writeFile(absPath, buf);
   } catch (e) {
     console.error("[api/internal/save-asset] write failed", e);
-    return NextResponse.json({ error: "write failed" }, { status: 500 });
+    return respondError("WRITE_FAILED", "write failed", 500);
   }
 
   // Return the relative path in the same format Relic.enhancedImagePath /

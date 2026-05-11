@@ -1,6 +1,8 @@
 // Shared types for the skill handler/invoke layer. Imported by
 // handlers, registry, invoke, and (later) Backbone/Orchestrator runtimes.
 
+import { AgentErrorCode } from "@/lib/agent-errors";
+
 export type SkillHandler = (
   input: unknown,
   config: Record<string, unknown>,
@@ -13,12 +15,12 @@ export type HandlerContext = {
 };
 
 export type HandlerErrorCode =
-  | "MISSING_ENV"
-  | "INVALID_CONFIG"
-  | "HTTP_ERROR"
-  | "TIMEOUT"
-  | "PROVIDER_ERROR"
-  | "OUTPUT_PARSE";
+  | typeof AgentErrorCode.MISSING_ENV
+  | typeof AgentErrorCode.INVALID_CONFIG
+  | typeof AgentErrorCode.HTTP_ERROR
+  | typeof AgentErrorCode.TIMEOUT
+  | typeof AgentErrorCode.PROVIDER_ERROR
+  | typeof AgentErrorCode.OUTPUT_PARSE;
 
 export class HandlerError extends Error {
   readonly code: HandlerErrorCode;

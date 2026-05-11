@@ -1,8 +1,13 @@
 "use client";
 
 // Edit one SceneBinding row: pick which agent satisfies it, customize
-// inputMap / outputMap, toggle enabled, write notes, and dry-run with a
-// sample ctx — all without touching code.
+// inputMap, toggle enabled, write notes, and dry-run with a sample ctx —
+// all without touching code.
+//
+// Output shape: NOT editable here. The scene's outputSchema (declared
+// in code) is the contract; the bound agent must produce that shape via
+// its tail node. The Scene contract panel below is read-only and shows
+// the schema fields admin needs to satisfy.
 //
 // Structure mirrors SkillEditor: portal-mounted full-screen overlay,
 // ESC + body overflow lock, single Save button posting to PATCH
@@ -64,9 +69,6 @@ export default function SceneBindingEditor({
 
   const [agentId, setAgentId] = useState<string>(binding?.agentId ?? "");
   const [inputMapText, setInputMapText] = useState<string>(pretty(binding?.inputMap ?? {}));
-  const [outputMapText, setOutputMapText] = useState<string>(
-    binding?.outputMap == null ? "" : pretty(binding.outputMap),
-  );
   const [enabled, setEnabled] = useState<boolean>(binding?.enabled ?? true);
   const [notes, setNotes] = useState<string>(binding?.notes ?? "");
 
@@ -118,12 +120,9 @@ export default function SceneBindingEditor({
   }, [agentId, agents, candidateAgents]);
 
   const inputMapParsed = useMemo(() => parseJson(inputMapText), [inputMapText]);
-  const outputMapParsed = useMemo(() => parseJson(outputMapText), [outputMapText]);
 
   const inputMapInvalid = !inputMapParsed.ok;
-  const outputMapInvalid = !outputMapParsed.ok;
-  const canSave =
-    !!agentId && !inputMapInvalid && !outputMapInvalid && !busy;
+  const canSave = !!agentId && !inputMapInvalid && !busy;
 
   async function handleSave() {
     if (!canSave) return;
@@ -136,7 +135,6 @@ export default function SceneBindingEditor({
         body: JSON.stringify({
           agentId,
           inputMap: (inputMapParsed as { ok: true; value: unknown }).value,
-          outputMap: (outputMapParsed as { ok: true; value: unknown }).value,
           enabled,
           notes: notes.trim() || null,
         }),
@@ -215,7 +213,7 @@ export default function SceneBindingEditor({
           </button>
         </header>
 
-        {/* Schema reference */}
+        {/* Schema reference — context (caller input) + output (agent contract) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
           <FieldList
             title={t.agentControl.sceneEditorContextFields}
@@ -224,8 +222,16 @@ export default function SceneBindingEditor({
           <FieldList
             title={t.agentControl.sceneEditorOutputFields}
             fields={scene.outputFields}
+            badge="contract"
           />
         </div>
+        <p className="text-[11px] text-on-surface-variant -mt-3">
+          📐 The output column is the scene contract — declared in code, not
+          editable here. The bound agent&apos;s leaf node must produce this
+          shape (typically via a tail{" "}
+          <code className="text-primary">transform</code> node in the
+          BackboneFlowEditor).
+        </p>
 
         {/* Agent picker */}
         <section className="space-y-2">
@@ -272,18 +278,6 @@ export default function SceneBindingEditor({
           invalid={inputMapInvalid}
           invalidLabel={t.agentControl.sceneEditorJsonInvalid}
           rows={8}
-          disabled={busy}
-        />
-
-        {/* Output Map */}
-        <JsonField
-          label={t.agentControl.sceneEditorOutputMap}
-          hint={t.agentControl.sceneEditorOutputMapHint}
-          value={outputMapText}
-          onChange={setOutputMapText}
-          invalid={outputMapInvalid}
-          invalidLabel={t.agentControl.sceneEditorJsonInvalid}
-          rows={5}
           disabled={busy}
         />
 
@@ -445,14 +439,23 @@ function JsonField({
 function FieldList({
   title,
   fields,
+  badge,
 }: {
   title: string;
   fields: { name: string; type: string; optional: boolean }[];
+  badge?: string;
 }) {
   return (
     <div className="rounded border border-primary/15 bg-primary/[0.03] p-2.5 space-y-1.5">
-      <div className="font-label text-[9px] tracking-[0.3em] uppercase text-on-surface-variant">
-        {title}
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-label text-[9px] tracking-[0.3em] uppercase text-on-surface-variant">
+          {title}
+        </div>
+        {badge ? (
+          <span className="font-label text-[9px] tracking-[0.2em] uppercase text-secondary border border-secondary/40 rounded px-1.5 py-0.5">
+            {badge}
+          </span>
+        ) : null}
       </div>
       {fields.length === 0 ? (
         <div className="text-[11px] text-on-surface-variant italic">unknown</div>

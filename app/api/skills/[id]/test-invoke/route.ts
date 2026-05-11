@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { skillTestInvokeSchema } from "@/lib/validators";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 import { invokeSkill } from "@/lib/skills/invoke";
 
 type Params = { params: Promise<{ id: string }> };
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -27,11 +28,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const json = await req.json().catch(() => null);
   const parsed = skillTestInvokeSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
 
   const skill = await prisma.skill.findUnique({ where: { id } });
-  if (!skill) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!skill) return respondError("NOT_FOUND", "not found", 404);
 
   const startedAt = Date.now();
   const result = await invokeSkill(skill, parsed.data.input);

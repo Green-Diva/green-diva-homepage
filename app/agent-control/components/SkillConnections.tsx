@@ -2,6 +2,7 @@
 
 import type { AgentMode, EquipRow } from "../types";
 import type { CentralPos, SlotPos } from "@/lib/agentControl/slotPositions";
+import { MECH_HEX, AGENT_HEX } from "@/lib/agentControl/theme";
 
 // Connection state: skill equipped + ONLINE → mode accent color;
 // equipped + OFFLINE → gray; empty slot → gray.
@@ -9,12 +10,12 @@ type ConnectionStatus = "online" | "offline" | "empty";
 
 const STATUS_COLORS: Record<AgentMode, Record<ConnectionStatus, string>> = {
   MECHANICAL: {
-    online: "#E9C176",
+    online: MECH_HEX,
     offline: "rgba(180,180,180,0.45)",
     empty: "rgba(180,180,180,0.18)",
   },
   AUTONOMOUS: {
-    online: "#90DECD",
+    online: AGENT_HEX,
     offline: "rgba(180,180,180,0.45)",
     empty: "rgba(180,180,180,0.18)",
   },

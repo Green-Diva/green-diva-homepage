@@ -34,6 +34,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenerativeAI, type Part as GeminiPart } from "@google/generative-ai";
 import { HandlerError, type SkillHandler } from "../types";
+import { applyTemplate as applySharedTemplate } from "@/lib/agent-service/template";
 
 const MAX_IMAGES = 8;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB per image
@@ -61,12 +62,15 @@ function getPath(obj: unknown, path: string): unknown {
   return cur;
 }
 
+// Shared engine (lib/agent-service/template.ts) is the single source of
+// truth. systemPrompt / userTemplate are always string→string here, so
+// we coerce the result (shared engine may return raw type for whole-
+// value `{{x}}` matches).
 function applyTemplate(template: string, input: unknown): string {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_.[\]]+)\s*\}\}/g, (_m, path: string) => {
-    const v = getPath(input, path);
-    if (v === undefined || v === null) return "";
-    return typeof v === "string" ? v : JSON.stringify(v);
-  });
+  const out = applySharedTemplate(template, (input ?? {}) as Record<string, unknown>);
+  if (typeof out === "string") return out;
+  if (out == null) return "";
+  return typeof out === "object" ? JSON.stringify(out) : String(out);
 }
 
 // Provider-agnostic image carrier. Each provider's call function turns

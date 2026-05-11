@@ -102,28 +102,44 @@ const SKILL_SAVE_ASSET = {
       base64: "{{downloadBase64}}",
       contentType: "{{downloadContentType}}",
     },
+    // Skill stays a pure IO operation — emits raw save result only.
+    // The agent's tail `shape-output` transform composes the
+    // `_relicWriteback` envelope (clean separation: skill = atomic IO,
+    // agent = wrapping / contract shaping).
     responseTransform: {
       savedPath: "{{response.savedPath}}",
       bytes: "{{response.bytes}}",
-      _relicWriteback: {
-        id: "{{input.relicId}}",
-        fields: {
-          modelPath: "{{response.savedPath}}",
-        },
-      },
     },
   } as Prisma.InputJsonValue,
 };
 
-// MESHY-FORGE-001 backbone DAG (v2 final): 2-node linear chain.
-//   agent.input.imageDataUri → meshy-3d → save
+// MESHY-FORGE-001 backbone DAG (v2 final): 2-skill chain + tail transform.
+//   agent.input.imageDataUri → meshy-3d → save → shape-output
+//
+// shape-output composes BOTH the scene-contract fields
+// ({ modelPath, taskId, previewImageUrl }) AND the runner writeback
+// envelope (`_relicWriteback`). The save skill stays a pure IO call;
+// agent owns the wrapping. Pulls relicId from agent.input so the
+// transform can build _relicWriteback.id without the skill knowing.
+const SHAPE_OUTPUT_EXPRESSION = `{
+  "modelPath": save.savedPath,
+  "taskId": meshy.taskId,
+  "previewImageUrl": meshy.previewImageUrl,
+  "_relicWriteback": {
+    "id": relicId,
+    "fields": {
+      "modelPath": save.savedPath
+    }
+  }
+}`;
+
 const FORGE_PIPELINE = {
   version: 2 as const,
   nodes: [
     {
       id: "meshy-3d",
       type: "skill" as const,
-      equipSlot: 1,
+      slotIndex: 1,
       inputFrom: {
         merge: {
           dataUri: "agent.input.imageDataUri",
@@ -135,22 +151,35 @@ const FORGE_PIPELINE = {
     {
       id: "save",
       type: "skill" as const,
-      equipSlot: 2,
+      slotIndex: 2,
       inputFrom: {
         merge: {
           downloadBase64: "meshy-3d.output.downloadBase64",
           downloadContentType: "meshy-3d.output.downloadContentType",
           relicSlug: "agent.input.relicSlug",
-          relicId: "agent.input._relicId",
           kind: "agent.input.kind",
-          taskId: "meshy-3d.output.taskId",
-          previewImageUrl: "meshy-3d.output.previewImageUrl",
         },
       },
       position: { x: 380, y: 200 },
     },
+    {
+      id: "shape-output",
+      type: "transform" as const,
+      inputFrom: {
+        merge: {
+          save: "save.output",
+          meshy: "meshy-3d.output",
+          relicId: "agent.input._relicId",
+        },
+      },
+      expression: SHAPE_OUTPUT_EXPRESSION,
+      position: { x: 700, y: 200 },
+    },
   ],
-  edges: [{ from: "meshy-3d", to: "save" }],
+  edges: [
+    { from: "meshy-3d", to: "save" },
+    { from: "save", to: "shape-output" },
+  ],
 };
 
 // SceneBinding inputMap for relic.create3d → MESHY-FORGE-001.

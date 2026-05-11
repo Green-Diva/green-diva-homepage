@@ -78,47 +78,75 @@ const SKILL_SAVE_ASSET_ENHANCED = {
       base64: "{{downloadBase64}}",
       contentType: "{{downloadContentType}}",
     },
+    // Skill stays a pure IO operation — emits raw save result only.
+    // The agent's tail `shape-output` transform composes the
+    // `_relicWriteback` envelope (clean separation: skill = atomic IO,
+    // agent = wrapping / contract shaping).
     responseTransform: {
       savedPath: "{{response.savedPath}}",
       bytes: "{{response.bytes}}",
-      _relicWriteback: {
-        id: "{{input.relicId}}",
-        fields: {
-          enhancedImagePath: "{{response.savedPath}}",
-        },
-      },
     },
   } as Prisma.InputJsonValue,
 };
 
-// CUTOUT-FORGE-001 backbone DAG (v2 final): 2-node linear chain.
-//   agent.input.imageDataUri → cutout → save
+// CUTOUT-FORGE-001 backbone DAG (v2 final): 2-skill chain + tail transform.
+//   agent.input.imageDataUri → cutout → save → shape-output
+//
+// shape-output composes BOTH the scene-contract field
+// (`enhancedImagePath`) AND the runner writeback envelope
+// (`_relicWriteback`). The save skill stays a pure IO call; agent owns
+// the wrapping. Pulls relicId from agent.input so the transform can
+// build _relicWriteback.id without the skill knowing about it.
+const SHAPE_OUTPUT_EXPRESSION = `{
+  "enhancedImagePath": save.savedPath,
+  "_relicWriteback": {
+    "id": relicId,
+    "fields": {
+      "enhancedImagePath": save.savedPath
+    }
+  }
+}`;
+
 const FORGE_PIPELINE = {
   version: 2 as const,
   nodes: [
     {
       id: "cutout",
       type: "skill" as const,
-      equipSlot: 1,
+      slotIndex: 1,
       inputFrom: { merge: { dataUri: "agent.input.imageDataUri" } },
       position: { x: 60, y: 200 },
     },
     {
       id: "save",
       type: "skill" as const,
-      equipSlot: 2,
+      slotIndex: 2,
       inputFrom: {
         merge: {
           downloadBase64: "cutout.output.downloadBase64",
           downloadContentType: "cutout.output.downloadContentType",
           relicSlug: "agent.input.relicSlug",
-          relicId: "agent.input._relicId",
         },
       },
       position: { x: 380, y: 200 },
     },
+    {
+      id: "shape-output",
+      type: "transform" as const,
+      inputFrom: {
+        merge: {
+          save: "save.output",
+          relicId: "agent.input._relicId",
+        },
+      },
+      expression: SHAPE_OUTPUT_EXPRESSION,
+      position: { x: 700, y: 200 },
+    },
   ],
-  edges: [{ from: "cutout", to: "save" }],
+  edges: [
+    { from: "cutout", to: "save" },
+    { from: "save", to: "shape-output" },
+  ],
 };
 
 const FORGE_INPUT_MAP_ENHANCE2D = {

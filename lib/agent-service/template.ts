@@ -1,4 +1,7 @@
-// Template engine for SceneBinding.inputMap / outputMap.
+// Template engine for SceneBinding.inputMap.
+// (Used to also drive outputMap reshape; that field was retired
+// 2026-05-11 in favor of fixed scene.outputSchema + agent tail
+// transforms.)
 //
 // Syntax — single placeholder per cell: `{{path.to.value}}`.
 //   - Whole-string match → returns the raw looked-up value (preserves
@@ -74,7 +77,9 @@ export function applyTemplate(
  * Walk a template and collect every `{{path}}` reference it contains.
  * Used by the binding-editor UI to surface "this template references
  * `ctx.relicID` but the scene's contextSchema only has `ctx.relicId`"
- * before the admin saves a typo.
+ * before the admin saves a typo. Malformed `{{...}}` blobs are ignored
+ * here (back-compat: pre-2026-05-11 behavior). Use `parseTemplate` for
+ * strict parse-time validation.
  */
 export function extractReferences(template: unknown): string[] {
   const refs = new Set<string>();
@@ -84,8 +89,9 @@ export function extractReferences(template: unknown): string[] {
 
 function walk(template: unknown, out: Set<string>): void {
   if (typeof template === "string") {
-    for (const m of template.matchAll(partialRefRe())) {
-      out.add(m[1]);
+    const parsed = parseTemplate(template);
+    if (parsed.ok) {
+      for (const r of parsed.refs) out.add(r);
     }
     return;
   }
@@ -96,4 +102,50 @@ function walk(template: unknown, out: Set<string>): void {
   if (template && typeof template === "object") {
     for (const v of Object.values(template)) walk(v, out);
   }
+}
+
+// Strict path syntax — same char class as partialRefRe (word + . + - + [ ]).
+const VALID_PATH_RE = /^[\w.\-[\]]+$/;
+
+export type TemplateParseResult =
+  | { ok: true; refs: string[] }
+  | { ok: false; error: string; offset: number };
+
+/**
+ * Strict parse-once validator for `{{path}}` templates. Used by zod
+ * refines on Skill.handlerConfig + SceneBinding.inputMap to surface
+ * config errors at save-time instead of at runtime ("configuration as
+ * compile") — same pattern JSONata `transform` nodes follow in
+ * lib/skills/runtime/backbone.ts.
+ *
+ * Rules:
+ *   - Every `{{` must have a matching `}}` later in the string.
+ *   - Reference body, after trim, must be non-empty and match
+ *     [\w.\-[\]]+ (word chars + dot + dash + brackets).
+ *   - A stray `}}` without a preceding `{{` is allowed (literal text;
+ *     applyTemplate also treats it as text). Only `{{...}}` opens a
+ *     reference scope.
+ */
+export function parseTemplate(input: string): TemplateParseResult {
+  const refs: string[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const open = input.indexOf("{{", i);
+    if (open === -1) break;
+    const close = input.indexOf("}}", open + 2);
+    if (close === -1) {
+      return { ok: false, error: "unterminated reference", offset: open };
+    }
+    const raw = input.slice(open + 2, close);
+    const path = raw.trim();
+    if (!path) {
+      return { ok: false, error: 'invalid path ""', offset: open };
+    }
+    if (!VALID_PATH_RE.test(path)) {
+      return { ok: false, error: `invalid path "${path}"`, offset: open };
+    }
+    refs.push(path);
+    i = close + 2;
+  }
+  return { ok: true, refs };
 }

@@ -78,11 +78,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // Phase 5: bound agent's SceneBinding outputMap exposes the relevant
-  // metadata fields directly under result.output (no more node-ID
-  // peeking from runLog). For relic.regen-metadata the binding pulls
-  // from runLog.byId.research-regen.output and re-shapes — admin can
-  // swap agents without this endpoint caring.
+  // Scene contract (lib/relics/scenes.ts → relicRegenMetadataScene)
+  // guarantees flat result.output shape. The bound agent's leaf
+  // (currently LORE-FORGE-001's metadata-regen node) produces that
+  // shape directly; admin can swap to a different agent as long as its
+  // tail node satisfies the same outputSchema.
   const out = isObject(result.output) ? result.output : {};
 
   return NextResponse.json({

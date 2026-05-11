@@ -13,24 +13,55 @@
 
 import "server-only";
 import { z } from "zod";
-import { registerScene } from "@/lib/agent-service";
+import { registerScene, registerSceneAlias } from "@/lib/agent-service";
 
-// — relic.draftMetadata —
-// Sync. Triggered from the draft pipeline's GENERATE_METADATA step
-// (lib/relics/pipeline/steps/generateMetadata.ts). The caller reads
-// `result.runLog` to pull per-node outputs (research / pick) — the leaf
-// agent.output isn't enough because pipeline writeback needs both.
+// — Shared structural primitives — ——————————————————————————————————
 //
-// outputSchema is z.unknown() because the runLog drives extraction;
-// Phase 5+ may tighten this once we have a richer template syntax for
-// runLog navigation.
+// Scene outputSchemas are the authoritative contract between agents and
+// downstream consumers (pipeline steps / endpoints). They enforce
+// STRUCTURE, not semantics — a transform node can still塑形 garbage into
+// schema-conformant garbage. The strict regex/length bounds raise the
+// floor by rejecting obvious mismatches (English in Chinese fields, etc.).
+const cjkRequired = (min: number, max: number) =>
+  z
+    .string()
+    .min(min)
+    .max(max)
+    .regex(/[一-鿿]/, "必须含至少一个汉字");
+const englishStarting = (min: number, max: number) =>
+  z
+    .string()
+    .min(min)
+    .max(max)
+    .regex(/^[A-Za-z]/, "必须英文打头");
+// Material Symbols icon name — lowercase letters / digits / underscore.
+const iconKey = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9_]*$/, "必须是 Material Symbols 名（小写字母 / 数字 / 下划线）");
+const RARITIES = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"] as const;
+const FORM_KINDS = ["TWO_D", "THREE_D"] as const;
+
+// — relic.generateDraftMetadata —
+// Sync. Triggered from the draft pipeline's GENERATE_METADATA step
+// (lib/relics/pipeline/steps/generateMetadata.ts).
+//
+// 2026-05-11: outputSchema tightened from z.unknown() to a structured
+// `{ research: {...} }`. LORE-FORGE-001 must self-shape via a tail
+// transform node; the previous outputMap-driven reshape is gone.
+//
+// 2026-05-11 (rename): key was "relic.draft-metadata" (noun) — renamed to
+// verb-first "relic.generate-draft-metadata" to match the other 4 relic.*
+// scenes. The old key resolves via registerSceneAlias below; drop the
+// alias once existing SceneBinding.sceneKey rows have been migrated.
 export const relicDraftMetadataScene = registerScene({
-  key: "relic.draft-metadata",
+  key: "relic.generate-draft-metadata",
   module: "relic",
   label: { en: "Draft Metadata Generation", zh: "草稿元数据生成" },
   description: {
-    en: "Run the relic scribe over a draft workspace to produce lore + metadata + candidate images.",
-    zh: "对草稿工作目录跑 relic scribe，生成圣记、元数据和候选图。",
+    en: "Run the relic scribe over a draft workspace to produce lore + metadata.",
+    zh: "对草稿工作目录跑 relic scribe，生成圣记 + 元数据。",
   },
   contextSchema: z.object({
     // Workspace-relative slug. For drafts: "_drafts/<draftId>".
@@ -44,12 +75,32 @@ export const relicDraftMetadataScene = registerScene({
     imageAbsPaths: z.array(z.string()).optional().default([]),
     textExcerpts: z.string().optional().default(""),
   }),
-  outputSchema: z.unknown(),
+  outputSchema: z
+    .object({
+      research: z.object({
+        titleZh: cjkRequired(2, 40),
+        titleEn: englishStarting(2, 80),
+        subtitleZh: cjkRequired(2, 80),
+        subtitleEn: englishStarting(2, 160),
+        icon: iconKey,
+        rarity: z.enum(RARITIES),
+        formKind: z.enum(FORM_KINDS),
+        decisionReason: z.string().max(500).optional(),
+        useUserImage: z.boolean().optional(),
+        networkImageQuery: z.string().max(200).optional(),
+        loreEn: z.string().min(50).max(2000).optional(),
+        loreZh: cjkRequired(50, 2000).optional(),
+      }),
+    })
+    .passthrough(),
   invocation: "sync",
   // image-pick lives in a separate scene (relic.smart-image-pick) since
   // the Phase 8 picker decomposition. LORE-FORGE no longer claims it.
   requiredCapabilities: ["lore-writing", "metadata-derivation"],
 });
+
+// Legacy alias — drop after SceneBinding.sceneKey rows have been migrated.
+registerSceneAlias("relic.draft-metadata", "relic.generate-draft-metadata");
 
 // — relic.smartImagePick —
 // Sync. Triggered by runScribeForWorkspace AFTER relic.draft-metadata so
@@ -78,16 +129,29 @@ export const relicSmartImagePickScene = registerScene({
     // null when there were no usable user images.
     referenceImageAbs: z.string().nullable().default(null),
   }),
-  outputSchema: z.object({
-    candidates: z.array(z.unknown()),
-    recommendedPrimaryPath: z.string(),
-    networkFetchAttempted: z.boolean().optional(),
-    networkFetchFailureReason: z.string().optional(),
-    visionFilterApplied: z.boolean().optional(),
-    visionFilterMatches: z.number().optional(),
-    visionFilterRounds: z.number().optional(),
-    refinedQueryUsed: z.string().optional(),
-  }),
+  outputSchema: z
+    .object({
+      candidates: z
+        .array(
+          z
+            .object({
+              path: z.string().min(1),
+              source: z.string().min(1),
+              score: z.number().min(0).max(1).optional(),
+              deleted: z.boolean().optional(),
+            })
+            .passthrough(),
+        )
+        .max(60),
+      recommendedPrimaryPath: z.string().min(1),
+      networkFetchAttempted: z.boolean().optional(),
+      networkFetchFailureReason: z.string().max(500).optional(),
+      visionFilterApplied: z.boolean().optional(),
+      visionFilterMatches: z.number().int().min(0).max(60).optional(),
+      visionFilterRounds: z.number().int().min(0).max(10).optional(),
+      refinedQueryUsed: z.string().max(200).optional(),
+    })
+    .passthrough(),
   invocation: "sync",
   requiredCapabilities: ["image-pick"],
 });
@@ -112,7 +176,21 @@ export const relicRegenMetadataScene = registerScene({
     }),
     feedback: z.string().max(500).optional(),
   }),
-  outputSchema: z.unknown(),
+  // Flat shape — regen consumer (regen-metadata route) reads top-level
+  // fields directly. Intentionally NOT wrapped in `{ research: ... }` so
+  // the regen consumer touches zero code; the two metadata scenes don't
+  // need to share a wrapper.
+  outputSchema: z
+    .object({
+      titleZh: cjkRequired(2, 40),
+      titleEn: englishStarting(2, 80),
+      subtitleZh: cjkRequired(2, 80),
+      subtitleEn: englishStarting(2, 160),
+      icon: iconKey,
+      rarity: z.enum(RARITIES),
+      formKind: z.enum(FORM_KINDS),
+    })
+    .passthrough(),
   invocation: "sync",
   requiredCapabilities: ["metadata-derivation"],
 });
@@ -139,9 +217,17 @@ export const relicEnhance2dScene = registerScene({
     // forward this straight into agent.input via inputMap.
     imageDataUri: z.string().regex(/^data:image\/[a-z+.-]+;base64,/, "expected image data URI"),
   }),
-  outputSchema: z.object({
-    enhancedImagePath: z.string().min(1),
-  }),
+  // `.passthrough()` is essential — the agent's leaf transform also emits
+  // `_relicWriteback` which the runner consumes (lib/skills/runtime/runner.ts
+  // maybeWriteRelicAsset). Stripping unknowns would break the writeback hook.
+  outputSchema: z
+    .object({
+      enhancedImagePath: z
+        .string()
+        .min(1)
+        .regex(/^\/[A-Za-z0-9_./-]+\.(png|webp|jpg|jpeg)$/i, "expected derived asset path"),
+    })
+    .passthrough(),
   invocation: "async",
   requiredCapabilities: ["image-cutout"],
 });
@@ -186,12 +272,18 @@ export const relicCreate3dScene = registerScene({
       })
       .optional(),
   }),
-  outputSchema: z.object({
-    modelPath: z.string().min(1),
-    taskId: z.string().optional(),
-    previewImageUrl: z.string().optional(),
-    elapsedMs: z.number().optional(),
-  }),
+  // `.passthrough()` for `_relicWriteback` (see relic.enhance2d note).
+  outputSchema: z
+    .object({
+      modelPath: z
+        .string()
+        .min(1)
+        .regex(/^\/[A-Za-z0-9_./-]+\.glb$/i, "expected GLB path"),
+      taskId: z.string().max(120).optional(),
+      previewImageUrl: z.string().url().optional(),
+      elapsedMs: z.number().int().nonnegative().optional(),
+    })
+    .passthrough(),
   invocation: "async",
   requiredCapabilities: ["model-3d-generation"],
 });

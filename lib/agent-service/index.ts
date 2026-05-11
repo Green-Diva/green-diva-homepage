@@ -8,6 +8,7 @@
 
 export {
   registerScene,
+  registerSceneAlias,
   getScene,
   requireScene,
   listScenes,

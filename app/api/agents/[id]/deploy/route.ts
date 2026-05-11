@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError } from "@/lib/api-error";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -12,7 +13,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id } = await params;
@@ -25,6 +26,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json(updated);
   } catch (e) {
     console.error("[api/agents/deploy POST] failed", e);
-    return NextResponse.json({ error: "deploy failed" }, { status: 500 });
+    return respondError("DEPLOY_FAILED", "deploy failed", 500);
   }
 }

@@ -2,16 +2,14 @@
 
 import { useT } from "@/lib/i18n/client";
 import type { AgentRow } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 export default function AgentHeroPortrait({ agent }: { agent: AgentRow }) {
   const t = useT();
-  const isMech = agent.mode === "MECHANICAL";
-  const tintClass = isMech ? "from-secondary/15" : "from-primary/15";
-  const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentBorder = isMech ? "border-secondary/25" : "border-primary/25";
-  const accentMarker = isMech
-    ? "before:bg-secondary/70 after:bg-secondary/70"
-    : "before:bg-primary/70 after:bg-primary/70";
+  const tintClass = themeClass(agent.mode, "tintFrom15");
+  const accentText = themeClass(agent.mode, "text");
+  const accentBorder = themeClass(agent.mode, "borderSoft");
+  const accentMarker = themeClass(agent.mode, "marker");
 
   return (
     <div

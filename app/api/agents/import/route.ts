@@ -20,6 +20,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 import { agentImportOptionsSchema, type AgentExport } from "@/lib/validators";
 
 type ImportSkill = AgentExport["skills"][number];
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
   try {
     me = await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -137,20 +138,17 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    return respondError("INVALID_JSON", "invalid JSON body", 400);
   }
 
   const parsed = agentImportOptionsSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error:
-          "invalid import payload: " +
-          parsed.error.issues
-            .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-            .join("; "),
-      },
-      { status: 400 },
+    return respondValidationError(
+      parsed.error.flatten(),
+      "invalid import payload: " +
+        parsed.error.issues
+          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+          .join("; "),
     );
   }
   const { payload, newCodename, rejectOnAgentConflict, skillConflict } = parsed.data;
@@ -163,9 +161,13 @@ export async function POST(req: NextRequest) {
     select: { id: true, codename: true },
   });
   if (existingAgent && rejectOnAgentConflict !== false) {
+    const msg = `agent codename "${targetCodename}" already exists`;
     return NextResponse.json(
       {
-        error: `agent codename "${targetCodename}" already exists`,
+        ok: false,
+        errorCode: "CODENAME_CONFLICT",
+        errorMessage: msg,
+        error: msg,
         conflict: "codename",
         existingId: existingAgent.id,
       },
@@ -259,6 +261,6 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("[api/agents/import] failed", e);
     const message = e instanceof Error ? e.message : "import failed";
-    return NextResponse.json({ error: `import failed: ${message.slice(0, 300)}` }, { status: 500 });
+    return respondError("IMPORT_FAILED", `import failed: ${message.slice(0, 300)}`, 500);
   }
 }

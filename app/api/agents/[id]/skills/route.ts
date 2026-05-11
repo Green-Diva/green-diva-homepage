@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { agentSkillEquipSchema } from "@/lib/validators";
 import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 import { SKILL_SLOT_COUNT } from "@/lib/agentTypes";
 
 const CAPACITY_SENTINEL = "EQUIP_CAPACITY_EXCEEDED";
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     await requireUser();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id } = await params;
@@ -30,14 +31,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id: agentId } = await params;
   const json = await req.json().catch(() => null);
   const parsed = agentSkillEquipSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
   const { skillId, unlocked, slotIndex } = parsed.data;
 
@@ -89,9 +90,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json(equip, { status: 201 });
   } catch (e) {
     if (e instanceof Error && e.message === CAPACITY_SENTINEL) {
-      return NextResponse.json({ error: "equip capacity exceeded" }, { status: 409 });
+      return respondError("EQUIP_CAPACITY_EXCEEDED", "equip capacity exceeded", 409);
     }
     console.error("[agent-skills] equip failed", e);
-    return NextResponse.json({ error: "equip failed" }, { status: 500 });
+    return respondError("EQUIP_FAILED", "equip failed", 500);
   }
 }

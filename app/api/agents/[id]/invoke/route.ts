@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { agentInvokeSchema } from "@/lib/validators";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 import { ensureServerInit } from "@/lib/server-init";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
 import { Prisma } from "@prisma/client";
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -28,11 +29,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const body = await req.json().catch(() => null);
   const parsed = agentInvokeSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
 
   const agent = await prisma.agent.findUnique({ where: { id }, select: { id: true, mode: true } });
-  if (!agent) return NextResponse.json({ error: "agent not found" }, { status: 404 });
+  if (!agent) return respondError("NOT_FOUND", "agent not found", 404);
 
   let job;
   try {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     });
   } catch (e) {
     console.error("[api/agents/invoke] create job failed", e);
-    return NextResponse.json({ error: "invoke failed" }, { status: 500 });
+    return respondError("INVOKE_FAILED", "invoke failed", 500);
   }
 
   // Fire-and-forget. Runner has its own try/catch and writes terminal

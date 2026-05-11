@@ -1,0 +1,53 @@
+{
+  "format": "green-diva-agent-export-v1",
+  "exportedAt": "2026-05-11T00:00:00.000Z",
+  "exportedBy": "canonical-example",
+  "agent": {
+    "codename": "EXAMPLE-03-FOREACH",
+    "codenameZh": "示例·遍历选优",
+    "nameEn": "forEach + Pick",
+    "nameZh": "遍历加选优",
+    "mode": "MECHANICAL",
+    "avatarUrl": "/images/agent-control/avatars/placeholder.svg",
+    "descriptionEn": "Canonical example #03 — per-item transform via forEach, then sort-and-pick. No skills, no external IO. Models the picker-forge skeleton. See docs/canonical-dags/03-foreach-pick.md.",
+    "descriptionZh": "示例 #03 —— 用 forEach 做 per-item transform,再排序选优。无 skill 无外部 IO,是 picker-forge 的骨架。详见 docs/canonical-dags/03-foreach-pick.md。",
+    "capabilities": [],
+    "pipelineConfig": {
+      "version": 2,
+      "nodes": [
+        {
+          "id": "for-each-stamp",
+          "type": "forEach",
+          "inputFrom": "agent.input.items",
+          "maxItems": 10,
+          "aggregate": "concat-array",
+          "body": {
+            "nodes": [
+              {
+                "id": "stamp-item",
+                "type": "transform",
+                "inputFrom": "agent.input",
+                "expression": "{ \"name\": item.name, \"score\": item.score, \"index\": index, \"total\": total }",
+                "position": { "x": 120, "y": 100 }
+              }
+            ],
+            "edges": []
+          },
+          "position": { "x": 120, "y": 180 }
+        },
+        {
+          "id": "pick-best",
+          "type": "transform",
+          "inputFrom": "for-each-stamp.output",
+          "expression": "($items := $; { \"winner\": ($items^(>score))[0], \"considered\": $count($items) })",
+          "position": { "x": 420, "y": 180 }
+        }
+      ],
+      "edges": [
+        { "from": "for-each-stamp", "to": "pick-best" }
+      ]
+    },
+    "dispatcherConfig": null
+  },
+  "skills": []
+}

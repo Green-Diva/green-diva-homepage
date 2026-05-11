@@ -1,0 +1,81 @@
+{
+  "format": "green-diva-agent-export-v1",
+  "exportedAt": "2026-05-11T00:00:00.000Z",
+  "exportedBy": "canonical-example",
+  "agent": {
+    "codename": "EXAMPLE-02-BRANCH",
+    "codenameZh": "示例·分支",
+    "nameEn": "Branch by Mode",
+    "nameZh": "按 mode 分支",
+    "mode": "MECHANICAL",
+    "avatarUrl": "/images/agent-control/avatars/placeholder.svg",
+    "descriptionEn": "Canonical example #02 — branch on agent.input.mode; one leaf is a skill (httpbin echo), the other is a transform (greeting). See docs/canonical-dags/02-branch-flow.md.",
+    "descriptionZh": "示例 #02 —— 按 agent.input.mode 分支;一条 leaf 是 skill(httpbin 回显),另一条是 transform(问候)。详见 docs/canonical-dags/02-branch-flow.md。",
+    "capabilities": [],
+    "pipelineConfig": {
+      "version": 2,
+      "nodes": [
+        {
+          "id": "branch-by-mode",
+          "type": "branch",
+          "inputFrom": "agent.input",
+          "cases": [
+            { "path": "mode", "op": "eq", "value": "echo",  "label": "echo"  },
+            { "path": "mode", "op": "eq", "value": "greet", "label": "greet" }
+          ],
+          "defaultLabel": "greet",
+          "position": { "x": 80, "y": 200 }
+        },
+        {
+          "id": "echo-via-httpbin",
+          "type": "skill",
+          "slotIndex": 0,
+          "inputFrom": "agent.input",
+          "position": { "x": 320, "y": 80 }
+        },
+        {
+          "id": "build-greeting",
+          "type": "transform",
+          "inputFrom": "agent.input",
+          "expression": "{ \"greeting\": 'Hello, ' & name }",
+          "position": { "x": 320, "y": 320 }
+        }
+      ],
+      "edges": [
+        { "from": "branch-by-mode", "to": "echo-via-httpbin", "when": "echo" },
+        { "from": "branch-by-mode", "to": "build-greeting",   "when": "greet" }
+      ]
+    },
+    "dispatcherConfig": null
+  },
+  "skills": [
+    {
+      "slug": "example-httpbin-echo",
+      "level": 1,
+      "icon": "echo",
+      "nameEn": "Httpbin Echo (POST)",
+      "nameZh": "Httpbin 回显 (POST)",
+      "kind": "HTTP_API",
+      "costAp": 0,
+      "descriptionEn": "POSTs the input body to https://httpbin.org/anything and returns the parsed echo. No auth. Shared across canonical examples #01 and #02.",
+      "descriptionZh": "把 input body POST 到 https://httpbin.org/anything,返回解析后的回显。无鉴权。示例 #01 / #02 共用。",
+      "status": "ONLINE",
+      "handlerConfig": {
+        "method": "POST",
+        "url": "https://httpbin.org/anything",
+        "responseType": "json",
+        "timeoutMs": 15000,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "bodyTemplate": {
+          "message": "{{message}}"
+        }
+      },
+      "inputSchema": null,
+      "outputSchema": null,
+      "slotIndex": 0,
+      "unlocked": true
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { agentSkillUnlockSchema } from "@/lib/validators";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 
 type Params = { params: Promise<{ id: string; skillId: string }> };
 
@@ -9,18 +10,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id: agentId, skillId } = await params;
   const json = await req.json().catch(() => null);
   const parsed = agentSkillUnlockSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
   const { unlocked, slotIndex } = parsed.data;
   if (typeof unlocked !== "boolean" && slotIndex === undefined) {
-    return NextResponse.json({ error: "no fields to update" }, { status: 400 });
+    return respondError("NO_FIELDS_TO_UPDATE", "no fields to update", 400);
   }
 
   try {
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json(equip);
   } catch (e) {
     console.error("[agent-skills] update failed", e);
-    return NextResponse.json({ error: "update failed" }, { status: 500 });
+    return respondError("UPDATE_FAILED", "update failed", 500);
   }
 }
 
@@ -53,7 +54,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id: agentId, skillId } = await params;
@@ -64,6 +65,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return new NextResponse(null, { status: 204 });
   } catch (e) {
     console.error("[agent-skills] unequip failed", e);
-    return NextResponse.json({ error: "unequip failed" }, { status: 500 });
+    return respondError("UNEQUIP_FAILED", "unequip failed", 500);
   }
 }

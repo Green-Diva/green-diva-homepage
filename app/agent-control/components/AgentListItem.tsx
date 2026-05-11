@@ -2,6 +2,7 @@
 
 import type { AgentRow } from "../types";
 import { useT } from "@/lib/i18n/client";
+import { themeClass } from "@/lib/agentControl/theme";
 
 const STATUS_STYLES: Record<AgentRow["status"], { dot: string; label: keyof ReturnType<typeof useT>["agentControl"] }> = {
   ONLINE: { dot: "bg-emerald-400", label: "statusOnline" },
@@ -9,9 +10,9 @@ const STATUS_STYLES: Record<AgentRow["status"], { dot: string; label: keyof Retu
   OFFLINE: { dot: "bg-rose-400", label: "statusOffline" },
 };
 
-const MODE_ICON: Record<AgentRow["mode"], { icon: string; color: string; key: "modeMechanical" | "modeAutonomous" }> = {
-  MECHANICAL: { icon: "precision_manufacturing", color: "text-secondary", key: "modeMechanical" },
-  AUTONOMOUS: { icon: "hub", color: "text-primary", key: "modeAutonomous" },
+const MODE_ICON: Record<AgentRow["mode"], { icon: string; key: "modeMechanical" | "modeAutonomous" }> = {
+  MECHANICAL: { icon: "precision_manufacturing", key: "modeMechanical" },
+  AUTONOMOUS: { icon: "hub", key: "modeAutonomous" },
 };
 
 export default function AgentListItem({
@@ -76,7 +77,7 @@ export default function AgentListItem({
         <div className={`font-label text-[11px] tracking-[0.2em] flex items-center gap-1.5 ${active ? "text-primary" : "text-on-surface"}`}>
           <span
             aria-hidden
-            className={`material-symbols-outlined text-[11px] leading-none ${mode.color}`}
+            className={`material-symbols-outlined text-[11px] leading-none ${themeClass(agent.mode ?? "MECHANICAL", "text")}`}
             title={t.agentControl[mode.key] as string}
           >
             {mode.icon}

@@ -2,6 +2,7 @@
 
 import { useT } from "@/lib/i18n/client";
 import type { AgentMode } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 export type ModeFilter = "ALL" | AgentMode;
 
@@ -25,10 +26,10 @@ export default function AgentFilterChips({
     <div role="tablist" aria-label="filter" className="flex items-center gap-1.5 flex-wrap">
       {chips.map((c) => {
         const active = value === c.key;
-        const toneActive =
-          c.tone === "secondary"
-            ? "border-secondary/70 text-secondary bg-secondary/[0.12] shadow-[0_0_12px_rgba(233,193,118,0.25)]"
-            : "border-primary/70 text-primary bg-primary/[0.12] shadow-[0_0_12px_rgba(144,222,205,0.25)]";
+        const toneActive = themeClass(
+          c.tone === "secondary" ? "MECHANICAL" : "AUTONOMOUS",
+          "chipActive",
+        );
         return (
           <button
             key={c.key}

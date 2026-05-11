@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError } from "@/lib/api-error";
 import type { AgentExport } from "@/lib/validators";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -22,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   try {
     me = await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -38,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     },
   });
   if (!agent) {
-    return NextResponse.json({ error: "agent not found" }, { status: 404 });
+    return respondError("NOT_FOUND", "agent not found", 404);
   }
 
   const payload: AgentExport = {

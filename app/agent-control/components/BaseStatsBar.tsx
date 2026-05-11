@@ -3,6 +3,7 @@
 import { useT } from "@/lib/i18n/client";
 import type { AgentRow } from "../types";
 import { AGENT_STAT_KEYS, type AgentStatKey } from "@/lib/agentTypes";
+import { themeClass, themeRgba } from "@/lib/agentControl/theme";
 
 const ROW_LABELS: Record<AgentStatKey, { label: keyof ReturnType<typeof useT>["agentControl"]; hint: keyof ReturnType<typeof useT>["agentControl"] }> = {
   chaosLevel: { label: "statChaos", hint: "statChaosHint" },
@@ -13,12 +14,11 @@ const ROW_LABELS: Record<AgentStatKey, { label: keyof ReturnType<typeof useT>["a
 
 export default function BaseStatsBar({ agent }: { agent: AgentRow }) {
   const t = useT();
-  const isMech = agent.mode === "MECHANICAL";
-  const accentColor = isMech ? "rgba(233,193,118,0.7)" : "rgba(144,222,205,0.7)";
-  const accentBar = isMech ? "bg-secondary" : "bg-primary";
-  const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentBorder = isMech ? "border-secondary/25" : "border-primary/25";
-  const accentMarker = isMech ? "before:bg-secondary/70 after:bg-secondary/70" : "before:bg-primary/70 after:bg-primary/70";
+  const accentColor = themeRgba(agent.mode, "strong");
+  const accentBar = themeClass(agent.mode, "bg");
+  const accentText = themeClass(agent.mode, "text");
+  const accentBorder = themeClass(agent.mode, "borderSoft");
+  const accentMarker = themeClass(agent.mode, "marker");
 
   // To revert: replace the outer wrapper back to `<div className="shrink-0 space-y-2">`
   // and drop the title-tab + corner markers.

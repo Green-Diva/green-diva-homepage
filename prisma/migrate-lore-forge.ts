@@ -101,13 +101,42 @@ const SKILL_METADATA = {
 
 // — — DAG — — — — — — — — — — — — — — — — — — — — — — — — — — — — — —
 //
-// Final shape (3-slot, agent.input pre-populated by scanWorkspace):
+// Final shape (3-slot + tail wrap-transform, agent.input pre-populated
+// by scanWorkspace):
 //
 //   Slot layout:
 //     1: gemini-lore-en (LLM_PROMPT)
 //     2: gemini-lore-zh (LLM_PROMPT)
 //     3: gemini-metadata (LLM_PROMPT — both metadata-init and
-//        metadata-regen reference the SAME equipSlot)
+//        metadata-regen reference the SAME slotIndex)
+//
+//   Tail nodes (NO slotIndex — pure transform shaping the leaf output
+//   to match the bound scene's outputSchema):
+//     wrap-research (transform) — init path leaf, produces
+//       { research: {...} } per relic.draft-metadata schema. Pulls
+//       loreEn / loreZh / metadata-init outputs and merges into one
+//       wrapped object.
+//
+//   Regen path: metadata-regen IS the leaf — its flat output already
+//   matches relic.regen-metadata's flat schema (passthrough allows
+//   extras like decisionReason). No tail transform needed.
+
+const WRAP_RESEARCH_EXPRESSION = `{
+  "research": {
+    "titleZh": meta.titleZh,
+    "titleEn": meta.titleEn,
+    "subtitleZh": meta.subtitleZh,
+    "subtitleEn": meta.subtitleEn,
+    "icon": meta.icon,
+    "rarity": meta.rarity,
+    "formKind": meta.formKind,
+    "decisionReason": meta.decisionReason,
+    "useUserImage": meta.useUserImage,
+    "networkImageQuery": meta.networkImageQuery,
+    "loreEn": loreEn,
+    "loreZh": loreZh
+  }
+}`;
 
 const FORGE_PIPELINE = {
   version: 2 as const,
@@ -125,7 +154,7 @@ const FORGE_PIPELINE = {
     {
       id: "loreEn",
       type: "skill" as const,
-      equipSlot: 1,
+      slotIndex: 1,
       inputFrom: {
         merge: {
           userBrief: "agent.input.userBrief",
@@ -139,14 +168,14 @@ const FORGE_PIPELINE = {
     {
       id: "loreZh",
       type: "skill" as const,
-      equipSlot: 2,
+      slotIndex: 2,
       inputFrom: { merge: { loreEn: "loreEn.output.text" } },
       position: { x: 480, y: 100 },
     },
     {
       id: "metadata-init",
       type: "skill" as const,
-      equipSlot: 3,
+      slotIndex: 3,
       inputFrom: {
         merge: {
           loreEn: "loreEn.output.text",
@@ -157,9 +186,22 @@ const FORGE_PIPELINE = {
       position: { x: 680, y: 100 },
     },
     {
+      id: "wrap-research",
+      type: "transform" as const,
+      inputFrom: {
+        merge: {
+          meta: "metadata-init.output",
+          loreEn: "loreEn.output.text",
+          loreZh: "loreZh.output.text",
+        },
+      },
+      expression: WRAP_RESEARCH_EXPRESSION,
+      position: { x: 880, y: 100 },
+    },
+    {
       id: "metadata-regen",
       type: "skill" as const,
-      equipSlot: 3,
+      slotIndex: 3,
       inputFrom: {
         merge: {
           loreEn: "agent.input.existingLore.en",
@@ -174,6 +216,7 @@ const FORGE_PIPELINE = {
     { from: "mode", to: "loreEn", when: "init" },
     { from: "loreEn", to: "loreZh" },
     { from: "loreZh", to: "metadata-init" },
+    { from: "metadata-init", to: "wrap-research" },
     { from: "mode", to: "metadata-regen", when: "regen" },
   ],
 };
@@ -198,37 +241,9 @@ const REGEN_INPUT_MAP = {
   feedback: "{{ctx.feedback}}",
 };
 
-// outputMap for draft: pipeline step (generateMetadata.ts) reads
-// result.output.research.* — and ALSO consumes useUserImage /
-// networkImageQuery to dispatch the picker scene afterwards.
-const DRAFT_METADATA_OUTPUT_MAP = {
-  research: {
-    titleZh: "{{runLog.byId.metadata-init.output.titleZh}}",
-    titleEn: "{{runLog.byId.metadata-init.output.titleEn}}",
-    subtitleZh: "{{runLog.byId.metadata-init.output.subtitleZh}}",
-    subtitleEn: "{{runLog.byId.metadata-init.output.subtitleEn}}",
-    icon: "{{runLog.byId.metadata-init.output.icon}}",
-    rarity: "{{runLog.byId.metadata-init.output.rarity}}",
-    formKind: "{{runLog.byId.metadata-init.output.formKind}}",
-    decisionReason: "{{runLog.byId.metadata-init.output.decisionReason}}",
-    useUserImage: "{{runLog.byId.metadata-init.output.useUserImage}}",
-    networkImageQuery: "{{runLog.byId.metadata-init.output.networkImageQuery}}",
-    loreEn: "{{runLog.byId.loreEn.output.text}}",
-    loreZh: "{{runLog.byId.loreZh.output.text}}",
-  },
-};
-
-// outputMap for regen: regen-metadata endpoint reads metadata fields
-// at result.output root.
-const REGEN_METADATA_OUTPUT_MAP = {
-  titleZh: "{{runLog.byId.metadata-regen.output.titleZh}}",
-  titleEn: "{{runLog.byId.metadata-regen.output.titleEn}}",
-  subtitleZh: "{{runLog.byId.metadata-regen.output.subtitleZh}}",
-  subtitleEn: "{{runLog.byId.metadata-regen.output.subtitleEn}}",
-  icon: "{{runLog.byId.metadata-regen.output.icon}}",
-  rarity: "{{runLog.byId.metadata-regen.output.rarity}}",
-  formKind: "{{runLog.byId.metadata-regen.output.formKind}}",
-};
+// 2026-05-11: outputMap dropped — agent's tail wrap-research transform
+// + metadata-regen leaf produce scene-shape directly. SceneBinding only
+// holds inputMap now.
 
 function genCuid(): string {
   const ts = Date.now().toString(36);
@@ -351,7 +366,6 @@ async function rebindScene(
   sceneKey: string,
   forgeId: string,
   inputMap: Record<string, unknown>,
-  outputMap: Record<string, unknown>,
   notes: string,
 ): Promise<void> {
   const binding = await prisma.sceneBinding.findUnique({ where: { sceneKey } });
@@ -359,13 +373,12 @@ async function rebindScene(
     console.log(`[migrate-lore-forge] no SceneBinding for ${sceneKey} — skip`);
     return;
   }
-  // Always write — heals stale legacy inputMap/outputMap shapes.
+  // Always write — heals stale legacy inputMap shapes.
   await prisma.sceneBinding.update({
     where: { sceneKey },
     data: {
       agentId: forgeId,
       inputMap: inputMap as unknown as Prisma.InputJsonValue,
-      outputMap: outputMap as unknown as Prisma.InputJsonValue,
       notes,
     },
   });
@@ -395,19 +408,17 @@ async function main() {
 
     await rebindScene(
       prisma,
-      "relic.draft-metadata",
+      "relic.generate-draft-metadata",
       forgeId,
       DRAFT_INPUT_MAP,
-      DRAFT_METADATA_OUTPUT_MAP,
-      "LORE-FORGE-001 final shape: scanWorkspace pre-fills ctx; agent runs loreEn → loreZh → metadata. Pick handled by separate relic.smart-image-pick scene → PICKER-FORGE-001.",
+      "LORE-FORGE-001 final shape: scanWorkspace pre-fills ctx; agent runs loreEn → loreZh → metadata-init → wrap-research, producing scene-shape directly. Pick handled by separate relic.smart-image-pick scene → PICKER-FORGE-001.",
     );
     await rebindScene(
       prisma,
       "relic.regen-metadata",
       forgeId,
       REGEN_INPUT_MAP,
-      REGEN_METADATA_OUTPUT_MAP,
-      "LORE-FORGE-001 final shape: regen mode jumps straight to metadata-regen with existingLore.",
+      "LORE-FORGE-001 final shape: regen mode jumps straight to metadata-regen (flat shape matches regen scene schema directly).",
     );
 
     console.log("[migrate-lore-forge] done");

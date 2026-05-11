@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { EquipRow, AgentMode } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 type Props = {
   agentId: string;
@@ -51,8 +52,7 @@ export default function SkillSlotDetailModal({ agentId, equip, mode, onClose }: 
     }
   }
 
-  const isMech = mode === "MECHANICAL";
-  const accent = isMech ? "text-secondary" : "text-primary";
+  const accent = themeClass(mode, "text");
   const skill = equip.skill;
   const slotLabel = typeof equip.slotIndex === "number" ? format(t.agentControl.skillSlotLabel, { n: equip.slotIndex + 1 }) : "";
 

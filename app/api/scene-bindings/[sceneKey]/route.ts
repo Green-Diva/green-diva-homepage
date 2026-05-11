@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 import { getScene, SceneError } from "@/lib/agent-service";
 import { sceneBindingUpdateSchema } from "@/lib/validators";
 import "@/lib/scenes-init";
@@ -24,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -45,20 +46,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    return respondError("INVALID_JSON", "invalid JSON body", 400);
   }
 
   const parsed = sceneBindingUpdateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error:
-          "invalid binding: " +
-          parsed.error.issues
-            .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-            .join("; "),
-      },
-      { status: 400 },
+    return respondValidationError(
+      parsed.error.flatten(),
+      "invalid binding: " +
+        parsed.error.issues
+          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+          .join("; "),
     );
   }
 
@@ -93,14 +91,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         sceneKey,
         agentId: parsed.data.agentId,
         inputMap: jsonOrNull(parsed.data.inputMap),
-        outputMap: jsonOrNull(parsed.data.outputMap ?? null),
         enabled: parsed.data.enabled,
         notes: parsed.data.notes ?? null,
       },
       update: {
         agentId: parsed.data.agentId,
         inputMap: jsonOrNull(parsed.data.inputMap),
-        outputMap: jsonOrNull(parsed.data.outputMap ?? null),
         enabled: parsed.data.enabled,
         notes: parsed.data.notes ?? null,
       },
@@ -114,9 +110,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json(row);
   } catch (e) {
     if (e instanceof SceneError) {
-      return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+      return respondError(e.errorCode, e.message, e.httpStatus);
     }
     console.error(`[api/scene-bindings] PATCH ${sceneKey} failed`, e);
-    return NextResponse.json({ error: "save failed" }, { status: 500 });
+    return respondError("SAVE_FAILED", "save failed", 500);
   }
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { SkillRow, EquipRow, AgentMode } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 type Props = {
   agentId: string;
@@ -99,7 +100,7 @@ export default function SkillPickerModal({
     }
   }
 
-  const accentClass = mode === "MECHANICAL" ? "text-secondary" : "text-primary";
+  const accentClass = themeClass(mode ?? "AUTONOMOUS", "text");
   const slotLabel =
     typeof targetSlotIndex === "number"
       ? format(t.agentControl.skillSlotLabel, { n: targetSlotIndex + 1 })

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireUser } from "@/lib/auth";
+import { respondError, respondAuthError } from "@/lib/api-error";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,13 +16,13 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   try {
     await requireUser();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id } = await params;
 
   const agent = await prisma.agent.findUnique({ where: { id }, select: { id: true } });
-  if (!agent) return NextResponse.json({ error: "agent not found" }, { status: 404 });
+  if (!agent) return respondError("NOT_FOUND", "agent not found", 404);
 
   const jobs = await prisma.agentJob.findMany({
     where: { agentId: id },
@@ -38,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       attempts: true,
       maxAttempts: true,
       startedAt: true,
-      endedAt: true,
+      finishedAt: true,
       createdAt: true,
       updatedAt: true,
     },

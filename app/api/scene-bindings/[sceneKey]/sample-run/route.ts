@@ -15,8 +15,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 import { applyTemplate, getScene } from "@/lib/agent-service";
-import { invokeAgent } from "@/lib/agents/invoke";
+import { executeAgent } from "@/lib/agents/invoke";
 import { sceneSampleRunSchema } from "@/lib/validators";
 import "@/lib/scenes-init";
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   try {
     me = await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -37,57 +38,49 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const scene = getScene(sceneKey);
   if (!scene) {
-    return NextResponse.json({ error: `scene "${sceneKey}" is not registered` }, { status: 404 });
+    return respondError("UNKNOWN_SCENE", `scene "${sceneKey}" is not registered`, 404);
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    return respondError("INVALID_JSON", "invalid JSON body", 400);
   }
   const parsedBody = sceneSampleRunSchema.safeParse(body);
   if (!parsedBody.success) {
-    return NextResponse.json(
-      {
-        error:
-          "invalid body: " +
-          parsedBody.error.issues
-            .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-            .join("; "),
-      },
-      { status: 400 },
+    return respondValidationError(
+      parsedBody.error.flatten(),
+      "invalid body: " +
+        parsedBody.error.issues
+          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+          .join("; "),
     );
   }
 
   const ctxResult = scene.contextSchema.safeParse(parsedBody.data.ctx);
   if (!ctxResult.success) {
-    return NextResponse.json(
-      {
-        error:
-          "ctx invalid: " +
-          ctxResult.error.issues
-            .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-            .join("; "),
-      },
-      { status: 400 },
+    return respondValidationError(
+      ctxResult.error.flatten(),
+      "ctx invalid: " +
+        ctxResult.error.issues
+          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+          .join("; "),
+      "CONTEXT_INVALID",
     );
   }
 
   const binding = await prisma.sceneBinding.findUnique({ where: { sceneKey } });
   if (!binding) {
-    return NextResponse.json(
-      { error: `scene "${sceneKey}" has no binding to sample` },
-      { status: 404 },
-    );
+    return respondError("UNBOUND_SCENE", `scene "${sceneKey}" has no binding to sample`, 404);
   }
 
   const agent = await prisma.agent.findUnique({ where: { id: binding.agentId } });
   if (!agent) {
-    return NextResponse.json({ error: "bound agent no longer exists" }, { status: 503 });
+    return respondError("BINDING_AGENT_MISSING", "bound agent no longer exists", 503);
   }
   if (!agent.deployedAt) {
-    return NextResponse.json({ error: "bound agent is not deployed" }, { status: 503 });
+    return respondError("BINDING_AGENT_NOT_DEPLOYED", "bound agent is not deployed", 503);
   }
 
   let agentInput: unknown;
@@ -97,11 +90,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       actor: { userId: me.id, level: me.level, name: me.name },
     } as Record<string, unknown>);
   } catch (e) {
-    return NextResponse.json(
-      {
-        error: `inputMap apply failed: ${e instanceof Error ? e.message : String(e)}`,
-      },
-      { status: 500 },
+    return respondError(
+      "TEMPLATE_ERROR",
+      `inputMap apply failed: ${e instanceof Error ? e.message : String(e)}`,
+      500,
     );
   }
 
@@ -113,7 +105,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   let raced;
   try {
     raced = await Promise.race([
-      invokeAgent({ agent, mode: agent.mode, input: agentInput }),
+      executeAgent({ agent, mode: agent.mode, input: agentInput }),
       timeoutPromise,
     ]);
   } finally {
@@ -121,12 +113,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   if ("__timeout" in raced) {
+    const msg = `sample run exceeded ${TIMEOUT_MS}ms`;
     return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "TIMEOUT",
-        errorMessage: `sample run exceeded ${TIMEOUT_MS}ms`,
-      },
+      { ok: false, errorCode: "TIMEOUT", errorMessage: msg, error: msg },
       { status: 504 },
     );
   }
@@ -137,6 +126,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         ok: false,
         errorCode: raced.errorCode,
         errorMessage: raced.errorMessage,
+        error: raced.errorMessage,
         runLog: raced.runLog,
         agentInput,
       },

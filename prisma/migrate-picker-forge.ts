@@ -298,14 +298,14 @@ const FOREACH_BODY = {
     {
       id: "dl",
       type: "skill" as const,
-      equipSlot: 2,
+      slotIndex: 2,
       inputFrom: { merge: { url: "agent.input.item.url" } },
       position: { x: 60, y: 100 },
     },
     {
       id: "save",
       type: "skill" as const,
-      equipSlot: 3,
+      slotIndex: 3,
       inputFrom: {
         merge: {
           relicSlug: "agent.input.item.workspaceSlug",
@@ -340,7 +340,7 @@ const LOOP_BODY = {
     {
       id: "serp",
       type: "skill" as const,
-      equipSlot: 1,
+      slotIndex: 1,
       inputFrom: { merge: { query: "agent.input.query" } },
       position: { x: 60, y: 200 },
     },
@@ -391,7 +391,7 @@ const LOOP_BODY = {
     {
       id: "vision",
       type: "skill" as const,
-      equipSlot: 4,
+      slotIndex: 4,
       inputFrom: "prepVision.output",
       position: { x: 780, y: 200 },
     },
@@ -561,20 +561,10 @@ const PICK_INPUT_MAP = {
   referenceImageAbs: "{{ctx.referenceImageAbs}}",
 };
 
-// outputMap: both leaves (userOnly + mergeFinal) produce the SAME shape,
-// so we just forward the active leaf via the `output` scope variable —
-// dispatch.ts resolves that to the topo-last live leaf's output. This
-// keeps generateMetadata's shapeMetadata simple (it doesn't need to
-// pick between two branches).
-const PICK_OUTPUT_MAP = {
-  candidates: "{{output.candidates}}",
-  recommendedPrimaryPath: "{{output.recommendedPrimaryPath}}",
-  networkFetchAttempted: "{{output.networkFetchAttempted}}",
-  visionFilterApplied: "{{output.visionFilterApplied}}",
-  visionFilterMatches: "{{output.visionFilterMatches}}",
-  visionFilterRounds: "{{output.visionFilterRounds}}",
-  refinedQueryUsed: "{{output.refinedQueryUsed}}",
-};
+// 2026-05-11: outputMap dropped — both branch leaves (userOnly +
+// mergeFinal) already produce scene-shape `{ candidates,
+// recommendedPrimaryPath, ... }` directly; dispatch returns the topo-last
+// live leaf's output and scene.outputSchema validates it.
 
 function genCuid(): string {
   const ts = Date.now().toString(36);
@@ -707,7 +697,6 @@ async function bindScene(prisma: PrismaClient, forgeId: string): Promise<void> {
       data: {
         agentId: forgeId,
         inputMap: PICK_INPUT_MAP as unknown as Prisma.InputJsonValue,
-        outputMap: PICK_OUTPUT_MAP as unknown as Prisma.InputJsonValue,
         enabled: true,
         notes: "PICKER-FORGE-001: backbone loop+forEach+transform decomposition of the legacy INTERNAL handler.",
       },
@@ -720,7 +709,6 @@ async function bindScene(prisma: PrismaClient, forgeId: string): Promise<void> {
       sceneKey,
       agentId: forgeId,
       inputMap: PICK_INPUT_MAP as unknown as Prisma.InputJsonValue,
-      outputMap: PICK_OUTPUT_MAP as unknown as Prisma.InputJsonValue,
       enabled: true,
       notes: "PICKER-FORGE-001: backbone loop+forEach+transform decomposition of the legacy INTERNAL handler.",
     },

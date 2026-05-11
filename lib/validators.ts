@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseTemplate } from "@/lib/agent-service/template";
 
 export const userCreateSchema = z.object({
   name: z.string().min(1).max(80),
@@ -41,7 +42,11 @@ const INPUT_FROM_RE = /^(agent\.input|[a-zA-Z0-9_-]+\.output)$/;
 
 export const pipelineStepSchema = z.object({
   id: z.string().min(1).max(64).regex(STEP_ID_RE, "step id must match [a-zA-Z0-9_-]+"),
-  equipSlot: z.number().int().min(0).max(5),
+  // Slot index 0-5 — matches AgentSkillEquip.slotIndex DB column. Was named
+  // `equipSlot` pre-2026-05-11; migrate-rename-equipslot.ts rewrote existing
+  // pipelineConfig JSON rows to the new name. New code should always emit
+  // `slotIndex`.
+  slotIndex: z.number().int().min(0).max(5),
   inputMapping: z.object({
     from: z.string().regex(INPUT_FROM_RE, 'must be "agent.input" or "<stepId>.output"'),
   }),
@@ -89,7 +94,9 @@ const positionSchema = z.object({ x: z.number(), y: z.number() }).optional();
 const dagSkillNodeSchema = z.object({
   id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
   type: z.literal("skill"),
-  equipSlot: z.number().int().min(0).max(5),
+  // 0-5 — matches AgentSkillEquip.slotIndex DB column. Was `equipSlot`
+  // pre-2026-05-11; migrate-rename-equipslot.ts handles the JSON rewrite.
+  slotIndex: z.number().int().min(0).max(5),
   inputFrom: sourceRef,
   position: positionSchema,
 });
@@ -311,6 +318,99 @@ export const handlerConfigSchema = z
     },
   );
 
+// Template parse-once validators — apply to every `{{path}}`-bearing
+// field in handlerConfig at save-time. Mirrors the JSONata parse-once
+// check on transform nodes in lib/skills/runtime/backbone.ts: malformed
+// templates surface in the SkillEditor red-text instead of blowing up
+// mid-AgentJob. Runtime `applyTemplate` stays graceful as defense in
+// depth.
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+type LeafPath = (string | number)[];
+
+function collectTemplateStrings(
+  value: unknown,
+  path: LeafPath,
+): Array<{ path: LeafPath; value: string }> {
+  if (typeof value === "string") return [{ path, value }];
+  if (Array.isArray(value)) {
+    return value.flatMap((item, i) => collectTemplateStrings(item, [...path, i]));
+  }
+  if (isPlainObject(value)) {
+    return Object.entries(value).flatMap(([k, v]) =>
+      collectTemplateStrings(v, [...path, k]),
+    );
+  }
+  return [];
+}
+
+function refineTemplateString(
+  ctx: z.RefinementCtx,
+  value: string,
+  path: LeafPath,
+): void {
+  const parsed = parseTemplate(value);
+  if (parsed.ok) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path,
+    message: `template parse failed at offset ${parsed.offset}: ${parsed.error}`,
+  });
+}
+
+function refineHttpApiHandlerConfig(
+  cfg: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+): void {
+  if (typeof cfg.url === "string") {
+    refineTemplateString(ctx, cfg.url, ["handlerConfig", "url"]);
+  }
+  for (const key of ["queryTemplate", "bodyTemplate", "headers", "responseTransform"] as const) {
+    const sub = cfg[key];
+    if (sub == null) continue;
+    if (typeof sub === "string") {
+      refineTemplateString(ctx, sub, ["handlerConfig", key]);
+      continue;
+    }
+    for (const leaf of collectTemplateStrings(sub, ["handlerConfig", key])) {
+      refineTemplateString(ctx, leaf.value, leaf.path);
+    }
+  }
+  const polling = cfg.polling;
+  if (isPlainObject(polling)) {
+    if (typeof polling.url === "string") {
+      refineTemplateString(ctx, polling.url, ["handlerConfig", "polling", "url"]);
+    }
+    if (isPlainObject(polling.headers)) {
+      for (const leaf of collectTemplateStrings(polling.headers, ["handlerConfig", "polling", "headers"])) {
+        refineTemplateString(ctx, leaf.value, leaf.path);
+      }
+    }
+  }
+}
+
+function refineLlmPromptHandlerConfig(
+  cfg: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+): void {
+  for (const key of ["systemPrompt", "userTemplate"] as const) {
+    if (typeof cfg[key] === "string") {
+      refineTemplateString(ctx, cfg[key] as string, ["handlerConfig", key]);
+    }
+  }
+}
+
+function refineSkillHandlerTemplates(
+  skill: { kind?: string | undefined; handlerConfig?: Record<string, unknown> | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (!skill.handlerConfig || !skill.kind) return;
+  if (skill.kind === "HTTP_API") refineHttpApiHandlerConfig(skill.handlerConfig, ctx);
+  else if (skill.kind === "LLM_PROMPT") refineLlmPromptHandlerConfig(skill.handlerConfig, ctx);
+}
+
 // Permissive JSON Schema validator — accept any JSON object (or null).
 // Real JSON Schema spec compliance lives at runtime in lib/skills/invoke.ts.
 const jsonSchemaSchema = z.record(z.unknown()).nullable().optional();
@@ -325,7 +425,7 @@ export const skillSlugSchema = z
   .max(64)
   .regex(skillSlugRegex, "slug must be lowercase letters, digits, single dashes (no leading/trailing dash)");
 
-export const skillCreateSchema = z.object({
+const skillCreateBaseSchema = z.object({
   slug: skillSlugSchema.optional(),
   // level/costAp kept for back-compat — new UI hides them. Optional so
   // POST bodies that omit these fall back to schema defaults.
@@ -345,7 +445,9 @@ export const skillCreateSchema = z.object({
   // tests the handler config, then flips to ONLINE.
   status: z.enum(["ONLINE", "OFFLINE"]).optional(),
 });
-export const skillUpdateSchema = skillCreateSchema.partial();
+
+export const skillCreateSchema = skillCreateBaseSchema.superRefine(refineSkillHandlerTemplates);
+export const skillUpdateSchema = skillCreateBaseSchema.partial().superRefine(refineSkillHandlerTemplates);
 
 export const skillTestInvokeSchema = z.object({
   input: z.unknown(),
@@ -379,13 +481,27 @@ export type SkillUpdateInput = z.infer<typeof skillUpdateSchema>;
 // happy with any nested shape. The runtime layer (lib/agent-service)
 // is what fails dispatch if the produced AgentJob.input doesn't match
 // the bound agent's inputSchema.
-export const sceneBindingUpdateSchema = z.object({
-  agentId: z.string().cuid(),
-  inputMap: z.unknown(),
-  outputMap: z.unknown().optional().nullable(),
-  enabled: z.boolean().default(true),
-  notes: z.string().max(500).nullable().optional(),
-});
+//
+// 2026-05-11: outputMap field retired. Bindings are pure routing now —
+// scene.outputSchema is the contract, agents self-shape via tail
+// transforms.
+export const sceneBindingUpdateSchema = z
+  .object({
+    agentId: z.string().cuid(),
+    inputMap: z.unknown(),
+    enabled: z.boolean().default(true),
+    notes: z.string().max(500).nullable().optional(),
+  })
+  .superRefine((binding, ctx) => {
+    // Parse-once every `{{path}}` template in inputMap at save-time.
+    // Same pattern as Skill.handlerConfig refine — admin sees red text
+    // in SceneBindingEditor instead of an empty-string interpolation
+    // surprising them at dispatch.
+    if (binding.inputMap == null) return;
+    for (const leaf of collectTemplateStrings(binding.inputMap, ["inputMap"])) {
+      refineTemplateString(ctx, leaf.value, leaf.path);
+    }
+  });
 export type SceneBindingUpdateInput = z.infer<typeof sceneBindingUpdateSchema>;
 
 export const sceneSampleRunSchema = z.object({

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
+import { themeClass } from "@/lib/agentControl/theme";
+import type { AgentMode } from "../types";
 
 const ASPECT = 131 / 304; // matches hero portrait outer panel ratio (0.4309)
 
@@ -43,11 +45,14 @@ export default function AvatarCropModal({ src, isMech, onCancel, onApply }: Prop
     }
   }
 
-  const accent = isMech ? "secondary" : "primary";
-  const applyCls = isMech
-    ? "min-h-[44px] px-6 py-2 bg-secondary/10 border border-secondary/40 text-secondary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-secondary/20 disabled:opacity-40 transition-colors"
-    : "min-h-[44px] px-6 py-2 bg-primary/10 border border-primary/40 text-primary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-primary/20 disabled:opacity-40 transition-colors";
-  void accent;
+  const mode: AgentMode = isMech ? "MECHANICAL" : "AUTONOMOUS";
+  const applyCls = [
+    "min-h-[44px] px-6 py-2 font-label text-[10px] tracking-[0.3em] uppercase rounded-md disabled:opacity-40 transition-colors border",
+    themeClass(mode, "bgSofter"),
+    themeClass(mode, "borderMedium"),
+    themeClass(mode, "text"),
+    themeClass(mode, "hoverSofter"),
+  ].join(" ");
 
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -61,7 +66,7 @@ export default function AvatarCropModal({ src, isMech, onCancel, onApply }: Prop
       }}
     >
       <div className="w-full max-w-md cyber-panel rounded-lg p-6 space-y-4">
-        <h3 className={`font-headline text-2xl ${isMech ? "text-secondary" : "text-primary"}`}>
+        <h3 className={`font-headline text-2xl ${themeClass(mode, "text")}`}>
           Crop Portrait
         </h3>
 
@@ -89,7 +94,7 @@ export default function AvatarCropModal({ src, isMech, onCancel, onApply }: Prop
             step={0.01}
             value={zoom}
             onChange={(e) => setZoom(Number(e.target.value))}
-            className={`flex-1 ${isMech ? "accent-secondary" : "accent-primary"}`}
+            className={`flex-1 ${themeClass(mode, "inputAccent")}`}
             aria-label="zoom"
           />
           <span className="material-symbols-outlined text-base text-on-surface-variant" aria-hidden>zoom_in</span>

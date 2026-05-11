@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { skillCreateSchema } from "@/lib/validators";
 import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 
 // Derive a kebab-case slug candidate from the human-readable nameEn. Mirrors
 // the regex enforced by skillSlugSchema. Collisions are resolved by appending
@@ -63,7 +64,7 @@ export async function GET() {
   try {
     await requireUser();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const skills = await prisma.skill.findMany({
@@ -78,14 +79,14 @@ export async function POST(req: NextRequest) {
   try {
     me = await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
   const json = await req.json().catch(() => null);
   const parsed = skillCreateSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
 
   const { handlerConfig, inputSchema, outputSchema, slug: providedSlug, ...rest } = parsed.data;
@@ -103,9 +104,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(skill, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json({ error: "slug already in use" }, { status: 409 });
+      return respondError("SKILL_SLUG_CONFLICT", "slug already in use", 409);
     }
     console.error("[skills] create failed", e);
-    return NextResponse.json({ error: "create failed" }, { status: 500 });
+    return respondError("CREATE_FAILED", "create failed", 500);
   }
 }

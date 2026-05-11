@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { skillUpdateSchema } from "@/lib/validators";
 import { AuthError, requireAdmin, requireUser } from "@/lib/auth";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -37,7 +38,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     await requireUser();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id } = await params;
@@ -45,7 +46,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     where: { id },
     include: { createdBy: { select: { id: true, name: true } } },
   });
-  if (!skill) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!skill) return respondError("NOT_FOUND", "not found", 404);
   return NextResponse.json(skill);
 }
 
@@ -53,14 +54,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id } = await params;
   const json = await req.json().catch(() => null);
   const parsed = skillUpdateSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
   const { handlerConfig, inputSchema, outputSchema, ...rest } = parsed.data;
   const jsonWrites = buildJsonWrites({ handlerConfig, inputSchema, outputSchema });
@@ -73,10 +74,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json(skill);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json({ error: "slug already in use" }, { status: 409 });
+      return respondError("SKILL_SLUG_CONFLICT", "slug already in use", 409);
     }
     console.error("[skills] update failed", e);
-    return NextResponse.json({ error: "update failed" }, { status: 500 });
+    return respondError("UPDATE_FAILED", "update failed", 500);
   }
 }
 
@@ -84,7 +85,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   const { id } = await params;
@@ -93,6 +94,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return new NextResponse(null, { status: 204 });
   } catch (e) {
     console.error("[skills] delete failed", e);
-    return NextResponse.json({ error: "delete failed" }, { status: 500 });
+    return respondError("DELETE_FAILED", "delete failed", 500);
   }
 }

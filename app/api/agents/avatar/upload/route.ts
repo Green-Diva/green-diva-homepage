@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError } from "@/lib/api-error";
 
 const STORAGE_DIR = path.join(
   process.cwd(),
@@ -16,16 +17,16 @@ export async function POST(req: NextRequest) {
     try {
       await requireAdmin();
     } catch (e) {
-      if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+      if (e instanceof AuthError) return respondAuthError(e);
       throw e;
     }
 
     const form = await req.formData().catch(() => null);
-    if (!form) return NextResponse.json({ error: "invalid form" }, { status: 400 });
+    if (!form) return respondError("INVALID_FORM", "invalid form", 400);
 
     const file = form.get("file");
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "missing file" }, { status: 400 });
+      return respondError("MISSING_FILE", "missing file", 400);
     }
 
     // Trust the client-cropped output; default to .jpg if no extension is given.

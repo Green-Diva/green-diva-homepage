@@ -12,8 +12,13 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { invokeAgent, type AgentRunResult } from "@/lib/agents/invoke";
+import { executeAgent, type AgentRunResult } from "@/lib/agents/invoke";
 import { recordRelicLog } from "@/lib/relicLog";
+import { AgentErrorCode, logError } from "@/lib/agent-errors";
+// Side-effect: registers all relic.* scenes so getScene works when a
+// runner job carries a sceneKey. Cheap import — same module dispatch.ts uses.
+import "@/lib/scenes-init";
+import { getScene } from "@/lib/agent-service/registry";
 
 const TRANSIENT_PATTERNS = [
   /\b5\d\d\b/, // 5xx HTTP status anywhere in message
@@ -64,7 +69,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
 
     let result: AgentRunResult;
     try {
-      result = await invokeAgent({
+      result = await executeAgent({
         agent: job.agent,
         mode: job.mode,
         input: job.input,
@@ -73,34 +78,77 @@ export async function runAgentJob(jobId: string): Promise<void> {
       // Catastrophic — dispatcher itself threw (invalid mode, prisma down).
       // No runLog to preserve. Mark FAILED unconditionally.
       const message = e instanceof Error ? e.message : String(e);
-      console.error(`[agent-job:run] ${jobId} dispatcher threw:`, message);
+      logError("agent-job:run", AgentErrorCode.AGENT_RUNTIME_ERROR, `${jobId} dispatcher threw: ${message}`);
       await prisma.agentJob.update({
         where: { id: jobId },
         data: {
           status: "FAILED",
-          errorCode: "AGENT_RUNTIME_ERROR",
+          errorCode: AgentErrorCode.AGENT_RUNTIME_ERROR,
           errorMessage: message.slice(0, 1000),
-          endedAt: new Date(),
+          finishedAt: new Date(),
         },
       });
       return;
     }
 
     if (result.ok) {
+      // Scene contract validation — when this job was triggered via
+      // dispatchScene, the agent's leaf output must match the bound
+      // scene's outputSchema. Catches "agent's tail transform doesn't
+      // produce the expected shape" loudly instead of silently writing
+      // a partial Relic row. Direct invokeAgent calls (no sceneKey) skip.
+      if (job.sceneKey) {
+        const scene = getScene(job.sceneKey);
+        if (scene) {
+          const parsed = scene.outputSchema.safeParse(result.output);
+          if (!parsed.success) {
+            const detail = parsed.error.issues
+              .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+              .join("; ");
+            await prisma.agentJob.update({
+              where: { id: jobId },
+              data: {
+                status: "FAILED",
+                errorCode: AgentErrorCode.SCENE_OUTPUT_INVALID,
+                errorMessage: `agent leaf output didn't match scene "${job.sceneKey}" outputSchema: ${detail}`.slice(
+                  0,
+                  1000,
+                ),
+                output: jsonOrNull(result.output),
+                runLog: result.runLog as unknown as Prisma.InputJsonValue,
+                finishedAt: new Date(),
+              },
+            });
+            try {
+              await recordRelicProcessingLog(
+                job.input,
+                job.sceneKey,
+                jobId,
+                "FAILED",
+                `scene contract mismatch: ${detail}`,
+              );
+            } catch (e) {
+              console.error(`[agent-job:run] ${jobId} relic log (scene-invalid) failed:`, e);
+            }
+            return;
+          }
+        }
+      }
+
       await prisma.agentJob.update({
         where: { id: jobId },
         data: {
           status: "SUCCESS",
           output: jsonOrNull(result.output),
           runLog: result.runLog as unknown as Prisma.InputJsonValue,
-          endedAt: new Date(),
+          finishedAt: new Date(),
         },
       });
       // Data-driven writeback to Relic — agent leaf output's
-      // `_relicWriteback: { id, fields }` (produced via SceneBinding
-      // outputMap or skill responseTransform) is applied against an
-      // allowlist. Pure agent invocations without `_relicWriteback` are
-      // no-ops.
+      // `_relicWriteback: { id, fields }` (produced via the agent's
+      // tail transform node or skill responseTransform) is applied
+      // against an allowlist. Pure agent invocations without
+      // `_relicWriteback` are no-ops.
       try {
         await maybeWriteRelicAsset(result.output);
       } catch (e) {
@@ -117,7 +165,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
     // result.ok === false — preserve runLog, decide retry based on errorMessage.
     const message = result.errorMessage;
     const code = result.errorCode;
-    console.error(`[agent-job:run] ${jobId} (${code}):`, message);
+    logError("agent-job:run", code, `${jobId}: ${message}`);
 
     const fresh = await prisma.agentJob.findUnique({
       where: { id: jobId },
@@ -149,7 +197,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
         errorCode: code,
         errorMessage: message.slice(0, 1000),
         runLog: result.runLog as unknown as Prisma.InputJsonValue,
-        endedAt: new Date(),
+        finishedAt: new Date(),
       },
     });
     try {
@@ -159,15 +207,15 @@ export async function runAgentJob(jobId: string): Promise<void> {
     }
   } catch (e) {
     // Catastrophic — couldn't even mark FAILED. One last attempt to record it.
-    console.error(`[agent-job:run] ${jobId} catastrophic top-level error`, e);
+    logError("agent-job:run", AgentErrorCode.RUNNER_CRASH, `${jobId} catastrophic top-level error`, e);
     try {
       await prisma.agentJob.update({
         where: { id: jobId },
         data: {
           status: "FAILED",
-          errorCode: "RUNNER_CRASH",
+          errorCode: AgentErrorCode.RUNNER_CRASH,
           errorMessage: e instanceof Error ? e.message.slice(0, 500) : "runner crashed",
-          endedAt: new Date(),
+          finishedAt: new Date(),
         },
       });
     } catch {
@@ -179,10 +227,10 @@ export async function runAgentJob(jobId: string): Promise<void> {
 // — Relic writeback hook — — — — — — — — — — — — — — — — — — — — — — —
 //
 // When the agent's leaf output carries `_relicWriteback: { id, fields }`,
-// each whitelisted field is applied to that Relic row. Skills produce
-// this shape via SceneBinding outputMap or directly in their leaf
-// output, so adding a new writeback target is purely a config change —
-// no runner code edits.
+// each whitelisted field is applied to that Relic row. Agents produce
+// this shape via a tail `transform` node or a skill's responseTransform,
+// so adding a new writeback target is purely a config change — no
+// runner code edits.
 //
 // Outputs without `_relicWriteback` are no-ops, so general agent
 // invocations are unaffected.

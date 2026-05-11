@@ -6,6 +6,7 @@ import { format } from "@/lib/i18n/format";
 import type { AgentRow, EquipRow } from "../types";
 import BackboneFlowEditor from "./BackboneFlowEditor";
 import OrchestratorEditor from "./OrchestratorEditor";
+import { themeClass } from "@/lib/agentControl/theme";
 
 // Replaces the old ControlConfigStrip — taller card that lives at the bottom
 // of the Skills column. Mode-aware accent.
@@ -31,11 +32,9 @@ export default function ControlConfigCard({
   const cfg = isMech ? agent.pipelineConfig : agent.dispatcherConfig;
   const isConfigured = !!cfg && Object.keys(cfg).length > 0;
 
-  const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentFill = isMech ? "bg-secondary/[0.12]" : "bg-primary/[0.12]";
-  const accentBtn = isMech
-    ? "border-secondary/70 text-secondary hover:bg-secondary/[0.12]"
-    : "border-primary/70 text-primary hover:bg-primary/[0.12]";
+  const accentText = themeClass(agent.mode, "text");
+  const accentFill = themeClass(agent.mode, "fill");
+  const accentBtn = themeClass(agent.mode, "btnAccent");
   const icon = isMech ? "schema" : "psychology";
 
   const summary = isConfigured

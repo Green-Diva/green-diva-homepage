@@ -2,6 +2,7 @@ import "server-only";
 import type { Agent, AgentMode } from "@prisma/client";
 import { runBackbone } from "@/lib/skills/runtime/backbone";
 import { runOrchestrator } from "@/lib/skills/runtime/orchestrator";
+import type { AgentErrorCode } from "@/lib/agent-errors";
 
 // Per-step record appended by Backbone (Phase 3) and Orchestrator (Phase 4)
 // runtimes. Phase 2 leaves runLog empty since the actual execution layer
@@ -14,7 +15,7 @@ export type AgentRunLogEntry = {
   durationMs: number;
   ok: boolean;
   output?: unknown;
-  errorCode?: string;
+  errorCode?: AgentErrorCode;
   errorMessage?: string;
   // DAG (v2) extras:
   // - `skipped`: node was unreachable (no live incoming edge) on this run,
@@ -33,7 +34,7 @@ export type AgentRunSuccess = {
 
 export type AgentRunFailure = {
   ok: false;
-  errorCode: string;
+  errorCode: AgentErrorCode;
   errorMessage: string;
   runLog: AgentRunLogEntry[];
 };
@@ -56,7 +57,13 @@ export class AgentRuntimeError extends Error {
 // Mode-dispatcher. Routes to mode-specific runtimes; never throws for
 // "execution failed" cases — those return AgentRunFailure so runLog
 // flows through to the AgentJob row. Only invalid mode throws.
-export async function invokeAgent(opts: {
+//
+// Naming: `executeAgent` is the canonical name as of 2026-05-11. Previously
+// called `invokeAgent`, which created 3-way overloading with the lower-level
+// `invokeSkill` (handler call) and orchestrator-internal `invokeTool` (LLM
+// tool dispatch). The export alias `invokeAgent` is preserved for callers
+// that haven't migrated yet; remove after 2026-06.
+export async function executeAgent(opts: {
   agent: Agent;
   mode: AgentMode;
   input: unknown;
@@ -86,3 +93,6 @@ export async function invokeAgent(opts: {
   }
   throw new AgentRuntimeError(`unknown agent mode: ${opts.mode}`, "INVALID_MODE");
 }
+
+/** @deprecated Use `executeAgent` instead. Removed after 2026-06. */
+export const invokeAgent = executeAgent;

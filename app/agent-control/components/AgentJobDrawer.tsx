@@ -7,6 +7,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { AgentErrorCode } from "@/lib/agent-errors";
+import { DIAGNOSTIC_HINTS_ZH } from "@/lib/agent-errors-i18n";
+
+function hintFor(code: string | null | undefined): string | undefined {
+  if (!code) return undefined;
+  return DIAGNOSTIC_HINTS_ZH[code as AgentErrorCode];
+}
 
 type JobStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
 type Mode = "MECHANICAL" | "AUTONOMOUS";
@@ -20,7 +27,7 @@ type JobListRow = {
   attempts: number;
   maxAttempts: number;
   startedAt: string | null;
-  endedAt: string | null;
+  finishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,9 +62,9 @@ function relTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-function durationMs(job: { startedAt: string | null; endedAt: string | null }): number | null {
-  if (!job.startedAt || !job.endedAt) return null;
-  return new Date(job.endedAt).getTime() - new Date(job.startedAt).getTime();
+function durationMs(job: { startedAt: string | null; finishedAt: string | null }): number | null {
+  if (!job.startedAt || !job.finishedAt) return null;
+  return new Date(job.finishedAt).getTime() - new Date(job.startedAt).getTime();
 }
 
 function formatDuration(ms: number | null): string {
@@ -342,10 +349,38 @@ export default function AgentJobDrawer({ agentId, agentCodename, isAdmin, onClos
                               </Section>
                             )}
                             {detail.errorMessage && (
-                              <Section label={`Error · ${detail.errorCode ?? "UNKNOWN"}`}>
-                                <p className="text-error/80 text-[11px] whitespace-pre-wrap break-all">
-                                  {detail.errorMessage}
-                                </p>
+                              <Section
+                                label={
+                                  detail.errorCode === "SCENE_OUTPUT_INVALID"
+                                    ? "Scene Contract Mismatch · SCENE_OUTPUT_INVALID"
+                                    : `Error · ${detail.errorCode ?? "UNKNOWN"}`
+                                }
+                              >
+                                {detail.errorCode === "SCENE_OUTPUT_INVALID" ? (
+                                  <div className="space-y-1.5">
+                                    <p className="text-amber-300 text-[11px] leading-snug">
+                                      📐 Agent leaf output didn&apos;t match the
+                                      bound scene&apos;s outputSchema. Add or
+                                      fix the tail{" "}
+                                      <code className="text-amber-200">transform</code>{" "}
+                                      node so it produces the contract shape.
+                                    </p>
+                                    <p className="text-error/80 text-[11px] font-mono whitespace-pre-wrap break-all">
+                                      {detail.errorMessage}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    <p className="text-error/80 text-[11px] whitespace-pre-wrap break-all">
+                                      {detail.errorMessage}
+                                    </p>
+                                    {hintFor(detail.errorCode) && (
+                                      <p className="text-on-surface-variant text-[11px] leading-snug">
+                                        💡 {hintFor(detail.errorCode)}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                               </Section>
                             )}
                             {Array.isArray(detail.runLog) && detail.runLog.length > 0 && (

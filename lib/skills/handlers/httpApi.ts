@@ -63,6 +63,7 @@
 //   stops mattering.
 
 import { HandlerError, type SkillHandler } from "../types";
+import { applyTemplate as applySharedTemplate } from "@/lib/agent-service/template";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
@@ -85,21 +86,11 @@ function getPath(obj: unknown, path: string): unknown {
   return cur;
 }
 
+// Shared engine (lib/agent-service/template.ts) is the single source of
+// truth. Wrapper coerces the `scope` arg into the Record-keyed shape the
+// shared engine expects.
 function applyTemplate(template: unknown, scope: unknown): unknown {
-  if (typeof template === "string") {
-    return template.replace(/\{\{\s*([a-zA-Z0-9_.[\]]+)\s*\}\}/g, (_m, path: string) => {
-      const v = getPath(scope, path);
-      if (v === undefined || v === null) return "";
-      return typeof v === "string" ? v : JSON.stringify(v);
-    });
-  }
-  if (Array.isArray(template)) return template.map((t) => applyTemplate(t, scope));
-  if (isObject(template)) {
-    const out: Record<string, unknown> = {};
-    for (const k of Object.keys(template)) out[k] = applyTemplate(template[k], scope);
-    return out;
-  }
-  return template;
+  return applySharedTemplate(template, (scope ?? {}) as Record<string, unknown>);
 }
 
 // — Polling helpers — — — — — — — — — — — — — — — — — — — — — — — — — —

@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { AgentRow, AgentStatus, AgentMode } from "../types";
 import AvatarCropModal from "./AvatarCropModal";
+import { themeAccent, themeClass } from "@/lib/agentControl/theme";
 
 type Mode = "create" | "edit";
 
@@ -52,7 +53,8 @@ function ThemedDropdown({
   }, [open]);
 
   const current = options.find((o) => o.value === value);
-  const accent = isMech ? "secondary" : "primary";
+  const mode: AgentMode = isMech ? "MECHANICAL" : "AUTONOMOUS";
+  const accent = themeAccent(mode);
   const triggerCls = isMech
     ? "mt-1 h-10 w-full rounded-md border border-secondary/20 bg-surface-container pl-3.5 pr-9 text-sm text-on-surface text-left flex items-center hover:border-secondary/40 focus:border-secondary/60 focus:outline-none transition-colors"
     : "mt-1 h-10 w-full rounded-md border border-primary/20 bg-surface-container pl-3.5 pr-9 text-sm text-on-surface text-left flex items-center hover:border-primary/40 focus:border-primary/60 focus:outline-none transition-colors";
@@ -63,8 +65,10 @@ function ThemedDropdown({
     ? "absolute z-50 mt-1 w-full rounded-md border border-secondary/30 bg-surface-container shadow-lg shadow-black/40 overflow-hidden"
     : "absolute z-50 mt-1 w-full rounded-md border border-primary/30 bg-surface-container shadow-lg shadow-black/40 overflow-hidden";
   const itemBase = "block w-full text-left px-3.5 h-10 text-sm flex items-center gap-2 transition-colors";
-  const itemActiveCls = isMech ? `${itemBase} bg-secondary/15 text-secondary` : `${itemBase} bg-primary/15 text-primary`;
-  const itemHoverCls = isMech ? `${itemBase} text-on-surface hover:bg-secondary/10 hover:text-secondary` : `${itemBase} text-on-surface hover:bg-primary/10 hover:text-primary`;
+  const itemActiveCls = `${itemBase} ${themeClass(mode, "bgSoft")} ${themeClass(mode, "text")}`;
+  const itemHoverCls = isMech
+    ? `${itemBase} text-on-surface hover:bg-secondary/10 hover:text-secondary`
+    : `${itemBase} text-on-surface hover:bg-primary/10 hover:text-primary`;
   void accent;
 
   return (
@@ -159,13 +163,17 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
   const labelCls = isMech
     ? "text-[11px] font-label uppercase tracking-[0.25em] text-secondary/70"
     : "text-[11px] font-label uppercase tracking-[0.25em] text-primary/60";
-  const headingCls = isMech ? "text-secondary" : "text-primary";
+  const headingCls = themeClass(values.mode, "text");
   const dashedCls = values.avatarUrl
     ? (isMech ? "border-secondary/30 hover:border-secondary/60" : "border-primary/30 hover:border-primary/60")
     : (isMech ? "border-secondary/40 hover:border-secondary/70 bg-surface-container/50" : "border-primary/40 hover:border-primary/70 bg-surface-container/50");
-  const submitCls = isMech
-    ? "min-h-[44px] px-6 py-2 bg-secondary/10 border border-secondary/40 text-secondary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-secondary/20 disabled:opacity-40 transition-colors"
-    : "min-h-[44px] px-6 py-2 bg-primary/10 border border-primary/40 text-primary font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-primary/20 disabled:opacity-40 transition-colors";
+  const submitCls = [
+    "min-h-[44px] px-6 py-2 font-label text-[10px] tracking-[0.3em] uppercase rounded-md disabled:opacity-40 transition-colors border",
+    themeClass(values.mode, "bgSofter"),
+    themeClass(values.mode, "borderMedium"),
+    themeClass(values.mode, "text"),
+    themeClass(values.mode, "hoverSofter"),
+  ].join(" ");
 
   function update<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((s) => ({ ...s, [key]: v }));
@@ -341,7 +349,7 @@ export default function AgentEditor({ mode, initial, onClose, onSaved }: Props) 
                   <span className="material-symbols-outlined text-3xl opacity-70" aria-hidden>
                     {uploadBusy ? "progress_activity" : "image"}
                   </span>
-                  <span className={`font-label text-[9px] tracking-[0.3em] uppercase ${isMech ? "text-secondary/70" : "text-primary/70"}`}>
+                  <span className={`font-label text-[9px] tracking-[0.3em] uppercase ${themeClass(values.mode, "textSoft")}`}>
                     {uploadBusy ? "uploading…" : "click to upload"}
                   </span>
                   <span className="text-[9px] text-on-surface-variant/60 px-2 text-center">

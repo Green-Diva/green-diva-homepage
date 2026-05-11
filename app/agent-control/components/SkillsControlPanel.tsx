@@ -3,6 +3,7 @@
 import EquipmentLoadout from "./EquipmentLoadout";
 import SkillsLoadoutColumn from "./SkillsLoadoutColumn";
 import type { AgentRow, EquipRow, SkillRow } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 export default function SkillsControlPanel({
   agent,
@@ -16,11 +17,9 @@ export default function SkillsControlPanel({
   isAdmin: boolean;
 }) {
   const isMech = agent.mode === "MECHANICAL";
-  const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentBorder = isMech ? "border-secondary/25" : "border-primary/25";
-  const accentMarker = isMech
-    ? "before:bg-secondary/70 after:bg-secondary/70"
-    : "before:bg-primary/70 after:bg-primary/70";
+  const accentText = themeClass(agent.mode, "text");
+  const accentBorder = themeClass(agent.mode, "borderSoft");
+  const accentMarker = themeClass(agent.mode, "marker");
 
   return (
     <div

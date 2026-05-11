@@ -437,7 +437,11 @@ model AgentJob {
   attempts     Int             @default(0)
   maxAttempts  Int             @default(3)
   startedAt    DateTime?
-  endedAt      DateTime?
+  // Aligns with RelicProcessingJob.finishedAt + RelicDraft.finishedAt (same
+  // concept across all three Job-shaped tables). DB column kept as "endedAt"
+  // via @map for zero-downtime rename — actual ALTER TABLE deferred until
+  // we're sure no external tool reads the old name.
+  finishedAt   DateTime?       @map("endedAt")
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
@@ -548,10 +552,10 @@ model SceneBinding {
   agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Restrict)
   // Json template applied to { ctx, actor } at dispatch time to produce
   // AgentJob.input. See lib/agent-service/template.ts for syntax.
+  // (Output reshape — used to live here as `outputMap`; retired
+  // 2026-05-11 in favor of fixed scene.outputSchema + agent tail
+  // transforms. Bindings now hold pure routing only.)
   inputMap        Json
-  // Optional Json template applied to { output, ctx, actor } AFTER the
-  // agent finishes, to reshape output into the scene's outputSchema.
-  outputMap       Json?
   enabled         Boolean  @default(true)
   notes           String?
   createdAt       DateTime @default(now())

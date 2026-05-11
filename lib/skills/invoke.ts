@@ -10,6 +10,7 @@
 import type { Skill } from "@prisma/client";
 import { handlerRegistry } from "./registry";
 import { HandlerError } from "./types";
+import { AgentErrorCode, logError } from "@/lib/agent-errors";
 
 export type InvokeResult =
   | { ok: true; output: unknown; errors: [] }
@@ -18,15 +19,15 @@ export type InvokeResult =
       output?: unknown;
       errors: string[];
       errorCode:
-        | "INPUT_SCHEMA_VIOLATION"
-        | "OUTPUT_SCHEMA_VIOLATION"
-        | "INVALID_CONFIG"
-        | "MISSING_ENV"
-        | "HTTP_ERROR"
-        | "TIMEOUT"
-        | "PROVIDER_ERROR"
-        | "OUTPUT_PARSE"
-        | "HANDLER_ERROR";
+        | typeof AgentErrorCode.INPUT_SCHEMA_VIOLATION
+        | typeof AgentErrorCode.OUTPUT_SCHEMA_VIOLATION
+        | typeof AgentErrorCode.INVALID_CONFIG
+        | typeof AgentErrorCode.MISSING_ENV
+        | typeof AgentErrorCode.HTTP_ERROR
+        | typeof AgentErrorCode.TIMEOUT
+        | typeof AgentErrorCode.PROVIDER_ERROR
+        | typeof AgentErrorCode.OUTPUT_PARSE
+        | typeof AgentErrorCode.HANDLER_ERROR;
       schemaErrors?: { input?: string[]; output?: string[] };
     };
 
@@ -89,7 +90,7 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
     return {
       ok: false,
       errors: ["input failed schema validation"],
-      errorCode: "INPUT_SCHEMA_VIOLATION",
+      errorCode: AgentErrorCode.INPUT_SCHEMA_VIOLATION,
       schemaErrors: { input: inputErrs },
     };
   }
@@ -99,7 +100,7 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
     return {
       ok: false,
       errors: [`no handler registered for ${skill.kind}`],
-      errorCode: "INVALID_CONFIG",
+      errorCode: AgentErrorCode.INVALID_CONFIG,
     };
   }
 
@@ -109,11 +110,11 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
     output = await handler(input, cfg, { skillId: skill.id });
   } catch (e) {
     if (e instanceof HandlerError) {
-      console.error(`[skill:invoke] ${skill.id} (${skill.kind}) ${e.code}:`, e.message);
+      logError("skill:invoke", e.code, `${skill.id} (${skill.kind}): ${e.message}`);
       return { ok: false, errors: [e.message], errorCode: e.code };
     }
-    console.error(`[skill:invoke] ${skill.id} unexpected error:`, e);
-    return { ok: false, errors: ["handler threw"], errorCode: "HANDLER_ERROR" };
+    logError("skill:invoke", AgentErrorCode.HANDLER_ERROR, `${skill.id} unexpected error`, e);
+    return { ok: false, errors: ["handler threw"], errorCode: AgentErrorCode.HANDLER_ERROR };
   }
 
   const outputErrs = validate(skill.outputSchema, output);
@@ -122,7 +123,7 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
       ok: false,
       output,
       errors: ["output failed schema validation"],
-      errorCode: "OUTPUT_SCHEMA_VIOLATION",
+      errorCode: AgentErrorCode.OUTPUT_SCHEMA_VIOLATION,
       schemaErrors: { output: outputErrs },
     };
   }

@@ -23,10 +23,12 @@ import type { PipelineContext, StepResult } from "../context";
 import { scanWorkspace } from "../scanWorkspace";
 import { stageUserCandidates } from "../stageUserCandidates";
 
-// Phase 5: pipeline step reads result.output from each scene directly.
-// SceneBinding outputMap shapes the runLog into the expected fields.
+// Pipeline step reads result.output from each scene directly. Each
+// scene declares its own fixed outputSchema in lib/relics/scenes.ts,
+// and the bound agent's tail transform produces that exact shape — no
+// per-binding outputMap reshape (retired 2026-05-11).
 //
-// Phase 8.5 (smart-pick decomposition): the step now calls TWO scenes
+// Phase 8.5 (smart-pick decomposition): the step calls TWO scenes
 // sequentially:
 //   1. relic.draft-metadata     → research fields + useUserImage/networkImageQuery decision
 //   2. relic.smart-image-pick   → candidates + recommendedPrimaryPath
@@ -249,7 +251,7 @@ export async function runScribeForWorkspace(
 
   try {
     const result = await callScene(
-      "relic.draft-metadata",
+      "relic.generate-draft-metadata",
       {
         workspaceSlug,
         userBrief: scan.userBrief,
@@ -272,8 +274,8 @@ export async function runScribeForWorkspace(
     }
   } catch (e) {
     if (e instanceof SceneError) {
-      metaPreRun = PRE_RUN_FAILURE_CODES.has(e.code);
-      metaFailReason = `draft-metadata scene dispatch failed (${e.code}): ${e.message}`;
+      metaPreRun = PRE_RUN_FAILURE_CODES.has(e.errorCode);
+      metaFailReason = `draft-metadata scene dispatch failed (${e.errorCode}): ${e.message}`;
     } else {
       metaFailReason = `draft-metadata callScene threw: ${e instanceof Error ? e.message : String(e)}`;
     }
@@ -317,7 +319,7 @@ export async function runScribeForWorkspace(
       }
     } catch (e) {
       if (e instanceof SceneError) {
-        pickFailReason = `smart-image-pick scene dispatch failed (${e.code}): ${e.message}`;
+        pickFailReason = `smart-image-pick scene dispatch failed (${e.errorCode}): ${e.message}`;
       } else {
         pickFailReason = `smart-image-pick callScene threw: ${e instanceof Error ? e.message : String(e)}`;
       }
@@ -363,7 +365,7 @@ export async function runScribeForWorkspace(
       ? pickFailReason
       : succeeded
         ? undefined
-        : "binding outputMap didn't expose research fields — see SceneBinding for relic.draft-metadata",
+        : "agent leaf output missing required research fields — check LORE-FORGE tail transform",
   };
 }
 

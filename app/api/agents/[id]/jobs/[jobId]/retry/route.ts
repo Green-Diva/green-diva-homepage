@@ -1,5 +1,5 @@
 // POST /api/agents/[id]/jobs/[jobId]/retry — admin-only re-run of a FAILED job.
-// Resets terminal state (status, output, error*, endedAt) but preserves the
+// Resets terminal state (status, output, error*, finishedAt) but preserves the
 // original input and the prior attempts counter so the runner's retry budget
 // still applies.
 //
@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
+import { respondError, respondAuthError } from "@/lib/api-error";
 import { ensureServerInit } from "@/lib/server-init";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
 import { Prisma } from "@prisma/client";
@@ -20,7 +21,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
   await ensureServerInit();
@@ -31,13 +32,13 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     select: { id: true, agentId: true, status: true },
   });
   if (!job || job.agentId !== id) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
+    return respondError("NOT_FOUND", "not found", 404);
   }
   if (job.status === "SUCCESS") {
-    return NextResponse.json({ error: "cannot retry a successful job; create a new invocation instead" }, { status: 409 });
+    return respondError("JOB_NOT_RETRYABLE", "cannot retry a successful job; create a new invocation instead", 409);
   }
   if (job.status === "PENDING" || job.status === "RUNNING") {
-    return NextResponse.json({ error: "job already in flight" }, { status: 409 });
+    return respondError("JOB_IN_FLIGHT", "job already in flight", 409);
   }
 
   try {
@@ -53,12 +54,12 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         // the original invocation). attempts counter is preserved so the
         // transient-retry budget still applies.
         startedAt: null,
-        endedAt: null,
+        finishedAt: null,
       },
     });
   } catch (e) {
     console.error("[api/agents/jobs/retry] reset failed", e);
-    return NextResponse.json({ error: "retry failed" }, { status: 500 });
+    return respondError("RETRY_FAILED", "retry failed", 500);
   }
 
   void runAgentJob(jobId);

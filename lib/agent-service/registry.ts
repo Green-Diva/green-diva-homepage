@@ -18,6 +18,12 @@ const KEY_RE = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/;
 const MODULE_RE = /^[a-z][a-z0-9-]*$/;
 
 const scenes = new Map<string, AnySceneDefinition>();
+// Alias map for scene-key renames. `getScene(alias)` resolves to the canonical
+// scene. Aliases are NOT listed in listScenes() (admin UI sees only canonical
+// keys); they exist purely to keep old SceneBinding rows / endpoint callers
+// working while a rename rolls out. Drop the alias entry after the
+// corresponding DB rows have been migrated.
+const sceneAliases = new Map<string, string>();
 
 /**
  * Register a scene. Call from module-side `lib/<module>/scenes.ts` files.
@@ -76,7 +82,34 @@ export function registerScene<
 }
 
 export function getScene(key: string): AnySceneDefinition | null {
-  return scenes.get(key) ?? null;
+  const direct = scenes.get(key);
+  if (direct) return direct;
+  const canonical = sceneAliases.get(key);
+  if (canonical) return scenes.get(canonical) ?? null;
+  return null;
+}
+
+/**
+ * Register an alias that resolves to a canonical scene key. Used during scene
+ * renames to keep existing SceneBinding rows / call sites working while the
+ * canonical name is being adopted. Aliases do NOT appear in listScenes().
+ */
+export function registerSceneAlias(aliasKey: string, canonicalKey: string): void {
+  if (!KEY_RE.test(aliasKey)) {
+    throw new SceneError(
+      "UNKNOWN_SCENE",
+      `invalid alias key "${aliasKey}" — must match <module>.<verb>`,
+      500,
+    );
+  }
+  if (scenes.has(aliasKey)) {
+    throw new SceneError(
+      "UNKNOWN_SCENE",
+      `alias "${aliasKey}" collides with a registered scene; rename the scene first`,
+      500,
+    );
+  }
+  sceneAliases.set(aliasKey, canonicalKey);
 }
 
 export function requireScene(key: string): AnySceneDefinition {

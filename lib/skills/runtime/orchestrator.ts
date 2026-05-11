@@ -19,6 +19,7 @@ import type { Skill } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { invokeSkill } from "@/lib/skills/invoke";
 import type { AgentRunResult, AgentRunLogEntry } from "@/lib/agents/invoke";
+import { AgentErrorCode } from "@/lib/agent-errors";
 
 type DispatcherConfig = {
   version: number;
@@ -36,7 +37,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 function validateDispatcherConfig(
   cfg: unknown,
-): { ok: true; config: DispatcherConfig } | { ok: false; code: string; message: string } {
+): { ok: true; config: DispatcherConfig } | { ok: false; code: AgentErrorCode; message: string } {
   if (!isObject(cfg)) {
     return { ok: false, code: "DISPATCHER_MISSING", message: "dispatcherConfig is empty — set up the Orchestrator before invoking" };
   }

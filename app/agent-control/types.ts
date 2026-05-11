@@ -35,6 +35,12 @@ export interface AgentRow {
   pipelineConfig: PipelineConfig | null;
   dispatcherConfig: DispatcherConfig | null;
   deployedAt: string | null;
+  // Scene contracts this agent must satisfy. Server-derived from
+  // SceneBinding rows joined with the registered scene definitions.
+  // BackboneFlowEditor renders these as decorative BEGIN / END nodes
+  // so admin sees "what comes in from the bound module / what must go
+  // back out". Empty array = agent unbound (free invocation only).
+  boundScenes: BoundSceneSummary[];
   skills: AgentSkill[] | null;
   availableAp: number;
   createdAt: string;
@@ -89,7 +95,6 @@ export interface SceneBindingRow {
   agentDeployed: boolean;
   agentCapabilities: string[];
   inputMap: unknown;
-  outputMap: unknown;
   enabled: boolean;
   notes: string | null;
   createdAt: string;
@@ -102,6 +107,30 @@ export type {
   SerializableSceneDef,
   SchemaFieldHint,
 } from "@/lib/agent-service";
+
+// Compact view of one scene this agent is bound to. Drives the
+// decorative BEGIN / END nodes in BackboneFlowEditor — admin sees
+// "module → ctx → agent.input" on the BEGIN side and "agent.leaf →
+// scene contract" on the END side, even though neither is part of
+// pipelineConfig. Server-derived in app/agent-control/page.tsx.
+export interface BoundSceneSummary {
+  sceneKey: string;
+  module: string;
+  invocation: "sync" | "async";
+  label: { en: string; zh: string };
+  // Caller's ctx → agent.input. Reuses scene.contextSchema's
+  // describeZod() output so the field shapes line up with the existing
+  // scene editor.
+  contextFields: import("@/lib/agent-service").SchemaFieldHint[];
+  // The contract this agent's leaf must satisfy.
+  outputFields: import("@/lib/agent-service").SchemaFieldHint[];
+  // Static SceneBinding.inputMap. Used by BackboneFlowEditor to do
+  // scene-aware edge routing — for multi-binding agents with branch
+  // nodes (e.g. LORE-FORGE-001 routes "init" vs "regen" off
+  // input.mode), each scene's BEGIN/END only connects to the branch
+  // its inputMap selects, not all leaves.
+  inputMap: unknown;
+}
 
 // Compact agent reference for the scene-binding agent picker (no
 // loadout / config blob bloat).

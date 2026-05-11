@@ -3,6 +3,7 @@
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { EquipRow, AgentMode } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 const STATUS_BADGE: Record<string, string> = {
   ONLINE: "text-emerald-300 border-emerald-400/50 bg-emerald-400/[0.10]",
@@ -20,13 +21,9 @@ type Props = {
 export default function SkillDetailCard({ slotIndex, equip, mode, onClick, disabled }: Props) {
   const t = useT();
   const { locale } = useI18n();
-  const isMech = mode === "MECHANICAL";
-
-  const accentFill = isMech ? "bg-secondary/[0.12]" : "bg-primary/[0.12]";
-  const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentHover = isMech
-    ? "hover:bg-secondary/[0.20]"
-    : "hover:bg-primary/[0.20]";
+  const accentFill = themeClass(mode, "fill");
+  const accentText = themeClass(mode, "text");
+  const accentHover = themeClass(mode, "fillHover");
 
   const slotLabel = format(t.agentControl.skillSlotLabel, { n: slotIndex + 1 });
 

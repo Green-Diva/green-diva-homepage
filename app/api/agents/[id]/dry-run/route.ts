@@ -15,7 +15,8 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { pipelineConfigSchema, dispatcherConfigSchema } from "@/lib/validators";
 import { AuthError, requireAdmin } from "@/lib/auth";
-import { invokeAgent } from "@/lib/agents/invoke";
+import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
+import { executeAgent } from "@/lib/agents/invoke";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   try {
     await requireAdmin();
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof AuthError) return respondAuthError(e);
     throw e;
   }
 
@@ -40,16 +41,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const body = await req.json().catch(() => null);
   const parsed = dryRunSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return respondValidationError(parsed.error.flatten());
   }
 
   const agent = await prisma.agent.findUnique({ where: { id } });
-  if (!agent) return NextResponse.json({ error: "agent not found" }, { status: 404 });
+  if (!agent) return respondError("NOT_FOUND", "agent not found", 404);
 
   const startedAt = Date.now();
   let result;
   try {
-    result = await invokeAgent({
+    result = await executeAgent({
       agent,
       mode: agent.mode,
       input: parsed.data.input ?? null,
@@ -58,11 +59,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     });
   } catch (e) {
     console.error("[api/agents/dry-run] dispatcher threw", e);
+    const msg = e instanceof Error ? e.message : "dispatcher crashed";
     return NextResponse.json(
       {
         ok: false,
         errorCode: "AGENT_RUNTIME_ERROR",
-        errorMessage: e instanceof Error ? e.message : "dispatcher crashed",
+        errorMessage: msg,
+        error: msg,
         runLog: [],
         durationMs: Date.now() - startedAt,
       },

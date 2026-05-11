@@ -3,6 +3,7 @@
 import { useT } from "@/lib/i18n/client";
 import type { AgentMode } from "../types";
 import type { CentralPos } from "@/lib/agentControl/slotPositions";
+import { themeClass, themeRgba } from "@/lib/agentControl/theme";
 
 type Props = {
   pos: CentralPos;
@@ -15,10 +16,8 @@ type Props = {
 export default function CentralControlSlot({ pos, mode, configured, onClick, disabled }: Props) {
   const t = useT();
   const isMech = mode === "MECHANICAL";
-  const accent = isMech
-    ? "border-secondary text-secondary"
-    : "border-primary text-primary";
-  const glow = isMech ? "rgba(233,193,118,0.55)" : "rgba(144,222,205,0.55)";
+  const accent = themeClass(mode, "ring");
+  const glow = themeRgba(mode, "medium");
   const icon = isMech ? "schema" : "psychology";
 
   return (

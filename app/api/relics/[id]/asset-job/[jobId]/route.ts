@@ -48,7 +48,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       errorCode: true,
       errorMessage: true,
       startedAt: true,
-      endedAt: true,
+      finishedAt: true,
       attempts: true,
       maxAttempts: true,
     },
@@ -71,7 +71,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     errorCode: job.errorCode,
     errorMessage: job.errorMessage,
     startedAt: job.startedAt,
-    endedAt: job.endedAt,
+    finishedAt: job.finishedAt,
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,
   });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 import type { AgentRow } from "../types";
+import { themeAccent, themeClass } from "@/lib/agentControl/theme";
 
 export default function DeployButton({ agent, isAdmin }: { agent: AgentRow; isAdmin: boolean }) {
   const t = useT();
@@ -11,15 +12,12 @@ export default function DeployButton({ agent, isAdmin }: { agent: AgentRow; isAd
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const isMech = agent.mode === "MECHANICAL";
-  const accent = isMech ? "secondary" : "primary";
-  const accentText = isMech ? "text-secondary" : "text-primary";
-  const accentBorder = isMech ? "border-secondary" : "border-primary";
-  const accentBg = isMech ? "bg-secondary/15" : "bg-primary/15";
-  const accentHover = isMech ? "hover:bg-secondary/25" : "hover:bg-primary/25";
-  const accentGlow = isMech
-    ? "shadow-[0_0_18px_rgba(233,193,118,0.45)]"
-    : "shadow-[0_0_18px_rgba(144,222,205,0.45)]";
+  const accent = themeAccent(agent.mode);
+  const accentText = themeClass(agent.mode, "text");
+  const accentBorder = themeClass(agent.mode, "border");
+  const accentBg = themeClass(agent.mode, "bgSoft");
+  const accentHover = themeClass(agent.mode, "hover");
+  const accentGlow = themeClass(agent.mode, "glow");
 
   async function deploy() {
     setBusy(true);
@@ -52,7 +50,7 @@ export default function DeployButton({ agent, isAdmin }: { agent: AgentRow; isAd
       {toast ? (
         <span
           role="status"
-          className={`absolute right-0 top-full mt-1 z-20 whitespace-nowrap font-label text-[9px] tracking-[0.25em] uppercase px-2.5 py-1 rounded border ${accentBorder}/40 ${accentText} bg-background/90 ${accentGlow}`}
+          className={`absolute right-0 top-full mt-1 z-20 whitespace-nowrap font-label text-[9px] tracking-[0.25em] uppercase px-2.5 py-1 rounded border ${themeClass(agent.mode, "borderMedium")} ${accentText} bg-background/90 ${accentGlow}`}
         >
           {toast}
         </span>

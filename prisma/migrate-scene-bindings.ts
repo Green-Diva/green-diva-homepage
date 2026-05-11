@@ -42,7 +42,7 @@ type DefaultBinding = {
 
 const DEFAULT_BINDINGS: DefaultBinding[] = [
   {
-    sceneKey: "relic.draft-metadata",
+    sceneKey: "relic.generate-draft-metadata",
     inputMap: {
       mode: "initial",
       relicSlug: "{{ctx.workspaceSlug}}",

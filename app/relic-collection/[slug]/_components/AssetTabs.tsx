@@ -82,6 +82,49 @@ export default function AssetTabs({
     [params, router],
   );
 
+  // On mount (admin only), restore job state from the server so a refresh
+  // mid-run doesn't drop back to "idle" while the runner is still going.
+  // Latest job per scene is returned regardless of status:
+  //   RUNNING → resume polling
+  //   FAILED  → show error inline so admin can retry
+  //   SUCCESS → ignored (hasEnhanced / hasModel already reflects it)
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/relics/${relicId}/active-jobs`, { credentials: "include" });
+        if (!r.ok || cancelled) return;
+        const data = (await r.json()) as {
+          enhance: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null } | null;
+          model: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null } | null;
+        };
+        const restore = (
+          j: typeof data.enhance,
+          setter: (s: JobState) => void,
+        ) => {
+          if (!j) return;
+          if (j.status === "RUNNING") {
+            setter({
+              kind: "running",
+              jobId: j.jobId,
+              startedAt: j.startedAt ? new Date(j.startedAt).getTime() : Date.now(),
+            });
+          } else if (j.status === "FAILED" || j.status === "CANCELLED") {
+            setter({ kind: "error", message: j.errorMessage ?? `job ${j.status.toLowerCase()}` });
+          }
+        };
+        restore(data.enhance, setEnhanceJob);
+        restore(data.model, setModelJob);
+      } catch {
+        // network failure on restore is non-fatal — admin can manually retry.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, relicId]);
+
   // Polling driver — one effect handles whichever job is currently running.
   // Refs hold the latest state without resubscribing the effect every render.
   const enhanceJobRef = useRef(enhanceJob);

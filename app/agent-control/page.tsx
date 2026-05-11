@@ -15,6 +15,7 @@ import type {
 } from "./types";
 import type { AgentSkill, PipelineConfig, DispatcherConfig } from "@/lib/agentTypes";
 import { listSerializableScenes } from "@/lib/agent-service";
+import type { BoundSceneSummary } from "./types";
 // Side-effect: triggers each module's scenes.ts → registerScene at server
 // boot. Without this, listSerializableScenes() returns an empty list and
 // the Scenes tab appears empty even though bindings exist in DB.
@@ -55,6 +56,30 @@ export default async function AgentControlPage() {
     }),
   ]);
 
+  // Pre-build the agent → bound-scenes index. listSerializableScenes
+  // already gives us the field hints for both context and output, so we
+  // just join SceneBindings to that map by sceneKey. Agents with no
+  // bindings get [] (BackboneFlowEditor renders nothing extra).
+  const allScenes = listSerializableScenes();
+  const sceneBySceneKey = new Map(allScenes.map((s) => [s.key, s]));
+  const boundScenesByAgentId = bindingRecords.reduce<Record<string, BoundSceneSummary[]>>(
+    (acc, b) => {
+      const def = sceneBySceneKey.get(b.sceneKey);
+      if (!def) return acc; // binding for an unregistered scene — ignore
+      (acc[b.agentId] ??= []).push({
+        sceneKey: b.sceneKey,
+        module: def.module,
+        invocation: def.invocation,
+        label: def.label,
+        contextFields: def.contextFields,
+        outputFields: def.outputFields,
+        inputMap: b.inputMap,
+      });
+      return acc;
+    },
+    {},
+  );
+
   const rows: AgentRow[] = agents.map((a) => ({
     id: a.id,
     serial: a.serial,
@@ -81,6 +106,7 @@ export default async function AgentControlPage() {
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     createdBy: a.createdBy,
+    boundScenes: boundScenesByAgentId[a.id] ?? [],
   }));
 
   // Helpers cast Prisma's loose JsonValue to the concrete shape SkillRow expects.
@@ -152,7 +178,6 @@ export default async function AgentControlPage() {
     agentDeployed: !!b.agent?.deployedAt,
     agentCapabilities: b.agent?.capabilities ?? [],
     inputMap: b.inputMap,
-    outputMap: b.outputMap,
     enabled: b.enabled,
     notes: b.notes,
     createdAt: b.createdAt.toISOString(),

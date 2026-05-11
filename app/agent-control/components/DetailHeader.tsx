@@ -3,6 +3,7 @@
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
 import type { AgentRow, EquipRow } from "../types";
+import { themeClass } from "@/lib/agentControl/theme";
 
 // New header (post-redesign): no avatar — that's now the Hero portrait below.
 // One row of: codename + mode badge + deploy badge + EDIT button + INVOCATIONS button.
@@ -24,13 +25,11 @@ export default function DetailHeader({
   const { locale } = useI18n();
 
   const isMech = agent.mode === "MECHANICAL";
-  const accentText = isMech ? "text-secondary" : "text-primary";
+  const accentText = themeClass(agent.mode, "text");
   const anyOnline = equips.some((e) => e.skill.status === "ONLINE");
   const modeBadge = !anyOnline
     ? "border-on-surface-variant/40 text-on-surface-variant/80 bg-on-surface-variant/[0.06]"
-    : isMech
-      ? "border-secondary/60 text-secondary bg-secondary/[0.10]"
-      : "border-primary/60 text-primary bg-primary/[0.10]";
+    : themeClass(agent.mode, "modeBadge");
   const deployBadge = agent.deployedAt
     ? "border-emerald-400/50 text-emerald-300 bg-emerald-400/[0.08]"
     : "border-amber-300/50 text-amber-200 bg-amber-300/[0.08]";

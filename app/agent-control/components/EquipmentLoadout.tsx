@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useT } from "@/lib/i18n/client";
 import type { AgentRow, EquipRow, SkillRow } from "../types";
 import { getLoadoutLayout } from "@/lib/agentControl/slotPositions";
+import { themeClass } from "@/lib/agentControl/theme";
 import SkillSlot from "./SkillSlot";
 import SkillConnections from "./SkillConnections";
 import CentralControlSlot from "./CentralControlSlot";
@@ -37,7 +38,7 @@ export default function EquipmentLoadout({ agent, equips, allSkills, isAdmin }: 
   }
 
   const isMech = agent.mode === "MECHANICAL";
-  const tintClass = isMech ? "from-secondary/20" : "from-primary/20";
+  const tintClass = themeClass(agent.mode, "tintFrom20");
   const configured = isMech
     ? !!agent.pipelineConfig && Object.keys(agent.pipelineConfig).length > 0
     : !!agent.dispatcherConfig && Object.keys(agent.dispatcherConfig).length > 0;
