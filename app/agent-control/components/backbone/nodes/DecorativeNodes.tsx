@@ -1,13 +1,23 @@
 "use client";
 
-// Decorative BEGIN / END / AGENT-BOUNDARY nodes — auto-injected from
-// agent.boundScenes. Read-only — no panel, no edit, no save. They
-// visualize the inbound/outbound contract for each scene this agent is
-// bound to:
-//   BEGIN: scene.contextSchema fields → applied via SceneBinding.inputMap
-//          → agent.input that the user-defined nodes will see
-//   END:   the leaf node's output is what dispatch validates against
-//          scene.outputSchema before returning to the calling module
+// Decorative BEGIN / AGENT.INPUT / AGENT.OUTPUT / END / AGENT-BOUNDARY
+// nodes — auto-injected from agent.boundScenes. Read-only — no panel, no
+// edit, no save.
+//
+// Visual model (matches runtime: one invocation = one input + one output):
+//
+//   BEGIN_X ─┐                                              ┌─→ END_X
+//   BEGIN_Y ─┼─→ AGENT.INPUT ─→ [DAG body] ─→ AGENT.OUTPUT ─┼─→ END_Y
+//   BEGIN_Z ─┘   (single convergence)   (single point)     └─→ END_Z
+//             ^                                            ^
+//             N scenes COULD invoke; runtime sees ONE      output dispatched
+//             input value per invocation                   to ONE scene's
+//                                                          outputSchema per
+//                                                          invocation
+//
+// BEGIN/END dashed edges = "candidate relationship" (N possibilities).
+// AGENT.INPUT→root and leaf→AGENT.OUTPUT solid edges = "actual runtime
+// data flow" (1 instance per invocation).
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type {
@@ -111,6 +121,75 @@ export function EndNodeView({ data }: NodeProps<FlowNode>) {
         leaf.output → scene.outputSchema
       </div>
       <FieldRows fields={d.fields} accent={accent} />
+    </div>
+  );
+}
+
+// AgentInputNodeView — single convergence point all BEGIN scenes funnel
+// into. Solid sky-400 border (vs BEGIN's dashed) to signal "actual data
+// flow point" rather than "candidate scene relationship".
+export function AgentInputNodeView() {
+  const accent = "rgb(96 165 250)"; // sky-400
+  return (
+    <div
+      className="min-w-[140px] px-3 py-2 rounded-md bg-sky-500/[0.12] shadow-md border-2"
+      style={{ borderColor: accent }}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!border-2"
+        style={{ background: accent, borderColor: accent }}
+      />
+      <div
+        className="font-label text-[9px] tracking-[0.25em] uppercase mb-1"
+        style={{ color: accent }}
+      >
+        ◆ AGENT.INPUT
+      </div>
+      <div className="text-[10px] text-on-surface-variant leading-tight">
+        single input per invocation
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!border-2"
+        style={{ background: accent, borderColor: accent }}
+      />
+    </div>
+  );
+}
+
+// AgentOutputNodeView — mirror of AgentInputNodeView. All user-leaves
+// funnel here, then fan out (decoratively) to END nodes.
+export function AgentOutputNodeView() {
+  const accent = "rgb(244 114 182)"; // pink-400
+  return (
+    <div
+      className="min-w-[140px] px-3 py-2 rounded-md bg-pink-500/[0.12] shadow-md border-2"
+      style={{ borderColor: accent }}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!border-2"
+        style={{ background: accent, borderColor: accent }}
+      />
+      <div
+        className="font-label text-[9px] tracking-[0.25em] uppercase mb-1"
+        style={{ color: accent }}
+      >
+        ◆ AGENT.OUTPUT
+      </div>
+      <div className="text-[10px] text-on-surface-variant leading-tight">
+        single output per invocation
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!border-2"
+        style={{ background: accent, borderColor: accent }}
+      />
     </div>
   );
 }

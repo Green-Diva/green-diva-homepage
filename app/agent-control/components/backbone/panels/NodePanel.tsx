@@ -7,6 +7,7 @@ import type {
   ForEachNodeData,
   LoopNodeData,
   NodeData,
+  PersistNodeData,
   SkillNodeData,
   TransformNodeData,
 } from "../types";
@@ -15,6 +16,7 @@ import { BranchNodePanel } from "./BranchNodePanel";
 import { LoopNodePanel } from "./LoopNodePanel";
 import { ForEachNodePanel } from "./ForEachNodePanel";
 import { TransformNodePanel } from "./TransformNodePanel";
+import { PersistNodePanel } from "./PersistNodePanel";
 
 export function NodePanel({
   node,
@@ -76,11 +78,17 @@ export function NodePanel({
           onPatch={onPatch as (p: Partial<ForEachNodeData>) => void}
           onOpenBody={onOpenLoopBody ? () => onOpenLoopBody(node.id) : null}
         />
-      ) : (
+      ) : node.data.type === "transform" ? (
         <TransformNodePanel
           data={node.data}
           sourceOptions={sourceOptions}
           onPatch={onPatch as (p: Partial<TransformNodeData>) => void}
+        />
+      ) : (
+        <PersistNodePanel
+          data={node.data}
+          sourceOptions={sourceOptions}
+          onPatch={onPatch as (p: Partial<PersistNodeData>) => void}
         />
       )}
     </div>

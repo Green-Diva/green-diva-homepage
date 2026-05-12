@@ -10,7 +10,20 @@
 //
 // runLog entries: one per tool invocation (stepId = "iter-N.tool-M"),
 // matching Phase 3's per-step shape so AgentJobDrawer renders them
-// uniformly. Final accumulated assistant text returns as `output.text`.
+// uniformly.
+//
+// outputMode (dispatcherConfig):
+//   - "text" (default) → output = { text, iterations, toolCallCount }.
+//                        Free-form conversation; scene.outputSchema validation
+//                        will fail unless the scene expects `{ text }`.
+//   - "json"           → orchestrator attempts JSON.parse on the trimmed final
+//                        text. On success the parsed object becomes the agent
+//                        output (consumable by scene.outputSchema + writeback
+//                        hook). On failure falls back to "text" shape with a
+//                        runLog warning. systemPrompt is auto-augmented with a
+//                        "JSON only, no prose" suffix so reliability is
+//                        acceptable for simple sync scenes; for high-stakes
+//                        contracts prefer MECHANICAL with a tail transform.
 
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
@@ -21,6 +34,8 @@ import { invokeSkill } from "@/lib/skills/invoke";
 import type { AgentRunResult, AgentRunLogEntry } from "@/lib/agents/invoke";
 import { AgentErrorCode } from "@/lib/agent-errors";
 
+type OutputMode = "text" | "json";
+
 type DispatcherConfig = {
   version: number;
   provider: "anthropic" | "openai";
@@ -29,7 +44,16 @@ type DispatcherConfig = {
   maxIterations?: number;
   temperature?: number;
   authEnv?: string;
+  outputMode?: OutputMode;
 };
+
+// Appended to systemPrompt when outputMode === "json". Kept terse — bigger
+// instructions belong in the admin-authored systemPrompt itself.
+const JSON_MODE_SUFFIX =
+  "\n\nIMPORTANT — Output format:\n" +
+  "After you have finished calling tools, your final assistant message MUST be a single valid JSON object (or array) and nothing else. " +
+  "No markdown fences, no commentary, no leading/trailing prose. " +
+  "The JSON shape must match the contract the caller expects.";
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -49,6 +73,9 @@ function validateDispatcherConfig(
   }
   if (typeof cfg.model !== "string" || !cfg.model) {
     return { ok: false, code: "DISPATCHER_INVALID", message: "dispatcherConfig.model is required" };
+  }
+  if (cfg.outputMode !== undefined && cfg.outputMode !== "text" && cfg.outputMode !== "json") {
+    return { ok: false, code: "DISPATCHER_INVALID", message: `dispatcherConfig.outputMode must be "text" or "json" (got ${String(cfg.outputMode)})` };
   }
   return { ok: true, config: cfg as unknown as DispatcherConfig };
 }
@@ -131,6 +158,15 @@ export async function runOrchestrator(opts: {
 
   const maxIter = typeof config.maxIterations === "number" ? Math.min(50, Math.max(1, config.maxIterations)) : 10;
   const temperature = typeof config.temperature === "number" ? config.temperature : 1.0;
+  const outputMode: OutputMode = config.outputMode ?? "text";
+
+  // Augment systemPrompt with JSON-only instruction when caller expects a
+  // structured object (typical for scene.outputSchema contracts). The suffix
+  // is small and tolerates an empty/missing user-authored systemPrompt.
+  const effectiveSystemPrompt =
+    outputMode === "json"
+      ? (config.systemPrompt ?? "") + JSON_MODE_SUFFIX
+      : config.systemPrompt;
 
   const initialUserText =
     typeof opts.input === "string"
@@ -189,31 +225,29 @@ export async function runOrchestrator(opts: {
   }
 
   try {
-    if (config.provider === "anthropic") {
-      const out = await runAnthropicLoop({
-        apiKey,
-        model: config.model,
-        systemPrompt: config.systemPrompt,
-        temperature,
-        maxIter,
-        equips: usableEquips,
-        initialUserText,
-        invokeTool,
-      });
-      return { ok: true, output: out, runLog };
-    } else {
-      const out = await runOpenAILoop({
-        apiKey,
-        model: config.model,
-        systemPrompt: config.systemPrompt,
-        temperature,
-        maxIter,
-        equips: usableEquips,
-        initialUserText,
-        invokeTool,
-      });
-      return { ok: true, output: out, runLog };
-    }
+    const out =
+      config.provider === "anthropic"
+        ? await runAnthropicLoop({
+            apiKey,
+            model: config.model,
+            systemPrompt: effectiveSystemPrompt,
+            temperature,
+            maxIter,
+            equips: usableEquips,
+            initialUserText,
+            invokeTool,
+          })
+        : await runOpenAILoop({
+            apiKey,
+            model: config.model,
+            systemPrompt: effectiveSystemPrompt,
+            temperature,
+            maxIter,
+            equips: usableEquips,
+            initialUserText,
+            invokeTool,
+          });
+    return { ok: true, output: shapeOutput(out, outputMode, runLog), runLog };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return {
@@ -226,6 +260,70 @@ export async function runOrchestrator(opts: {
 }
 
 type LoopOutput = { text: string; iterations: number; toolCallCount: number };
+
+// Convert the raw loop result into the agent output shape.
+//
+// - "text" mode: preserves the legacy `{ text, iterations, toolCallCount }`
+//   envelope. scene.outputSchema must explicitly accept that shape (rare —
+//   most scenes want a structured object).
+// - "json" mode: JSON.parse the trimmed text. Success → the parsed value
+//   IS the agent output (consumable by scene.outputSchema + writeback
+//   hook); failure → falls back to the text envelope and pushes a runLog
+//   entry so the failure is visible in AgentJobDrawer.
+//
+// `_text` / `_iterations` / `_toolCallCount` are merged into successful JSON
+// objects as a passive audit trail (lets AgentJobDrawer still show iteration
+// counts; scene.outputSchema with `.passthrough()` allows these through).
+function shapeOutput(
+  out: LoopOutput,
+  mode: OutputMode,
+  runLog: AgentRunLogEntry[],
+): unknown {
+  if (mode !== "json") {
+    return { text: out.text, iterations: out.iterations, toolCallCount: out.toolCallCount };
+  }
+  const trimmed = out.text.trim();
+  // Strip ```json ... ``` or ``` ... ``` fences if the LLM ignored instructions.
+  const stripped = trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  if (stripped && (stripped.startsWith("{") || stripped.startsWith("["))) {
+    try {
+      const parsed = JSON.parse(stripped) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return {
+          ...(parsed as Record<string, unknown>),
+          _iterations: out.iterations,
+          _toolCallCount: out.toolCallCount,
+        };
+      }
+      return parsed;
+    } catch (e) {
+      runLog.push({
+        stepId: "output-parse",
+        startedAt: new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        durationMs: 0,
+        ok: false,
+        errorCode: "OUTPUT_PARSE_FAILED",
+        errorMessage: `outputMode=json but final text isn't valid JSON: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  } else if (stripped) {
+    runLog.push({
+      stepId: "output-parse",
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      durationMs: 0,
+      ok: false,
+      errorCode: "OUTPUT_NOT_JSON",
+      errorMessage: "outputMode=json but final text doesn't start with { or [",
+    });
+  }
+  // Fallback so the AgentJob row still has a parseable output column.
+  return { text: out.text, iterations: out.iterations, toolCallCount: out.toolCallCount };
+}
 
 type LoopOpts = {
   apiKey: string;

@@ -5,18 +5,19 @@
 // Lifecycle for both functions:
 //   1. registry.requireScene(key) — definition exists in code?
 //   2. scene.contextSchema.safeParse(ctx) — caller's input shape OK?
-//   3. SceneBinding row exists & enabled?
-//   4. agent exists & deployed?
-//   5. applyTemplate(binding.inputMap, {ctx, actor}) → agentInput
+//   3. scene.prepareAgentInput(ctx, actor) → agentInput   [code, default = identity]
+//   4. SceneBinding row exists & enabled?
+//   5. agent exists & deployed?
 //   6a. dispatchScene: prisma.agentJob.create + void runAgentJob → {jobId}
 //                       (runner validates leaf output against scene.outputSchema)
-//   6b. callScene: invokeAgent inline (timeout-bounded) →
+//   6b. callScene: executeAgent inline (timeout-bounded) →
 //                  scene.outputSchema validate → result
 //
 // 2026-05-11 — SceneBinding.outputMap retired. Each agent's leaf node
 // must produce scene-shape output directly (typically via a tail
-// `transform` JSONata node). See scenebinding-outputmap-peaceful-token
-// plan in /Users/lixinhan/.claude/plans/.
+// `transform` JSONata node).
+// 2026-05-12 — SceneBinding.inputMap retired. ctx → agent.input shaping
+// is now scene.prepareAgentInput in code, not a DB template.
 
 import "server-only";
 import { Prisma, type AgentJobStatus, type AgentMode } from "@prisma/client";
@@ -25,7 +26,6 @@ import { ensureServerInit } from "@/lib/server-init";
 import { runAgentJob } from "@/lib/skills/runtime/runner";
 import { executeAgent, type AgentRunLogEntry } from "@/lib/agents/invoke";
 import { requireScene } from "./registry";
-import { applyTemplate } from "./template";
 import {
   SceneError,
   type AnySceneDefinition,
@@ -44,7 +44,6 @@ function jsonOrNull(v: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull 
 type ResolvedBinding = {
   scene: AnySceneDefinition;
   agent: { id: string; codename: string; mode: AgentMode; deployedAt: Date | null };
-  inputMap: unknown;
   agentInput: unknown;
   ctxResolved: unknown;
   actor: SceneActor | null;
@@ -101,17 +100,20 @@ async function resolveBinding(
     );
   }
 
+  // ctx → agent.input shaping. Owned by scene definition in code
+  // (2026-05-12). Default = identity for scenes that don't override.
+  // prepareAgentInput is a pure sync function; any throw is wrapping
+  // failure into DISPATCH_FAILED — caller bug, not template misuse.
   let agentInput: unknown;
   try {
-    agentInput = applyTemplate(binding.inputMap, {
-      ctx: ctxResult.data,
-      actor,
-    } as Record<string, unknown>);
+    agentInput = scene.prepareAgentInput
+      ? scene.prepareAgentInput(ctxResult.data, actor)
+      : ctxResult.data;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     throw new SceneError(
-      "TEMPLATE_ERROR",
-      `scene "${sceneKey}" inputMap apply failed: ${message}`,
+      "DISPATCH_FAILED",
+      `scene "${sceneKey}" prepareAgentInput threw: ${message}`,
       500,
     );
   }
@@ -119,7 +121,6 @@ async function resolveBinding(
   return {
     scene,
     agent,
-    inputMap: binding.inputMap,
     agentInput,
     ctxResolved: ctxResult.data,
     actor,

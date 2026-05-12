@@ -81,6 +81,8 @@ export function parseBody(raw: unknown): LoopNodeData["body"] {
           inputFrom,
           expression: typeof n.expression === "string" ? n.expression : "$",
         });
+      } else if (n.type === "persist") {
+        nodes.push({ type: "persist", nodeId: id, inputFrom });
       }
       // loop / forEach inside body silently dropped — UI can't render
       // nested sub-canvases (runtime supports MAX_LOOP_DEPTH=2 via raw JSON).
@@ -168,6 +170,8 @@ export function loadConfig(cfg: unknown): {
       } else if (raw.type === "transform") {
         const expression = typeof raw.expression === "string" ? raw.expression : "$";
         nodeData.push({ type: "transform", nodeId: id, inputFrom, expression });
+      } else if (raw.type === "persist") {
+        nodeData.push({ type: "persist", nodeId: id, inputFrom });
       }
       if (isObject(raw.position) && typeof raw.position.x === "number" && typeof raw.position.y === "number") {
         positions.set(id, { x: raw.position.x, y: raw.position.y });
@@ -216,7 +220,9 @@ export function loadConfig(cfg: unknown): {
             ? "loopNode"
             : nd.type === "forEach"
               ? "forEachNode"
-              : "transformNode",
+              : nd.type === "transform"
+                ? "transformNode"
+                : "persistNode",
     position: positions.get(nd.nodeId) ?? { x: 0, y: 0 },
     data: nd,
   }));
@@ -261,12 +267,20 @@ export function serializeBody(body: LoopNodeData["body"]): {
           ...base,
         };
       }
-      // transform
+      if (nd.type === "transform") {
+        return {
+          id: nd.nodeId,
+          type: "transform" as const,
+          inputFrom: nd.inputFrom,
+          expression: nd.expression,
+          ...base,
+        };
+      }
+      // persist
       return {
         id: nd.nodeId,
-        type: "transform" as const,
+        type: "persist" as const,
         inputFrom: nd.inputFrom,
-        expression: nd.expression,
         ...base,
       };
     }),
@@ -278,12 +292,18 @@ export function serializeBody(body: LoopNodeData["body"]): {
   };
 }
 
-// Decorative BEGIN / END / AGENT-BOUNDARY nodes carry an `__ioRole`
-// sentinel on `data` — ignore them on save so they never round-trip
-// into pipelineConfig.
+// Decorative BEGIN / END / AGENT-BOUNDARY / AGENT.INPUT / AGENT.OUTPUT
+// nodes carry an `__ioRole` sentinel on `data` — ignore them on save so
+// they never round-trip into pipelineConfig.
 export function isIoNode(n: FlowNode): boolean {
   const role = (n.data as unknown as { __ioRole?: string }).__ioRole;
-  return role === "begin" || role === "end" || role === "agentBoundary";
+  return (
+    role === "begin" ||
+    role === "end" ||
+    role === "agentBoundary" ||
+    role === "agentInput" ||
+    role === "agentOutput"
+  );
 }
 
 export function buildConfig(nodes: FlowNode[], edges: FlowEdge[]) {
@@ -339,12 +359,20 @@ export function buildConfig(nodes: FlowNode[], edges: FlowEdge[]) {
           position: pos,
         };
       }
-      // transform
+      if (d.type === "transform") {
+        return {
+          id: d.nodeId,
+          type: "transform" as const,
+          inputFrom: d.inputFrom,
+          expression: d.expression,
+          position: pos,
+        };
+      }
+      // persist
       return {
         id: d.nodeId,
-        type: "transform" as const,
+        type: "persist" as const,
         inputFrom: d.inputFrom,
-        expression: d.expression,
         position: pos,
       };
     }),
@@ -373,7 +401,9 @@ export function bodyToFlow(body: LoopNodeData["body"]): { nodes: FlowNode[]; edg
         ? "skillNode"
         : nd.type === "branch"
           ? "branchNode"
-          : "transformNode",
+          : nd.type === "transform"
+            ? "transformNode"
+            : "persistNode",
     position: layout.get(nd.nodeId) ?? { x: 0, y: 0 },
     data: nd,
   }));

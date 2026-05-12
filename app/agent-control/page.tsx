@@ -27,7 +27,7 @@ export default async function AgentControlPage() {
 
   const [agents, skillsRaw, equipRecords, bindingRecords] = await Promise.all([
     prisma.agent.findMany({
-      orderBy: [{ serial: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ displayOrder: "asc" }, { serial: "asc" }, { createdAt: "asc" }],
       include: { createdBy: { select: { id: true, name: true } } },
     }),
     prisma.skill.findMany({
@@ -73,7 +73,6 @@ export default async function AgentControlPage() {
         label: def.label,
         contextFields: def.contextFields,
         outputFields: def.outputFields,
-        inputMap: b.inputMap,
         via: "binding",
       });
       return acc;
@@ -83,7 +82,7 @@ export default async function AgentControlPage() {
 
   // Merge in draft-phase intent claims that haven't been deployed yet.
   // Intent + binding for the same scene de-dupes to the binding entry
-  // (binding is more authoritative — admin has filled inputMap).
+  // (binding is the production-routable row).
   for (const a of agents) {
     const list = (boundScenesByAgentId[a.id] ??= []);
     const haveKeys = new Set(list.map((s) => s.sceneKey));
@@ -98,7 +97,6 @@ export default async function AgentControlPage() {
         label: def.label,
         contextFields: def.contextFields,
         outputFields: def.outputFields,
-        inputMap: null,
         via: "intent",
       });
     }
@@ -202,7 +200,6 @@ export default async function AgentControlPage() {
     agentMode: (b.agent?.mode as SceneBindingRow["agentMode"]) ?? null,
     agentDeployed: !!b.agent?.deployedAt,
     agentCapabilities: b.agent?.capabilities ?? [],
-    inputMap: b.inputMap,
     enabled: b.enabled,
     notes: b.notes,
     createdAt: b.createdAt.toISOString(),

@@ -25,9 +25,11 @@ export type SceneActor = {
 
 // One scene = one capability request the rest of the site can make.
 // The DEFINITION (this object) lives in code so type checks bite at
-// build time. The IMPLEMENTATION (which agent runs it, how its input is
-// built from ctx) lives in DB as a SceneBinding row, edited in
-// /agent-control?tab=scenes.
+// build time. The ROUTING ("which agent runs it") lives in DB as a
+// SceneBinding row, edited in /agent-control?tab=scenes — but the
+// ctx → agent.input shaping is owned by code via `prepareAgentInput`
+// below (2026-05-12 all-in refactor; the previous DB-driven
+// SceneBinding.inputMap is retired).
 export type SceneDefinition<
   TContext extends z.ZodTypeAny = z.ZodTypeAny,
   TOutput extends z.ZodTypeAny = z.ZodTypeAny,
@@ -40,8 +42,9 @@ export type SceneDefinition<
   module: string;
   label: { en: string; zh: string };
   description?: { en: string; zh: string };
-  // Caller's input shape (validated at the service boundary BEFORE the
-  // binding's inputMap is applied).
+  // Caller's input shape. Validated at the service boundary BEFORE
+  // prepareAgentInput runs — so prepareAgentInput sees a parsed,
+  // typed ctx.
   contextSchema: TContext;
   // Authoritative output contract. The agent bound to this scene MUST
   // produce a leaf output that satisfies this schema — typically by
@@ -68,6 +71,25 @@ export type SceneDefinition<
   // default (3). Set to 1 for scenes where retrying re-submits an
   // expensive external task (e.g. Meshy) and would just burn quota.
   maxAttempts?: number;
+  // Shapes the parsed ctx (+ caller actor) into the agent.input object
+  // the bound agent will receive. Pure synchronous function — no FS / DB
+  // calls allowed; IO must be done by the caller before dispatch (the
+  // "pipeline-input-pattern", see docs/pipeline-input-pattern.md).
+  //
+  // Default (when omitted): identity — `agent.input = ctx`. Override
+  // when the agent expects a different shape than ctx — e.g. injecting
+  // a literal `kind: "model"` or `mode: "initial"` discriminator, or
+  // renaming `ctx.workspaceSlug` to `relicSlug` for an agent that wants
+  // the latter name.
+  //
+  // 2026-05-12: replaces the DB-driven SceneBinding.inputMap (retired).
+  // Shape changes here = git PR, not 0-commit admin tweak — accepted as
+  // the cost of having a typed, single-source-of-truth contract between
+  // scene caller and agent.
+  prepareAgentInput?: (
+    ctx: z.infer<TContext>,
+    actor: SceneActor | null,
+  ) => unknown;
 };
 
 // Type-level extractors so callers get full inference from sceneKey.
@@ -118,7 +140,7 @@ export type SceneErrorCode =
   | typeof AgentErrorCode.AGENT_NOT_DEPLOYED   // agent.deployedAt is null
   | typeof AgentErrorCode.CONTEXT_INVALID      // ctx fails contextSchema
   | typeof AgentErrorCode.SCENE_OUTPUT_INVALID // agent leaf output fails outputSchema (sync + async)
-  | typeof AgentErrorCode.TEMPLATE_ERROR       // inputMap couldn't be applied
+  | typeof AgentErrorCode.TEMPLATE_ERROR       // deprecated 2026-05-12; retained only for back-compat in pre-existing AgentJob rows
   | typeof AgentErrorCode.TIMEOUT              // sync call exceeded timeoutMs
   | typeof AgentErrorCode.DISPATCH_FAILED;     // catastrophic — usually DB write failed
 

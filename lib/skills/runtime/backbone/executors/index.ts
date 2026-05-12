@@ -10,6 +10,7 @@ import { executeBranchNode } from "./branch";
 import { executeLoopNode } from "./loop";
 import { executeForEachNode } from "./forEach";
 import { executeTransformNode } from "./transform";
+import { executePersistNode } from "./persist";
 
 export {
   executeSkillNode,
@@ -17,4 +18,5 @@ export {
   executeLoopNode,
   executeForEachNode,
   executeTransformNode,
+  executePersistNode,
 };

@@ -36,10 +36,18 @@ export const AgentErrorCode = {
   LOOP_TOO_DEEP: "LOOP_TOO_DEEP",
   FOREACH_INPUT_NOT_ARRAY: "FOREACH_INPUT_NOT_ARRAY",
   TRANSFORM_FAILED: "TRANSFORM_FAILED",
+  PERSIST_INPUT_INVALID: "PERSIST_INPUT_INVALID",
+  PERSIST_FAILED: "PERSIST_FAILED",
 
   // Orchestrator layer
   NO_TOOLS: "NO_TOOLS",
   UNKNOWN_TOOL: "UNKNOWN_TOOL",
+  // outputMode=json but the LLM's final message couldn't be parsed.
+  // OUTPUT_NOT_JSON: text doesn't start with { or [; OUTPUT_PARSE_FAILED:
+  // JSON.parse threw. Both emit a runLog entry (visible in AgentJobDrawer)
+  // and the agent output falls back to the legacy { text, ... } envelope.
+  OUTPUT_NOT_JSON: "OUTPUT_NOT_JSON",
+  OUTPUT_PARSE_FAILED: "OUTPUT_PARSE_FAILED",
 
   // Handler layer (grandfathered names)
   MISSING_ENV: "MISSING_ENV",

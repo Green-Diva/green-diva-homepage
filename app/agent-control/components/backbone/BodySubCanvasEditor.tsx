@@ -161,6 +161,19 @@ function BodySubCanvasEditorInner({
     ]);
     setSelectedId(id);
   }
+  function addPersistNode() {
+    const id = nextNodeId(nodes, "bps");
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "persistNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: { type: "persist", nodeId: id, inputFrom: "agent.input" },
+      },
+    ]);
+    setSelectedId(id);
+  }
   function deleteSelected() {
     if (selectedEdgeId) {
       setEdges((eds) => eds.filter((e) => e.id !== selectedEdgeId));
@@ -275,6 +288,14 @@ function BodySubCanvasEditorInner({
               style={{ borderColor: "rgb(52 211 153 / 0.6)", color: "rgb(52 211 153)", background: "rgb(52 211 153 / 0.12)" }}
             >
               + Transform
+            </button>
+            <button
+              type="button"
+              onClick={addPersistNode}
+              className="px-3 py-1.5 border-2 font-label text-[10px] tracking-[0.25em] uppercase"
+              style={{ borderColor: "rgb(251 191 36 / 0.6)", color: "rgb(251 191 36)", background: "rgb(251 191 36 / 0.12)" }}
+            >
+              + Persist
             </button>
             <button
               type="button"

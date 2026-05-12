@@ -13,11 +13,13 @@ type Ctx = { params: Promise<{ id: string }> };
 //
 // Takeover semantics:
 //   - existing SceneBinding for `sceneKey` → set agentId = this.id,
-//     preserve inputMap + enabled (so live traffic doesn't drop and
-//     admin-curated inputMap survives the switch).
+//     preserve enabled (so live traffic doesn't drop).
 //   - no existing SceneBinding → create with agentId = this.id,
-//     inputMap = {}, enabled = false (admin must fill inputMap and flip
-//     enabled via /agent-control?tab=scenes before traffic flows).
+//     enabled = false (admin must flip enabled via
+//     /agent-control?tab=scenes before traffic flows).
+//     ctx → agent.input shaping is owned by scene.prepareAgentInput in
+//     code (2026-05-12), so no admin-side wiring is needed beyond
+//     enabling the binding.
 // Conflict semantics:
 //   - "conflict" = sceneKey currently bound to a DIFFERENT agent. Deploy
 //     stomps the previous owner's binding (the new agent takes over
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           }
         } else {
           await tx.sceneBinding.create({
-            data: { sceneKey, agentId: id, inputMap: {}, enabled: false },
+            data: { sceneKey, agentId: id, enabled: false },
           });
         }
       }

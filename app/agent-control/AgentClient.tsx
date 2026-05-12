@@ -1,7 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { useT } from "@/lib/i18n/client";
 import type {
   AgentRow,
@@ -13,6 +26,7 @@ import type {
 } from "./types";
 import CyberPanel from "./components/CyberPanel";
 import AgentListItem from "./components/AgentListItem";
+import SortableAgentListItem from "./components/SortableAgentListItem";
 import AgentEditor from "./components/AgentEditor";
 import AgentImportModal from "./components/AgentImportModal";
 import SkillLibrary from "./components/SkillLibrary";
@@ -57,6 +71,61 @@ export default function AgentClient({
   const [filter, setFilter] = useState<ModeFilter>("ALL");
   const [jobsOpen, setJobsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // Mount DndContext only after hydration. dnd-kit's auto-generated
+  // aria-describedby ids come from a module-level counter that diverges
+  // between server and client, causing a hydration mismatch warning.
+  // Rendering the plain list during SSR and swapping to the sortable
+  // version post-mount avoids the warning entirely.
+  const [dndMounted, setDndMounted] = useState(false);
+  useEffect(() => {
+    setDndMounted(true);
+  }, []);
+  // Local mirror of agents so drag-reorder can update optimistically. Resync
+  // whenever the server prop changes (router.refresh after save/import/etc.)
+  // using React's "adjust state during render" pattern (avoids useEffect).
+  const [orderedAgents, setOrderedAgents] = useState<AgentRow[]>(agents);
+  const [prevAgentsRef, setPrevAgentsRef] = useState(agents);
+  if (prevAgentsRef !== agents) {
+    setPrevAgentsRef(agents);
+    setOrderedAgents(agents);
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const prev = orderedAgents;
+    // Reorder within the currently-visible subset (mode filter may hide rows).
+    const visibleIds = orderedAgents.filter((a) => filter === "ALL" || a.mode === filter).map((a) => a.id);
+    const fromVisible = visibleIds.indexOf(String(active.id));
+    const toVisible = visibleIds.indexOf(String(over.id));
+    if (fromVisible < 0 || toVisible < 0) return;
+    const nextVisible = arrayMove(visibleIds, fromVisible, toVisible);
+    // Merge back into full list: walk full list; whenever we hit a visible
+    // position, take the next id from nextVisible.
+    let cursor = 0;
+    const nextFull = orderedAgents.map((a) => {
+      const inVisible = filter === "ALL" || a.mode === filter;
+      if (!inVisible) return a;
+      const id = nextVisible[cursor++];
+      return orderedAgents.find((x) => x.id === id)!;
+    });
+    setOrderedAgents(nextFull);
+    try {
+      const res = await fetch("/api/agents/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: nextFull.map((a) => a.id) }),
+      });
+      if (!res.ok) throw new Error("reorder failed");
+      router.refresh();
+    } catch {
+      setOrderedAgents(prev);
+    }
+  }
 
   const activeTab: TabKey = tabFromQuery(searchParams.get("tab"));
 
@@ -74,21 +143,21 @@ export default function AgentClient({
 
   const counts = useMemo(
     () => ({
-      all: agents.length,
-      machines: agents.filter((a) => a.mode === "MECHANICAL").length,
-      agents: agents.filter((a) => a.mode === "AUTONOMOUS").length,
+      all: orderedAgents.length,
+      machines: orderedAgents.filter((a) => a.mode === "MECHANICAL").length,
+      agents: orderedAgents.filter((a) => a.mode === "AUTONOMOUS").length,
     }),
-    [agents],
+    [orderedAgents],
   );
 
   const visibleAgents = useMemo(() => {
-    if (filter === "ALL") return agents;
-    return agents.filter((a) => a.mode === filter);
-  }, [agents, filter]);
+    if (filter === "ALL") return orderedAgents;
+    return orderedAgents.filter((a) => a.mode === filter);
+  }, [orderedAgents, filter]);
 
   const activeAgent = useMemo(
-    () => (activeId ? agents.find((a) => a.id === activeId) ?? null : null),
-    [agents, activeId],
+    () => (activeId ? orderedAgents.find((a) => a.id === activeId) ?? null : null),
+    [orderedAgents, activeId],
   );
 
   const activeEquips: EquipRow[] = useMemo(
@@ -169,11 +238,29 @@ export default function AgentClient({
                   {t.agentControl.emptyState}
                 </div>
               ) : (
-                <div className="flex-1 min-h-0 space-y-2 overflow-y-auto custom-scrollbar pr-1">
-                  {visibleAgents.map((a) => (
-                    <AgentListItem key={a.id} agent={a} active={a.id === activeId} onSelect={setActiveId} />
-                  ))}
-                </div>
+                dndMounted ? (
+                  <DndContext id="agent-roster-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={visibleAgents.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+                      <div className="flex-1 min-h-0 space-y-2 overflow-y-auto custom-scrollbar pr-1">
+                        {visibleAgents.map((a) => (
+                          <SortableAgentListItem
+                            key={a.id}
+                            agent={a}
+                            active={a.id === activeId}
+                            onSelect={setActiveId}
+                            draggable={isAdmin}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  <div className="flex-1 min-h-0 space-y-2 overflow-y-auto custom-scrollbar pr-1">
+                    {visibleAgents.map((a) => (
+                      <AgentListItem key={a.id} agent={a} active={a.id === activeId} onSelect={setActiveId} />
+                    ))}
+                  </div>
+                )
               )}
               {isAdmin ? (
                 <div className="mt-2 shrink-0 flex flex-col gap-2">

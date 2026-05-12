@@ -55,7 +55,7 @@
 | 用途 | 字段名 |
 |---|---|
 | 从二进制下载/网络抓取出来的字节 | `downloadBase64` / `downloadContentType` / `downloadBytes` |
-| 保存到 `/api/internal/save-asset` 后返回的相对路径 | `savedPath` / `absPath` |
+| `persist` 原语节点写盘后返回的相对路径 | `savedPath` / `absPath` |
 | **触发 runner 写回 Relic 列的契约 payload** | `_relicWriteback: { id, fields }` — 字段名走 [`ALLOWED_WRITEBACK_FIELDS` allowlist](../../lib/skills/runtime/runner.ts)。本目录所有示例**不依赖** `_relicWriteback`，纯演示 DAG 流；relic 回写另起篇章。 |
 
 ### inputFrom source-ref 速查

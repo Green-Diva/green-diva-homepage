@@ -13,7 +13,7 @@ export async function GET() {
     throw e;
   }
   const agents = await prisma.agent.findMany({
-    orderBy: [{ serial: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ displayOrder: "asc" }, { serial: "asc" }, { createdAt: "asc" }],
     include: {
       createdBy: { select: { id: true, name: true } },
     },

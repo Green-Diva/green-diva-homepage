@@ -29,10 +29,14 @@ export const DIAGNOSTIC_HINTS_ZH: Record<AgentErrorCode, string> = {
   LOOP_TOO_DEEP: "loop / forEach 嵌套超过 MAX_LOOP_DEPTH=2,把内层拍平。",
   FOREACH_INPUT_NOT_ARRAY: "forEach 节点的 inputFrom 解析出非数组,检查上游 transform 的输出形状。",
   TRANSFORM_FAILED: "transform 节点 JSONata 表达式求值失败,看 errorMessage 定位语法 / 引用错误。",
+  PERSIST_INPUT_INVALID: "persist 节点入参不合法,检查 inputFrom 是否解析出 { relicSlug, kind, base64, contentType? }。",
+  PERSIST_FAILED: "persist 节点写盘失败,通常是磁盘权限或路径越界,看 errorMessage。",
 
   // Orchestrator
   NO_TOOLS: "Orchestrator 找不到可暴露的 ONLINE skill,先装配并 ONLINE 至少一条 skill。",
   UNKNOWN_TOOL: "LLM 调用了不存在的 tool 名,通常是 prompt 与 skill 装备不同步。",
+  OUTPUT_NOT_JSON: "outputMode=json 但 LLM 末段文本不是 JSON(不以 { 或 [ 开头),检查 systemPrompt 是否清晰描述了输出格式。",
+  OUTPUT_PARSE_FAILED: "outputMode=json 且文本像 JSON 但 parse 失败,通常是 LLM 加了 markdown 围栏或漏闭合括号。",
 
   // Handler
   MISSING_ENV: "服务端缺对应 env 变量(GEMINI_API_KEY / FAL_API_KEY / MESHY_API_KEY 等),检查 .env。",

@@ -3,7 +3,14 @@ import { BranchNodeView } from "./BranchNode";
 import { LoopNodeView } from "./LoopNode";
 import { ForEachNodeView } from "./ForEachNode";
 import { TransformNodeView } from "./TransformNode";
-import { BeginNodeView, EndNodeView, AgentBoundaryView } from "./DecorativeNodes";
+import { PersistNodeView } from "./PersistNode";
+import {
+  BeginNodeView,
+  EndNodeView,
+  AgentBoundaryView,
+  AgentInputNodeView,
+  AgentOutputNodeView,
+} from "./DecorativeNodes";
 import { LabeledEdge } from "./LabeledEdge";
 
 export const nodeTypes = {
@@ -12,9 +19,12 @@ export const nodeTypes = {
   loopNode: LoopNodeView,
   forEachNode: ForEachNodeView,
   transformNode: TransformNodeView,
+  persistNode: PersistNodeView,
   beginNode: BeginNodeView,
   endNode: EndNodeView,
   agentBoundaryNode: AgentBoundaryView,
+  agentInputNode: AgentInputNodeView,
+  agentOutputNode: AgentOutputNodeView,
 };
 
 export const edgeTypes = { labeled: LabeledEdge };

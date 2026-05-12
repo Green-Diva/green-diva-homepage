@@ -7,7 +7,6 @@
 // an unknown sceneKey to avoid ghost rows that no dispatcher can find.
 
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
@@ -16,10 +15,6 @@ import { sceneBindingUpdateSchema } from "@/lib/validators";
 import "@/lib/scenes-init";
 
 type Ctx = { params: Promise<{ sceneKey: string }> };
-
-function jsonOrNull(v: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
-  return v === undefined || v === null ? Prisma.JsonNull : (v as Prisma.InputJsonValue);
-}
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
@@ -90,13 +85,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       create: {
         sceneKey,
         agentId: parsed.data.agentId,
-        inputMap: jsonOrNull(parsed.data.inputMap),
         enabled: parsed.data.enabled,
         notes: parsed.data.notes ?? null,
       },
       update: {
         agentId: parsed.data.agentId,
-        inputMap: jsonOrNull(parsed.data.inputMap),
         enabled: parsed.data.enabled,
         notes: parsed.data.notes ?? null,
       },

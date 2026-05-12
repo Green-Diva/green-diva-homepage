@@ -98,34 +98,6 @@ const SKILL_PRESETS: SkillPreset[] = [
     },
   },
   {
-    key: "save-asset",
-    labelEn: "Save asset to relic storage",
-    labelZh: "保存资产到 relic 存储",
-    descEn: "POST a base64 blob to /api/internal/save-asset and emit _relicWriteback for runner persistence.",
-    descZh: "POST base64 到 /api/internal/save-asset，并产出 _relicWriteback 让 runner 写回 Relic 列。",
-    handlerKind: "HTTP_API",
-    defaultConfig: {
-      method: "POST",
-      url: "http://localhost:3000/api/internal/save-asset",
-      authEnv: "INTERNAL_SERVICE_TOKEN",
-      authScheme: "Header",
-      authHeader: "X-Internal-Token",
-      bodyTemplate: {
-        relicSlug: "{{relicSlug}}",
-        kind: "{{kind}}",
-        base64: "{{_download.base64}}",
-        contentType: "{{_download.contentType}}",
-      },
-      responseTransform: {
-        savedPath: "{{response.savedPath}}",
-        _relicWriteback: {
-          id: "{{input.relicId}}",
-          fields: { enhancedImagePath: "{{response.savedPath}}" },
-        },
-      },
-    },
-  },
-  {
     key: "mcp",
     labelEn: "MCP server (Phase 5+)",
     labelZh: "MCP 服务器（Phase 5+）",
@@ -150,9 +122,7 @@ function derivePresetKey(
     if (provider === "openai") return "llm-openai";
     return "llm-anthropic";
   }
-  // HTTP_API: distinguish save-asset / async / vanilla via heuristics.
-  const url = typeof cfg.url === "string" ? cfg.url : "";
-  if (url.includes("/api/internal/save-asset")) return "save-asset";
+  // HTTP_API: distinguish async / vanilla via heuristics.
   if (isObject(cfg.polling)) return "http-async";
   return "http-api";
 }

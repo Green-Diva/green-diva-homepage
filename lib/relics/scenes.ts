@@ -97,6 +97,17 @@ export const relicDraftMetadataScene = registerScene({
   // image-pick lives in a separate scene (relic.smart-image-pick) since
   // the Phase 8 picker decomposition. LORE-FORGE no longer claims it.
   requiredCapabilities: ["lore-writing", "metadata-derivation"],
+  // ctx → agent.input. Injects mode discriminator (LORE-FORGE branches
+  // on `input.mode` to pick draft vs regen DAG path) + renames
+  // workspaceSlug to relicSlug (forge's internal vocabulary).
+  prepareAgentInput: (ctx) => ({
+    mode: "initial",
+    relicSlug: ctx.workspaceSlug,
+    userBrief: ctx.userBrief,
+    fileSummary: ctx.fileSummary,
+    imageAbsPaths: ctx.imageAbsPaths,
+    textExcerpts: ctx.textExcerpts,
+  }),
 });
 
 // Legacy alias — drop after SceneBinding.sceneKey rows have been migrated.
@@ -154,6 +165,16 @@ export const relicSmartImagePickScene = registerScene({
     .passthrough(),
   invocation: "sync",
   requiredCapabilities: ["image-pick"],
+  // ctx → agent.input. Pass-through — PICKER-FORGE's DAG already reads
+  // workspaceSlug / useUserImage / networkImageQuery / userCandidates /
+  // referenceImageAbs straight from agent.input.
+  prepareAgentInput: (ctx) => ({
+    workspaceSlug: ctx.workspaceSlug,
+    useUserImage: ctx.useUserImage,
+    networkImageQuery: ctx.networkImageQuery,
+    userCandidates: ctx.userCandidates,
+    referenceImageAbs: ctx.referenceImageAbs,
+  }),
 });
 
 // — relic.regenMetadata —
@@ -193,6 +214,14 @@ export const relicRegenMetadataScene = registerScene({
     .passthrough(),
   invocation: "sync",
   requiredCapabilities: ["metadata-derivation"],
+  // ctx → agent.input. Injects mode discriminator (LORE-FORGE branches
+  // on `input.mode`) and renames relicSlug pass-through.
+  prepareAgentInput: (ctx) => ({
+    mode: "regenMetadata",
+    relicSlug: ctx.relicSlug,
+    existingLore: ctx.existingLore,
+    feedback: ctx.feedback,
+  }),
 });
 
 // — relic.enhance2d —
@@ -233,6 +262,23 @@ export const relicEnhance2dScene = registerScene({
   // 3 min SLA — fal.ai BiRefNet typically returns in <30s; anything
   // past 3 min means the API is degraded.
   slaMs: 180_000,
+  // ctx → agent.input. `_relicId` underscore-prefixed because the
+  // runner's maybeWriteRelicAsset reads it via _relicWriteback envelope
+  // produced by the leaf transform; admin's DAG view treats it as
+  // metadata, not a normal field.
+  //
+  // `mode` discriminates the unified RELIC-FORGE-001 omni-agent's 4-way
+  // mode branch (initial / regenMetadata / 2dEnhance / 3dCreate).
+  // `kind` is consumed by the shared save-asset-relic skill's bodyTemplate
+  // — tells /api/internal/save-asset to write the cutout PNG under
+  // private/relics/<slug>/derived/enhanced-*.png.
+  prepareAgentInput: (ctx) => ({
+    relicSlug: ctx.relicSlug,
+    imageDataUri: ctx.imageDataUri,
+    _relicId: ctx.relicId,
+    mode: "2dEnhance",
+    kind: "enhanced",
+  }),
 });
 
 // — relic.create3d —
@@ -297,4 +343,16 @@ export const relicCreate3dScene = registerScene({
   // discards whatever the previous attempt was doing. Late success
   // from the original attempt still writes back via the runner hook.
   maxAttempts: 1,
+  // ctx → agent.input. Injects `kind: "model"` (save-asset uses it as
+  // the persisted filename prefix), `mode: "3dCreate"` (discriminates the
+  // RELIC-FORGE-001 omni-agent's 4-way mode branch), and the _relicId
+  // envelope for the runner's writeback hook.
+  prepareAgentInput: (ctx) => ({
+    relicSlug: ctx.relicSlug,
+    imageDataUri: ctx.imageDataUri,
+    _relicId: ctx.relicId,
+    mode: "3dCreate",
+    kind: "model",
+    opts: ctx.opts,
+  }),
 });

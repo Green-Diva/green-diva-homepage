@@ -482,14 +482,9 @@ export interface Dictionary {
     sceneEditorAgent: string;
     sceneEditorAgentHint: string;
     sceneEditorAgentMissing: string;
-    sceneEditorInputMap: string;
-    sceneEditorInputMapHint: string;
-    sceneEditorOutputMap: string;
-    sceneEditorOutputMapHint: string;
     sceneEditorEnabled: string;
     sceneEditorEnabledHint: string;
     sceneEditorNotes: string;
-    sceneEditorJsonInvalid: string;
     sceneEditorContextFields: string;
     sceneEditorOutputFields: string;
     sceneEditorSampleRun: string;

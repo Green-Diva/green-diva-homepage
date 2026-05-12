@@ -5,10 +5,14 @@
 // What it creates (idempotent — checks for existing rows by slug/codename):
 //   1. Skill "serp-image-search"            (HTTP_API GET, QueryParam auth)
 //   2. Skill "download-network-image"       (HTTP_API GET binary)
-//   3. Skill "save-network-asset"           (HTTP_API → /api/internal/save-asset)
-//   4. Skill "vision-compare-candidates"    (LLM_PROMPT gemini multi-image)
-//   5. Agent "PICKER-FORGE-001"             (MECHANICAL, 4-slot DAG)
-//   6. SceneBinding for relic.smart-image-pick → PICKER-FORGE-001
+//   3. Skill "vision-compare-candidates"    (LLM_PROMPT gemini multi-image)
+//   4. Agent "PICKER-FORGE-001"             (MECHANICAL, 3-slot DAG)
+//   5. SceneBinding for relic.smart-image-pick → PICKER-FORGE-001
+//
+// 2026-05-13: the former "save-network-asset" HTTP_API skill (slot 3) was
+// retired in favor of the backbone `persist` primitive node. Slots are now
+// 1=serp / 2=download / 4=vision (slot 3 stays empty for hash compatibility
+// with prior DAG node ids).
 //
 // User candidates are pre-staged at the pipeline layer
 // (lib/relics/pipeline/stageUserCandidates.ts) so the picker DAG only
@@ -50,6 +54,13 @@ const SKILL_SERP = {
     timeoutMs: 30_000,
     responseType: "json",
   } as Prisma.InputJsonValue,
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Google Images search query, e.g. product name + brand + edition. Be specific." },
+    },
+    required: ["query"],
+  } as Prisma.InputJsonValue,
 };
 
 const SKILL_DOWNLOAD = {
@@ -72,39 +83,19 @@ const SKILL_DOWNLOAD = {
       "User-Agent": "Mozilla/5.0 (compatible; GreenDiva/1.0)",
     },
   } as Prisma.InputJsonValue,
-};
-
-const SKILL_SAVE_NET = {
-  slug: "save-network-asset",
-  nameEn: "Save Network Asset",
-  nameZh: "保存网络资产",
-  icon: "save_alt",
-  descriptionEn:
-    "POSTs base64 bytes to /api/internal/save-asset. Returns { savedPath, absPath, contentType, bytes } — absPath is consumed by the vision-compare LLM_PROMPT skill via imagePathsField.",
-  descriptionZh:
-    "把 base64 字节 POST 到 /api/internal/save-asset。返回 { savedPath, absPath, contentType, bytes } —— absPath 由 vision-compare 的 imagePathsField 消费。",
-  kind: "HTTP_API" as const,
-  handlerConfig: {
-    method: "POST",
-    url: "http://localhost:3000/api/internal/save-asset",
-    authEnv: "INTERNAL_SERVICE_TOKEN",
-    authScheme: "Header",
-    authHeader: "X-Internal-Token",
-    timeoutMs: 30_000,
-    bodyTemplate: {
-      relicSlug: "{{relicSlug}}",
-      kind: "{{kind}}",
-      base64: "{{base64}}",
-      contentType: "{{contentType}}",
+  inputSchema: {
+    type: "object",
+    properties: {
+      url: { type: "string", description: "Absolute http(s) URL of an image to fetch." },
     },
-    responseTransform: {
-      savedPath: "{{response.savedPath}}",
-      absPath: "{{response.absPath}}",
-      contentType: "{{response.contentType}}",
-      bytes: "{{response.bytes}}",
-    },
+    required: ["url"],
   } as Prisma.InputJsonValue,
 };
+
+// (2026-05-13) save-network-asset HTTP_API skill retired — replaced by
+// the backbone `persist` primitive node in the forEach body. See
+// migrate-replace-save-asset.ts for the cleanup of stale rows + DAG
+// rewrites in existing databases.
 
 // Prompt body — same content as the historical INTERNAL handler's
 // DEFAULT_VISION_PROMPT_WITH_REFINE, hoisted here as a constant so it's
@@ -151,6 +142,19 @@ const SKILL_VISION = {
     systemPrompt: VISION_SYSTEM_PROMPT,
     userTemplate:
       "REFERENCE IMAGE is image 1; CANDIDATE IMAGES are images 2..{{candidateCount}} from Google search \"{{currentQuery}}\". Output {{candidateCount}} verdicts in candidate order, plus a refinedQuery (read printed text off the reference; empty string if every verdict already matches).",
+  } as Prisma.InputJsonValue,
+  inputSchema: {
+    type: "object",
+    properties: {
+      candidateCount: { type: "integer", description: "Number of candidate images being compared (1..N). Used in the prompt to ground the verdicts array length." },
+      currentQuery: { type: "string", description: "The Google Images search query that produced these candidates." },
+      imageAbsPaths: {
+        type: "array",
+        items: { type: "string" },
+        description: "Absolute filesystem paths. First entry is the user's REFERENCE image; remaining entries are the SerpAPI candidates being judged.",
+      },
+    },
+    required: ["candidateCount", "currentQuery", "imageAbsPaths"],
   } as Prisma.InputJsonValue,
 };
 
@@ -304,8 +308,7 @@ const FOREACH_BODY = {
     },
     {
       id: "save",
-      type: "skill" as const,
-      slotIndex: 3,
+      type: "persist" as const,
       inputFrom: {
         merge: {
           relicSlug: "agent.input.item.workspaceSlug",
@@ -552,14 +555,8 @@ const EXPR_SERP_FILTER_WITH_KIND = `(
 
 (LOOP_BODY.nodes[1] as { expression: string }).expression = EXPR_SERP_FILTER_WITH_KIND;
 
-// — Scene binding inputMap — — — — — — — — — — — — — — — — — — — — — —
-const PICK_INPUT_MAP = {
-  workspaceSlug: "{{ctx.workspaceSlug}}",
-  useUserImage: "{{ctx.useUserImage}}",
-  networkImageQuery: "{{ctx.networkImageQuery}}",
-  userCandidates: "{{ctx.userCandidates}}",
-  referenceImageAbs: "{{ctx.referenceImageAbs}}",
-};
+// 2026-05-12 — inputMap retired. ctx → agent.input is owned by
+// scene.prepareAgentInput in lib/relics/scenes.ts (relicSmartImagePickScene).
 
 // 2026-05-11: outputMap dropped — both branch leaves (userOnly +
 // mergeFinal) already produce scene-shape `{ candidates,
@@ -575,7 +572,6 @@ function genCuid(): string {
 type SkillSpec =
   | typeof SKILL_SERP
   | typeof SKILL_DOWNLOAD
-  | typeof SKILL_SAVE_NET
   | typeof SKILL_VISION;
 
 async function ensureSkill(prisma: PrismaClient, spec: SkillSpec): Promise<string> {
@@ -587,6 +583,7 @@ async function ensureSkill(prisma: PrismaClient, spec: SkillSpec): Promise<strin
       where: { id: existing.id },
       data: {
         handlerConfig: spec.handlerConfig,
+        inputSchema: spec.inputSchema,
         nameEn: spec.nameEn,
         nameZh: spec.nameZh,
         descriptionEn: spec.descriptionEn,
@@ -608,6 +605,7 @@ async function ensureSkill(prisma: PrismaClient, spec: SkillSpec): Promise<strin
       descriptionZh: spec.descriptionZh,
       kind: spec.kind,
       handlerConfig: spec.handlerConfig,
+      inputSchema: spec.inputSchema,
       status: "ONLINE",
     },
     select: { id: true },
@@ -618,7 +616,7 @@ async function ensureSkill(prisma: PrismaClient, spec: SkillSpec): Promise<strin
 
 async function ensureForgeAgent(
   prisma: PrismaClient,
-  skillIds: { serp: string; download: string; save: string; vision: string },
+  skillIds: { serp: string; download: string; vision: string },
 ): Promise<string> {
   const existing = await prisma.agent.findUnique({ where: { codename: NEW_AGENT_CODENAME } });
   if (existing) {
@@ -629,7 +627,6 @@ async function ensureForgeAgent(
     for (const [slotIndex, skillId] of [
       [1, skillIds.serp],
       [2, skillIds.download],
-      [3, skillIds.save],
       [4, skillIds.vision],
     ] as const) {
       const eq = await prisma.agentSkillEquip.findFirst({
@@ -678,13 +675,12 @@ async function ensureForgeAgent(
       data: [
         { agentId: agent.id, skillId: skillIds.serp, slotIndex: 1, unlocked: true },
         { agentId: agent.id, skillId: skillIds.download, slotIndex: 2, unlocked: true },
-        { agentId: agent.id, skillId: skillIds.save, slotIndex: 3, unlocked: true },
         { agentId: agent.id, skillId: skillIds.vision, slotIndex: 4, unlocked: true },
       ],
     });
     return agent;
   });
-  console.log(`[migrate-picker-forge] created agent ${NEW_AGENT_CODENAME} (${result.id}) + 4 equips`);
+  console.log(`[migrate-picker-forge] created agent ${NEW_AGENT_CODENAME} (${result.id}) + 3 equips (slot 3 empty — persist primitive)`);
   return result.id;
 }
 
@@ -696,7 +692,6 @@ async function bindScene(prisma: PrismaClient, forgeId: string): Promise<void> {
       where: { sceneKey },
       data: {
         agentId: forgeId,
-        inputMap: PICK_INPUT_MAP as unknown as Prisma.InputJsonValue,
         enabled: true,
         notes: "PICKER-FORGE-001: backbone loop+forEach+transform decomposition of the legacy INTERNAL handler.",
       },
@@ -708,7 +703,6 @@ async function bindScene(prisma: PrismaClient, forgeId: string): Promise<void> {
     data: {
       sceneKey,
       agentId: forgeId,
-      inputMap: PICK_INPUT_MAP as unknown as Prisma.InputJsonValue,
       enabled: true,
       notes: "PICKER-FORGE-001: backbone loop+forEach+transform decomposition of the legacy INTERNAL handler.",
     },
@@ -729,13 +723,11 @@ async function main() {
 
     const serpId = await ensureSkill(prisma, SKILL_SERP);
     const downloadId = await ensureSkill(prisma, SKILL_DOWNLOAD);
-    const saveId = await ensureSkill(prisma, SKILL_SAVE_NET);
     const visionId = await ensureSkill(prisma, SKILL_VISION);
 
     const forgeId = await ensureForgeAgent(prisma, {
       serp: serpId,
       download: downloadId,
-      save: saveId,
       vision: visionId,
     });
     await bindScene(prisma, forgeId);

@@ -72,10 +72,24 @@ export function nextNodeId(existing: FlowNode[], prefix: string): string {
   return `${prefix}${i}`;
 }
 
-// Build the decorative BEGIN / END FlowNodes (one pair per bound scene)
-// + a single AGENT-BOUNDARY rectangle wrapping all user nodes. All are
-// read-only — admin can drag, but positions are NEVER persisted
+// Build the decorative I/O nodes:
+//   - 1 AGENT-BOUNDARY rectangle wrapping all user nodes
+//   - N BEGIN nodes (one per bound scene) on the far left
+//   - 1 AGENT.INPUT convergence node just inside the left boundary
+//   - 1 AGENT.OUTPUT convergence node just inside the right boundary
+//   - N END nodes on the far right
+//
+// All decorative — admin can drag, but positions are NEVER persisted
 // (filtered out of buildConfig).
+//
+// 2026-05-12 — visual model swapped from "N×M tangled edges" to
+// "BEGINs ─→ AGENT.INPUT ─→ DAG ─→ AGENT.OUTPUT ─→ ENDs" so the picture
+// matches runtime semantics (one invocation = one input + one output;
+// BEGIN/END multiplicity = alternative scene candidates, not concurrent
+// data flow).
+export const AGENT_INPUT_NODE_ID = "__agent_input__";
+export const AGENT_OUTPUT_NODE_ID = "__agent_output__";
+
 export function buildIoNodes(
   boundScenes: BoundSceneSummary[],
   userNodes: FlowNode[],
@@ -100,8 +114,14 @@ export function buildIoNodes(
       if (n.position.y > maxY) maxY = n.position.y;
     }
   }
-  const beginX = minX - 320;
-  const endX = maxX + 320;
+  // BEGIN/END columns pushed further out to leave room for the new
+  // convergence nodes between them and the user-DAG. AGENT.INPUT sits
+  // just inside the left boundary edge; AGENT.OUTPUT mirrors on the right.
+  const beginX = minX - 540;
+  const endX = maxX + USER_NODE_W + 360;
+  const agentInputX = minX - 200;
+  const agentOutputX = maxX + USER_NODE_W + 80;
+  const midY = userNodes.length > 0 ? (minY + maxY) / 2 : 200;
   const STACK_GAP = 220;
   const out: FlowNode[] = [];
 
@@ -134,12 +154,37 @@ export function buildIoNodes(
   }
 
   if (boundScenes.length === 0) return out;
+
+  // 2. AGENT.INPUT and AGENT.OUTPUT convergence nodes — only meaningful
+  // when there are user nodes (otherwise nothing flows through them).
+  if (userNodes.length > 0) {
+    out.push({
+      id: AGENT_INPUT_NODE_ID,
+      type: "agentInputNode",
+      position: { x: agentInputX, y: midY },
+      deletable: false,
+      data: { __ioRole: "agentInput" } as unknown as NodeData,
+    });
+    out.push({
+      id: AGENT_OUTPUT_NODE_ID,
+      type: "agentOutputNode",
+      position: { x: agentOutputX, y: midY },
+      deletable: false,
+      data: { __ioRole: "agentOutput" } as unknown as NodeData,
+    });
+  }
+
+  // 3. BEGIN / END nodes (one pair per bound scene). Vertically centered
+  // around midY so the BEGIN/END column is balanced relative to the
+  // convergence nodes.
+  const stackOffset = ((boundScenes.length - 1) * STACK_GAP) / 2;
   boundScenes.forEach((s, i) => {
     const sceneLabel = s.label.zh || s.label.en;
+    const y = midY + i * STACK_GAP - stackOffset;
     out.push({
       id: `__begin__${s.sceneKey}`,
       type: "beginNode",
-      position: { x: beginX, y: i * STACK_GAP },
+      position: { x: beginX, y },
       deletable: false,
       data: {
         __ioRole: "begin",
@@ -153,7 +198,7 @@ export function buildIoNodes(
     out.push({
       id: `__end__${s.sceneKey}`,
       type: "endNode",
-      position: { x: endX, y: i * STACK_GAP },
+      position: { x: endX, y },
       deletable: false,
       data: {
         __ioRole: "end",
@@ -168,117 +213,14 @@ export function buildIoNodes(
   return out;
 }
 
-// Walk a dot.path through a JS object. Mirror of backbone.ts pickPath.
-function pickPath(obj: unknown, path: string): unknown {
-  if (!path) return obj;
-  let cur: unknown = obj;
-  for (const seg of path.split(".")) {
-    if (cur == null || typeof cur !== "object") return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return cur;
-}
-
-// Mirror of backbone.ts evalCase. Returns one of:
-//   - "match"        case matched (statically known)
-//   - "no-match"     case definitively did NOT match
-//   - "unresolvable" path resolves to a template ({{ctx.X}}) — value is
-//                    only known at runtime; can't decide statically
-function evalCaseStatic(
-  inputMap: unknown,
-  c: { path: string; op: string; value: unknown },
-): "match" | "no-match" | "unresolvable" {
-  const v = pickPath(inputMap, c.path);
-  if (typeof v === "string" && v.startsWith("{{")) return "unresolvable";
-  let matched = false;
-  switch (c.op) {
-    case "eq":
-      matched = v === c.value;
-      break;
-    case "ne":
-      matched = v !== c.value;
-      break;
-    case "exists":
-      matched = v !== undefined && v !== null;
-      break;
-    case "in":
-      matched = Array.isArray(c.value) && c.value.includes(v);
-      break;
-  }
-  return matched ? "match" : "no-match";
-}
-
-// Per-scene reachability: BFS from each root, but at branch nodes only
-// follow the edge whose `when` matches the case selected by inputMap.
-// Returns the set of leaves (reachable nodes with no reachable children)
-// for THIS scene specifically.
-function findSceneLeaves(
-  inputMap: unknown,
-  userNodes: FlowNode[],
-  userEdges: FlowEdge[],
-  roots: FlowNode[],
-): Set<string> {
-  const nodeById = new Map(userNodes.map((n) => [n.id, n]));
-  const outAdj = new Map<string, FlowEdge[]>();
-  for (const e of userEdges) {
-    if (!outAdj.has(e.source)) outAdj.set(e.source, []);
-    outAdj.get(e.source)!.push(e);
-  }
-  const reachable = new Set<string>();
-  const queue: string[] = roots.map((r) => r.id);
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (reachable.has(id)) continue;
-    reachable.add(id);
-    const node = nodeById.get(id);
-    if (!node) continue;
-    const outs = outAdj.get(id) ?? [];
-    const data = node.data as unknown as {
-      type?: string;
-      cases?: { path: string; op: string; value: unknown; label: string }[];
-      defaultLabel?: string;
-    };
-    if (data.type === "branch" && Array.isArray(data.cases)) {
-      let pickedLabel: string | undefined;
-      let anyUnresolvable = false;
-      for (const c of data.cases) {
-        const verdict = evalCaseStatic(inputMap, c);
-        if (verdict === "unresolvable") {
-          anyUnresolvable = true;
-          break;
-        }
-        if (verdict === "match") {
-          pickedLabel = c.label;
-          break;
-        }
-      }
-      if (!anyUnresolvable && !pickedLabel && data.defaultLabel) {
-        pickedLabel = data.defaultLabel;
-      }
-      if (anyUnresolvable || !pickedLabel) {
-        for (const e of outs) queue.push(e.target);
-      } else {
-        for (const e of outs) {
-          if (e.data?.when === pickedLabel) queue.push(e.target);
-        }
-      }
-    } else {
-      for (const e of outs) queue.push(e.target);
-    }
-  }
-  const leaves = new Set<string>();
-  for (const id of reachable) {
-    const outs = outAdj.get(id) ?? [];
-    const hasReachableChild = outs.some((e) => reachable.has(e.target));
-    if (!hasReachableChild) leaves.add(id);
-  }
-  return leaves;
-}
-
-// Build decorative edges connecting BEGIN nodes to user roots and user
-// leaves to END nodes. Scene-aware: each scene's BEGIN/END only connect
-// to nodes reachable from THIS scene's static inputMap.
-// Read-only, filtered from buildConfig.
+// Build decorative edges that mirror the runtime flow shape:
+//   BEGINs → AGENT.INPUT → user-roots → ... → user-leaves → AGENT.OUTPUT → ENDs
+//
+// Edge styling encodes the "candidate vs actual" distinction:
+//   - dashed sky-400  : BEGIN → AGENT.INPUT (candidate scene trigger)
+//   - solid  sky-400  : AGENT.INPUT → root  (actual data entering DAG)
+//   - solid  pink-400 : leaf → AGENT.OUTPUT (actual data leaving DAG)
+//   - dashed pink-400 : AGENT.OUTPUT → END  (candidate schema validation)
 export function buildIoEdges(
   boundScenes: BoundSceneSummary[],
   userNodes: FlowNode[],
@@ -286,37 +228,69 @@ export function buildIoEdges(
 ): FlowEdge[] {
   if (boundScenes.length === 0 || userNodes.length === 0) return [];
   const inDeg = new Map<string, number>(userNodes.map((n) => [n.id, 0]));
+  const outDeg = new Map<string, number>(userNodes.map((n) => [n.id, 0]));
   for (const e of userEdges) {
     if (inDeg.has(e.target)) inDeg.set(e.target, (inDeg.get(e.target) ?? 0) + 1);
+    if (outDeg.has(e.source)) outDeg.set(e.source, (outDeg.get(e.source) ?? 0) + 1);
   }
   const roots = userNodes.filter((n) => (inDeg.get(n.id) ?? 0) === 0);
+  const leaves = userNodes.filter((n) => (outDeg.get(n.id) ?? 0) === 0);
+
   const out: FlowEdge[] = [];
+  const SKY = "rgb(96 165 250)";
+  const PINK = "rgb(244 114 182)";
+
+  // BEGIN → AGENT.INPUT (one per scene, dashed = candidate)
   for (const s of boundScenes) {
-    const beginId = `__begin__${s.sceneKey}`;
-    const endId = `__end__${s.sceneKey}`;
-    const sceneLeaves = findSceneLeaves(s.inputMap, userNodes, userEdges, roots);
-    for (const r of roots) {
-      out.push({
-        id: `__ioedge__begin__${s.sceneKey}__${r.id}`,
-        source: beginId,
-        target: r.id,
-        style: { stroke: "rgb(96 165 250)", strokeDasharray: "4 4", strokeWidth: 1.5 },
-        animated: false,
-        deletable: false,
-        data: { __ioRole: "begin" } as unknown as EdgeData,
-      });
-    }
-    for (const leafId of sceneLeaves) {
-      out.push({
-        id: `__ioedge__end__${s.sceneKey}__${leafId}`,
-        source: leafId,
-        target: endId,
-        style: { stroke: "rgb(244 114 182)", strokeDasharray: "4 4", strokeWidth: 1.5 },
-        animated: false,
-        deletable: false,
-        data: { __ioRole: "end" } as unknown as EdgeData,
-      });
-    }
+    out.push({
+      id: `__ioedge__begin__${s.sceneKey}`,
+      source: `__begin__${s.sceneKey}`,
+      target: AGENT_INPUT_NODE_ID,
+      style: { stroke: SKY, strokeDasharray: "4 4", strokeWidth: 1.5 },
+      animated: false,
+      deletable: false,
+      data: { __ioRole: "begin" } as unknown as EdgeData,
+    });
   }
+
+  // AGENT.INPUT → root (solid = actual data flow into DAG)
+  for (const r of roots) {
+    out.push({
+      id: `__ioedge__input__${r.id}`,
+      source: AGENT_INPUT_NODE_ID,
+      target: r.id,
+      style: { stroke: SKY, strokeWidth: 1.75 },
+      animated: false,
+      deletable: false,
+      data: { __ioRole: "begin" } as unknown as EdgeData,
+    });
+  }
+
+  // leaf → AGENT.OUTPUT (solid = actual data flow out of DAG)
+  for (const leaf of leaves) {
+    out.push({
+      id: `__ioedge__output__${leaf.id}`,
+      source: leaf.id,
+      target: AGENT_OUTPUT_NODE_ID,
+      style: { stroke: PINK, strokeWidth: 1.75 },
+      animated: false,
+      deletable: false,
+      data: { __ioRole: "end" } as unknown as EdgeData,
+    });
+  }
+
+  // AGENT.OUTPUT → END (one per scene, dashed = candidate)
+  for (const s of boundScenes) {
+    out.push({
+      id: `__ioedge__end__${s.sceneKey}`,
+      source: AGENT_OUTPUT_NODE_ID,
+      target: `__end__${s.sceneKey}`,
+      style: { stroke: PINK, strokeDasharray: "4 4", strokeWidth: 1.5 },
+      animated: false,
+      deletable: false,
+      data: { __ioRole: "end" } as unknown as EdgeData,
+    });
+  }
+
   return out;
 }

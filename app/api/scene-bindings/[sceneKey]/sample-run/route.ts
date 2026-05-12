@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
 import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
-import { applyTemplate, getScene } from "@/lib/agent-service";
+import { getScene } from "@/lib/agent-service";
 import { executeAgent } from "@/lib/agents/invoke";
 import { sceneSampleRunSchema } from "@/lib/validators";
 import "@/lib/scenes-init";
@@ -83,16 +83,20 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return respondError("BINDING_AGENT_NOT_DEPLOYED", "bound agent is not deployed", 503);
   }
 
+  // ctx → agent.input via scene.prepareAgentInput (code, default identity).
   let agentInput: unknown;
   try {
-    agentInput = applyTemplate(binding.inputMap, {
-      ctx: ctxResult.data,
-      actor: { userId: me.id, level: me.level, name: me.name },
-    } as Record<string, unknown>);
+    agentInput = scene.prepareAgentInput
+      ? scene.prepareAgentInput(ctxResult.data, {
+          userId: me.id,
+          level: me.level,
+          name: me.name,
+        })
+      : ctxResult.data;
   } catch (e) {
     return respondError(
-      "TEMPLATE_ERROR",
-      `inputMap apply failed: ${e instanceof Error ? e.message : String(e)}`,
+      "DISPATCH_FAILED",
+      `prepareAgentInput threw: ${e instanceof Error ? e.message : String(e)}`,
       500,
     );
   }

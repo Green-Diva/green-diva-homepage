@@ -98,7 +98,6 @@ export interface SceneBindingRow {
   agentMode: AgentMode | null;
   agentDeployed: boolean;
   agentCapabilities: string[];
-  inputMap: unknown;
   enabled: boolean;
   notes: string | null;
   createdAt: string;
@@ -128,12 +127,6 @@ export interface BoundSceneSummary {
   contextFields: import("@/lib/agent-service").SchemaFieldHint[];
   // The contract this agent's leaf must satisfy.
   outputFields: import("@/lib/agent-service").SchemaFieldHint[];
-  // Static SceneBinding.inputMap. Used by BackboneFlowEditor to do
-  // scene-aware edge routing — for multi-binding agents with branch
-  // nodes (e.g. LORE-FORGE-001 routes "init" vs "regen" off
-  // input.mode), each scene's BEGIN/END only connects to the branch
-  // its inputMap selects, not all leaves.
-  inputMap: unknown;
   // "binding" → real SceneBinding row exists (production-routable).
   // "intent"  → draft-phase claim via Agent.intentSceneKeys only; no
   //             traffic flows until the agent is deployed and the binding

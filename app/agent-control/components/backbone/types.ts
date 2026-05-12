@@ -28,9 +28,14 @@ export type BranchNodeData = {
   defaultLabel?: string;
 };
 
-// Body sub-DAG can contain skill / branch / transform — UI disallows
-// nested loops / forEach (runtime supports MAX_LOOP_DEPTH=2 only via raw JSON).
-export type BodyNodeData = SkillNodeData | BranchNodeData | TransformNodeData;
+// Body sub-DAG can contain skill / branch / transform / persist — UI
+// disallows nested loops / forEach (runtime supports MAX_LOOP_DEPTH=2 only
+// via raw JSON).
+export type BodyNodeData =
+  | SkillNodeData
+  | BranchNodeData
+  | TransformNodeData
+  | PersistNodeData;
 export type BodyEdge = { from: string; to: string; when?: string };
 
 export type LoopNodeData = {
@@ -59,12 +64,19 @@ export type TransformNodeData = {
   expression: string;
 };
 
+export type PersistNodeData = {
+  type: "persist";
+  nodeId: string;
+  inputFrom: SourceRef;
+};
+
 export type NodeData =
   | SkillNodeData
   | BranchNodeData
   | LoopNodeData
   | ForEachNodeData
-  | TransformNodeData;
+  | TransformNodeData
+  | PersistNodeData;
 
 export type FlowNode = Node<NodeData>;
 
@@ -97,6 +109,21 @@ export type EndNodeData = {
 export type AgentBoundaryData = {
   __ioRole: "agentBoundary";
   codename: string;
+};
+
+// Single convergence point: where the scene-resolved `agent.input` enters the
+// DAG (one input per invocation, regardless of which BEGIN-side scene
+// triggered). Decorative — not serialized into pipelineConfig.
+export type AgentInputNodeData = {
+  __ioRole: "agentInput";
+};
+
+// Single convergence point: where the DAG's leaf output emerges, then fans
+// out (decoratively) to whichever scene's END contract validates it. One
+// output per invocation; the END selected at runtime depends on which scene
+// invoked.
+export type AgentOutputNodeData = {
+  __ioRole: "agentOutput";
 };
 
 export type BodySubCanvasKind = "loop" | "forEach";

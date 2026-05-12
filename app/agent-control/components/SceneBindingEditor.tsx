@@ -1,8 +1,12 @@
 "use client";
 
-// Edit one SceneBinding row: pick which agent satisfies it, customize
-// inputMap, toggle enabled, write notes, and dry-run with a sample ctx —
-// all without touching code.
+// Edit one SceneBinding row: pick which agent satisfies it, toggle
+// enabled, write notes, and dry-run with a sample ctx — all without
+// touching code.
+//
+// 2026-05-12 — inputMap retired. ctx → agent.input is owned by
+// `scene.prepareAgentInput` in code (lib/relics/scenes.ts). Admin only
+// edits routing here (which agent + enabled + notes).
 //
 // Output shape: NOT editable here. The scene's outputSchema (declared
 // in code) is the contract; the bound agent must produce that shape via
@@ -32,11 +36,6 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
-
-function pretty(v: unknown): string {
-  if (v === undefined || v === null) return "";
-  return JSON.stringify(v, null, 2);
-}
 
 function parseJson(s: string): { ok: true; value: unknown } | { ok: false; error: string } {
   const trimmed = s.trim();
@@ -68,7 +67,6 @@ export default function SceneBindingEditor({
   const router = useRouter();
 
   const [agentId, setAgentId] = useState<string>(binding?.agentId ?? "");
-  const [inputMapText, setInputMapText] = useState<string>(pretty(binding?.inputMap ?? {}));
   const [enabled, setEnabled] = useState<boolean>(binding?.enabled ?? true);
   const [notes, setNotes] = useState<string>(binding?.notes ?? "");
 
@@ -119,10 +117,7 @@ export default function SceneBindingEditor({
     return stale ? [stale, ...candidateAgents] : candidateAgents;
   }, [agentId, agents, candidateAgents]);
 
-  const inputMapParsed = useMemo(() => parseJson(inputMapText), [inputMapText]);
-
-  const inputMapInvalid = !inputMapParsed.ok;
-  const canSave = !!agentId && !inputMapInvalid && !busy;
+  const canSave = !!agentId && !busy;
 
   async function handleSave() {
     if (!canSave) return;
@@ -134,7 +129,6 @@ export default function SceneBindingEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           agentId,
-          inputMap: (inputMapParsed as { ok: true; value: unknown }).value,
           enabled,
           notes: notes.trim() || null,
         }),
@@ -269,18 +263,6 @@ export default function SceneBindingEditor({
           <p className="text-[11px] text-on-surface-variant">{t.agentControl.sceneEditorAgentHint}</p>
         </section>
 
-        {/* Input Map */}
-        <JsonField
-          label={t.agentControl.sceneEditorInputMap}
-          hint={t.agentControl.sceneEditorInputMapHint}
-          value={inputMapText}
-          onChange={setInputMapText}
-          invalid={inputMapInvalid}
-          invalidLabel={t.agentControl.sceneEditorJsonInvalid}
-          rows={8}
-          disabled={busy}
-        />
-
         {/* Enabled + notes */}
         <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 items-start">
           <label className="flex items-center gap-2 text-sm text-on-surface select-none">
@@ -387,53 +369,6 @@ export default function SceneBindingEditor({
 
   if (typeof document === "undefined") return null;
   return createPortal(node, document.body);
-}
-
-function JsonField({
-  label,
-  hint,
-  value,
-  onChange,
-  invalid,
-  invalidLabel,
-  rows,
-  disabled,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (v: string) => void;
-  invalid: boolean;
-  invalidLabel: string;
-  rows: number;
-  disabled: boolean;
-}) {
-  return (
-    <label className="block">
-      <div className="flex items-center justify-between mb-1">
-        <span className="font-label text-[10px] tracking-[0.3em] uppercase text-primary">{label}</span>
-        {invalid ? (
-          <span className="text-[10px] text-rose-400 font-label tracking-[0.2em] uppercase">
-            {invalidLabel}
-          </span>
-        ) : null}
-      </div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        rows={rows}
-        spellCheck={false}
-        className={[
-          "w-full bg-surface-variant border rounded px-3 py-2 font-mono text-xs text-on-surface focus:outline-none transition-colors",
-          invalid
-            ? "border-rose-500/50 focus:border-rose-500"
-            : "border-primary/30 focus:border-primary",
-        ].join(" ")}
-      />
-      <p className="text-[11px] text-on-surface-variant mt-1">{hint}</p>
-    </label>
-  );
 }
 
 function FieldList({

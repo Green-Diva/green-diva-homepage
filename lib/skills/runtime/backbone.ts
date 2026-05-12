@@ -27,6 +27,7 @@ import {
   executeBranchNode,
   executeForEachNode,
   executeLoopNode,
+  executePersistNode,
   executeSkillNode,
   executeTransformNode,
 } from "./backbone/executors";
@@ -172,8 +173,10 @@ export async function runBackbone(opts: {
       result = await executeLoopNode(node, ctx);
     } else if (node.type === "forEach") {
       result = await executeForEachNode(node, ctx);
-    } else {
+    } else if (node.type === "transform") {
       result = await executeTransformNode(node, ctx);
+    } else {
+      result = await executePersistNode(node, ctx);
     }
 
     if (!result.ok) {

@@ -198,12 +198,25 @@ const dagTransformNodeSchema = z.object({
   position: positionSchema,
 });
 
+// persist node — runtime data-persistence primitive. inputFrom must resolve
+// to { relicSlug, kind, base64, contentType?, ext? }. No node-level config
+// (kind / slug come from upstream, usually injected via
+// scene.prepareAgentInput + an inputFrom merge ref). Output is
+// { savedPath, absPath, bytes, contentType }.
+const dagPersistNodeSchema = z.object({
+  id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
+  type: z.literal("persist"),
+  inputFrom: sourceRef,
+  position: positionSchema,
+});
+
 const dagNodeSchema = z.discriminatedUnion("type", [
   dagSkillNodeSchema,
   dagBranchNodeSchema,
   dagLoopNodeSchema as unknown as typeof dagSkillNodeSchema,
   dagForEachNodeSchema as unknown as typeof dagSkillNodeSchema,
   dagTransformNodeSchema as unknown as typeof dagSkillNodeSchema,
+  dagPersistNodeSchema as unknown as typeof dagSkillNodeSchema,
 ]);
 
 export const pipelineConfigV2Schema = z.object({
@@ -236,6 +249,11 @@ export const dispatcherConfigSchema = z
     maxIterations: z.number().int().min(1).max(50).optional(),
     temperature: z.number().min(0).max(2).optional(),
     authEnv: z.string().max(64).optional(),
+    // "text" (default) returns { text, iterations, toolCallCount }; "json"
+    // tries to JSON.parse the LLM's final message so scene.outputSchema +
+    // writeback hook can consume a structured object. See orchestrator.ts
+    // header comment for the LLM-reliability tradeoff.
+    outputMode: z.enum(["text", "json"]).optional(),
   })
   .nullable();
 
@@ -476,36 +494,18 @@ export type SkillUpdateInput = z.infer<typeof skillUpdateSchema>;
 //
 // PATCH body for /api/scene-bindings/[sceneKey]. Used as upsert: if the
 // row doesn't yet exist for this sceneKey (e.g. a freshly-registered
-// scene without a default seed), the endpoint creates it. Admin always
-// supplies the full set of fields — partial PATCH semantics would force
-// us to query-then-merge inside the endpoint, complicating template
-// validation.
+// scene without a default seed), the endpoint creates it.
 //
-// inputMap is intentionally a permissive `unknown` — applyTemplate is
-// happy with any nested shape. The runtime layer (lib/agent-service)
-// is what fails dispatch if the produced AgentJob.input doesn't match
-// the bound agent's inputSchema.
-//
-// 2026-05-11: outputMap field retired. Bindings are pure routing now —
-// scene.outputSchema is the contract, agents self-shape via tail
-// transforms.
-export const sceneBindingUpdateSchema = z
-  .object({
-    agentId: z.string().cuid(),
-    inputMap: z.unknown(),
-    enabled: z.boolean().default(true),
-    notes: z.string().max(500).nullable().optional(),
-  })
-  .superRefine((binding, ctx) => {
-    // Parse-once every `{{path}}` template in inputMap at save-time.
-    // Same pattern as Skill.handlerConfig refine — admin sees red text
-    // in SceneBindingEditor instead of an empty-string interpolation
-    // surprising them at dispatch.
-    if (binding.inputMap == null) return;
-    for (const leaf of collectTemplateStrings(binding.inputMap, ["inputMap"])) {
-      refineTemplateString(ctx, leaf.value, leaf.path);
-    }
-  });
+// 2026-05-11: outputMap retired. scene.outputSchema is the contract,
+//             agents self-shape via tail transforms.
+// 2026-05-12: inputMap retired. scene.prepareAgentInput (code) owns the
+//             ctx → agent.input shaping. SceneBinding is pure routing
+//             (which agent runs this scene) + enabled + notes.
+export const sceneBindingUpdateSchema = z.object({
+  agentId: z.string().cuid(),
+  enabled: z.boolean().default(true),
+  notes: z.string().max(500).nullable().optional(),
+});
 export type SceneBindingUpdateInput = z.infer<typeof sceneBindingUpdateSchema>;
 
 export const sceneSampleRunSchema = z.object({
@@ -596,30 +596,6 @@ export const agentImportOptionsSchema = z.object({
 });
 export type AgentImportInput = z.infer<typeof agentImportOptionsSchema>;
 
-// — — Internal save-asset endpoint (agent-service Phase 2.3) — —
-//
-// Body for POST /api/internal/save-asset. Used by HTTP_API skills that
-// need to persist a downloaded blob (Meshy GLB, fal cutout PNG, …) into
-// `private/relics/<slug>/derived/`. Restricted to relic-* slug formats
-// + a small allowlist of `kind` values to keep filenames predictable.
-//
-// `ext` is parsed from contentType when omitted, falling back to ".bin".
-// We never trust client-side filenames (path-traversal risk).
-// Accepts both real Relic slugs ("vault-001-abc") and draft workspace
-// slugs ("_drafts/<cuid>"). The slash is the only special char allowed,
-// and only as the prefix separator — saved files still land under the
-// same private/relics/<slug>/derived/ tree because path.join handles it
-// correctly. Path traversal is blocked downstream by the path.resolve()
-// boundary check in the route handler.
-const RELIC_SLUG_RE = /^(_drafts\/)?[a-zA-Z0-9_-]{1,80}$/;
-const KIND_RE = /^[a-z0-9-]{1,32}$/;
-const EXT_RE = /^\.[a-z0-9]{1,8}$/;
-
-export const internalSaveAssetSchema = z.object({
-  relicSlug: z.string().regex(RELIC_SLUG_RE, "relicSlug must match [a-zA-Z0-9_-]{1,80}"),
-  kind: z.string().regex(KIND_RE, 'kind must match [a-z0-9-]{1,32} (e.g. "enhanced", "model")'),
-  base64: z.string().min(1).max(120_000_000), // ~90MB raw — base64 swells ~33%
-  contentType: z.string().max(120).optional(),
-  ext: z.string().regex(EXT_RE, 'ext must look like ".png" / ".glb"').optional(),
-});
-export type InternalSaveAssetInput = z.infer<typeof internalSaveAssetSchema>;
+// (2026-05-12) `internalSaveAssetSchema` retired alongside the
+// /api/internal/save-asset endpoint. The persist primitive node now writes
+// in-process via lib/relics/persistAsset.ts (own Zod schema).

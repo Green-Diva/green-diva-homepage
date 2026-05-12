@@ -1,21 +1,31 @@
-// Template engine for SceneBinding.inputMap.
-// (Used to also drive outputMap reshape; that field was retired
-// 2026-05-11 in favor of fixed scene.outputSchema + agent tail
-// transforms.)
+// `{{path}}` template engine + parser. Two roles:
+//
+//   1. applyTemplate — runtime interpolation. Used by skill handlers
+//      (httpApi / llmPrompt) to resolve `{{input.X}}` style refs inside
+//      Skill.handlerConfig (request bodies, URLs, prompts, polling URLs,
+//      responseTransform). Caller picks the variables namespace
+//      (conventionally `{ input }` for skills, formerly `{ ctx, actor }`
+//      for SceneBinding.inputMap before that field was retired
+//      2026-05-12).
+//
+//   2. parseTemplate — strict save-time validator. Used by zod refines
+//      on Skill.handlerConfig to surface malformed `{{...}}` blobs
+//      before they reach runtime.
 //
 // Syntax — single placeholder per cell: `{{path.to.value}}`.
 //   - Whole-string match → returns the raw looked-up value (preserves
 //     number / object / array type). Use this for non-string fields.
-//       e.g. { _relicId: "{{ctx.relicId}}", opts: "{{ctx.opts}}" }
 //   - Embedded match → string interpolation; non-string values are
-//     JSON.stringified so {{actor}} inside prose still serializes.
-//       e.g. { note: "Triggered by {{actor.name}} for {{ctx.relicId}}" }
+//     JSON.stringified.
 //
-// Variables are conventionally { ctx, actor }. The engine itself doesn't
-// care — caller picks the namespace. Missing paths resolve to undefined
-// (whole-value) or empty string (interpolated); they DO NOT throw, so
-// downstream zod schema validation gets the chance to give a much better
-// error pointing at which field broke.
+// Missing paths resolve to undefined (whole-value) or empty string
+// (interpolated); they DO NOT throw — downstream zod schema validation
+// gives a much better error pointing at which field broke.
+//
+// SceneBinding.inputMap is the historical primary caller and was retired
+// 2026-05-12. ctx → agent.input is now owned by scene.prepareAgentInput
+// in code. `extractReferences` (the inputMap-editor helper) went with
+// it; only applyTemplate + parseTemplate remain.
 
 import "server-only";
 
@@ -56,11 +66,10 @@ export function applyTemplate(
     return template.map((item) => applyTemplate(item, variables));
   }
   if (typeof template === "object") {
-    // Drop keys whose value resolves to undefined. This matches zod's
-    // optional() semantics — `{ x: "{{ctx.maybe}}" }` with absent
-    // ctx.maybe yields `{}`, not `{ x: undefined }`. Critical because
-    // Prisma's InputJsonValue rejects undefined; an unfiltered template
-    // would explode at AgentJob.create. `null` is preserved (legal JSON).
+    // Drop keys whose value resolves to undefined. Matches zod's
+    // optional() semantics — `{ x: "{{maybe}}" }` with absent
+    // maybe yields `{}`, not `{ x: undefined }`. Critical because
+    // Prisma's InputJsonValue rejects undefined. `null` is preserved.
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(template)) {
       const resolved = applyTemplate(v, variables);
@@ -73,38 +82,7 @@ export function applyTemplate(
   return template;
 }
 
-/**
- * Walk a template and collect every `{{path}}` reference it contains.
- * Used by the binding-editor UI to surface "this template references
- * `ctx.relicID` but the scene's contextSchema only has `ctx.relicId`"
- * before the admin saves a typo. Malformed `{{...}}` blobs are ignored
- * here (back-compat: pre-2026-05-11 behavior). Use `parseTemplate` for
- * strict parse-time validation.
- */
-export function extractReferences(template: unknown): string[] {
-  const refs = new Set<string>();
-  walk(template, refs);
-  return Array.from(refs).sort();
-}
-
-function walk(template: unknown, out: Set<string>): void {
-  if (typeof template === "string") {
-    const parsed = parseTemplate(template);
-    if (parsed.ok) {
-      for (const r of parsed.refs) out.add(r);
-    }
-    return;
-  }
-  if (Array.isArray(template)) {
-    for (const item of template) walk(item, out);
-    return;
-  }
-  if (template && typeof template === "object") {
-    for (const v of Object.values(template)) walk(v, out);
-  }
-}
-
-// Strict path syntax — same char class as partialRefRe (word + . + - + [ ]).
+// Strict path syntax — same char class as partialRefRe.
 const VALID_PATH_RE = /^[\w.\-[\]]+$/;
 
 export type TemplateParseResult =

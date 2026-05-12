@@ -176,6 +176,10 @@ export function validateAndNormalize(cfg: unknown): ValidationOk | ValidationFai
         };
       }
       nodes.push({ id, type: "transform", inputFrom: inputRef, expression });
+    } else if (raw.type === "persist") {
+      // persist node carries no extra config — the input contract is
+      // checked by lib/relics/persistAsset.ts at runtime, not here.
+      nodes.push({ id, type: "persist", inputFrom: inputRef });
     } else if (raw.type === "branch") {
       if (!Array.isArray(raw.cases) || raw.cases.length === 0) {
         return { ok: false, code: "PIPELINE_INVALID", message: `branch "${id}" must have ≥1 case` };
@@ -204,7 +208,7 @@ export function validateAndNormalize(cfg: unknown): ValidationOk | ValidationFai
       return {
         ok: false,
         code: "PIPELINE_INVALID",
-        message: `node "${id}".type must be "skill" | "branch" | "loop" | "forEach" | "transform"`,
+        message: `node "${id}".type must be "skill" | "branch" | "loop" | "forEach" | "transform" | "persist"`,
       };
     }
   }

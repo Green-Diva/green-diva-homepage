@@ -15,8 +15,6 @@ export {
   listScenesByModule,
 } from "./registry";
 
-export { applyTemplate, extractReferences } from "./template";
-
 export { callScene, dispatchScene } from "./dispatch";
 
 export {

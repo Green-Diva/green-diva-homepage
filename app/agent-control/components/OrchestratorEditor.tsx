@@ -68,6 +68,8 @@ const DEFAULT_BY_PROVIDER: Record<Provider, { model: string; authEnv: string }> 
   openai: { model: "gpt-4o", authEnv: "OPENAI_API_KEY" },
 };
 
+type OutputMode = "text" | "json";
+
 type Drafts = {
   provider: Provider;
   model: string;
@@ -75,6 +77,7 @@ type Drafts = {
   maxIterations: string;
   temperature: string;
   authEnv: string;
+  outputMode: OutputMode;
 };
 
 function loadDrafts(cfg: unknown): { drafts: Drafts; warning: string | null } {
@@ -85,6 +88,7 @@ function loadDrafts(cfg: unknown): { drafts: Drafts; warning: string | null } {
     maxIterations: "10",
     temperature: "1",
     authEnv: "",
+    outputMode: "text",
   };
   if (cfg == null) return { drafts: fresh, warning: null };
   if (typeof cfg !== "object" || Array.isArray(cfg)) {
@@ -102,6 +106,7 @@ function loadDrafts(cfg: unknown): { drafts: Drafts; warning: string | null } {
       maxIterations: typeof c.maxIterations === "number" ? String(c.maxIterations) : "10",
       temperature: typeof c.temperature === "number" ? String(c.temperature) : "1",
       authEnv: typeof c.authEnv === "string" ? c.authEnv : "",
+      outputMode: c.outputMode === "json" ? "json" : "text",
     },
     warning: null,
   };
@@ -116,6 +121,7 @@ function buildConfig(d: Drafts) {
     maxIterations: Math.max(1, Math.min(50, Number(d.maxIterations) || 10)),
     temperature: Math.max(0, Math.min(2, Number(d.temperature) || 1)),
     ...(d.authEnv.trim() ? { authEnv: d.authEnv.trim() } : {}),
+    outputMode: d.outputMode,
   };
 }
 
@@ -381,6 +387,23 @@ export default function OrchestratorEditor({ agent, equips, onClose }: Props) {
           </div>
 
           <div>
+            <label className={labelCls}>Output Mode</label>
+            <select
+              value={v.outputMode}
+              onChange={(e) => upd("outputMode", e.target.value as OutputMode)}
+              className={inputCls}
+            >
+              <option value="text">text — free-form response (default)</option>
+              <option value="json">json — parse final message as JSON (for scene contracts)</option>
+            </select>
+            <p className="text-[11px] text-on-surface-variant mt-1">
+              <strong>text</strong>: output = {`{ text, iterations, toolCallCount }`}. Use for chat / research scenes.
+              {" "}
+              <strong>json</strong>: orchestrator parses the LLM&apos;s final message as JSON; required when this agent is bound to a scene whose <code>outputSchema</code> expects a structured object. Reliability depends on LLM compliance — for high-stakes contracts (writebacks to DB) prefer MECHANICAL.
+            </p>
+          </div>
+
+          <div>
             <label className={labelCls}>System Prompt</label>
             <textarea
               rows={5}
@@ -390,6 +413,11 @@ export default function OrchestratorEditor({ agent, equips, onClose }: Props) {
               placeholder="You are an agent that uses the available tools to solve the user's request..."
               spellCheck={false}
             />
+            {v.outputMode === "json" ? (
+              <p className="text-[11px] text-on-surface-variant mt-1">
+                ℹ️ <strong>json mode</strong> appends a &ldquo;Output format: valid JSON only, no prose&rdquo; suffix to your system prompt at runtime. Describe the expected JSON shape in your prompt above.
+              </p>
+            ) : null}
           </div>
 
           {/* Tools preview (read-only) */}

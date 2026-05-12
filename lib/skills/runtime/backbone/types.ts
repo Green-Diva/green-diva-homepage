@@ -73,7 +73,27 @@ export type TransformNode = {
   expression: string;
 };
 
-export type DagNode = SkillNode | BranchNode | LoopNode | ForEachNode | TransformNode;
+// persist node — data persistence infrastructure primitive. Resolves
+// `inputFrom` to { relicSlug, kind, base64, contentType?, ext? } and writes
+// the bytes under private/relics/<slug>/derived/. Output shape mirrors what
+// the retired /api/internal/save-asset endpoint returned:
+// { savedPath, absPath, bytes, contentType }. Lives at the runtime layer
+// (not as a skill) because it's symmetric with runner's `_relicWriteback`
+// hook: DB-column persistence + file persistence are both runtime
+// infrastructure, not external capabilities.
+export type PersistNode = {
+  id: string;
+  type: "persist";
+  inputFrom: SourceRef;
+};
+
+export type DagNode =
+  | SkillNode
+  | BranchNode
+  | LoopNode
+  | ForEachNode
+  | TransformNode
+  | PersistNode;
 export type DagEdge = { from: string; to: string; when?: string };
 export type DagConfig = { version: 2; nodes: DagNode[]; edges: DagEdge[] };
 

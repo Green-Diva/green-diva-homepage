@@ -16,7 +16,7 @@
 //
 // Required env: DATABASE_URL.
 
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const SCRIBE_CODENAME = "RELIC-SCRIBE-001";
 // Initial seed only — admin can edit these in /agent-control later.
@@ -29,71 +29,36 @@ const SCRIBE_CAPABILITIES = [
   "model-3d-generation",
 ];
 
-// Default bindings for the four relic.* scenes. Each inputMap is the
-// minimal template that reproduces the field shape the legacy
-// hardcoded endpoints used to construct manually. Admin edits these
-// in /agent-control?tab=scenes; this seed only fires when the row
-// is absent (ON CONFLICT-equivalent via per-row existence check).
+// Default bindings for the four relic.* scenes. 2026-05-12 — inputMap
+// retired; ctx → agent.input shaping is owned by scene.prepareAgentInput
+// in lib/relics/scenes.ts. Admin edits agent / enabled / notes in
+// /agent-control?tab=scenes; this seed only fires when the row is absent
+// (per-row existence check).
 type DefaultBinding = {
   sceneKey: string;
-  inputMap: Record<string, unknown>;
   notes: string;
 };
 
 const DEFAULT_BINDINGS: DefaultBinding[] = [
   {
     sceneKey: "relic.generate-draft-metadata",
-    inputMap: {
-      mode: "initial",
-      relicSlug: "{{ctx.workspaceSlug}}",
-    },
     notes:
-      "Default seed: routes draft pipeline GENERATE_METADATA to RELIC-SCRIBE-001 in initial mode.",
+      "Default seed: routes draft pipeline GENERATE_METADATA to RELIC-SCRIBE-001.",
   },
   {
     sceneKey: "relic.regen-metadata",
-    inputMap: {
-      mode: "regenMetadata",
-      relicSlug: "{{ctx.relicSlug}}",
-      existingLore: "{{ctx.existingLore}}",
-      feedback: "{{ctx.feedback}}",
-    },
     notes:
-      "Default seed: routes admin '🔄 重新生成' button to RELIC-SCRIBE-001 in regenMetadata mode.",
+      "Default seed: routes admin '🔄 重新生成' button to RELIC-SCRIBE-001.",
   },
   {
     sceneKey: "relic.enhance2d",
-    inputMap: {
-      mode: "2dEnhance",
-      relicSlug: "{{ctx.relicSlug}}",
-      imagePath: "{{ctx.primaryImagePath}}",
-      _relicId: "{{ctx.relicId}}",
-    },
     notes:
-      "Default seed: routes detail-page 2D enhance tab to RELIC-SCRIBE-001 in 2dEnhance mode.",
+      "Default seed: routes detail-page 2D enhance tab to RELIC-SCRIBE-001.",
   },
   {
     sceneKey: "relic.create3d",
-    inputMap: {
-      // Meshy options are fanned out flat because the meshy-3d handler
-      // reads them at the top level (input.enablePbr etc). Keeping the
-      // wire shape stable preserves back-compat with any DAG that
-      // hasn't been re-seeded.
-      mode: "3dCreate",
-      relicSlug: "{{ctx.relicSlug}}",
-      imagePath: "{{ctx.enhancedImagePath}}",
-      _relicId: "{{ctx.relicId}}",
-      enablePbr: "{{ctx.opts.enablePbr}}",
-      hdTexture: "{{ctx.opts.hdTexture}}",
-      autoSize: "{{ctx.opts.autoSize}}",
-      targetFormats: "{{ctx.opts.targetFormats}}",
-      texturePrompt: "{{ctx.opts.texturePrompt}}",
-      targetPolycount: "{{ctx.opts.targetPolycount}}",
-      symmetryMode: "{{ctx.opts.symmetryMode}}",
-      modelType: "{{ctx.opts.modelType}}",
-    },
     notes:
-      "Default seed: routes detail-page 3D create tab to RELIC-SCRIBE-001 in 3dCreate mode. opts fanned out flat for handler back-compat.",
+      "Default seed: routes detail-page 3D create tab to RELIC-SCRIBE-001.",
   },
 ];
 
@@ -161,7 +126,6 @@ async function seedDefaultBindings(prisma: PrismaClient): Promise<void> {
       data: {
         sceneKey: def.sceneKey,
         agentId: scribe.id,
-        inputMap: def.inputMap as unknown as Prisma.InputJsonValue,
         notes: def.notes,
       },
     });

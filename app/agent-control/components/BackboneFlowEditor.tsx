@@ -2,8 +2,9 @@
 
 // Backbone DAG editor — React Flow canvas for editing pipelineConfig v2.
 //
-// Supports five node types — skill / branch / loop / forEach / transform —
-// and edges that may carry a `when` label when their source is a branch.
+// Supports six node types — skill / branch / loop / forEach / transform /
+// persist — and edges that may carry a `when` label when their source is a
+// branch.
 // Loop / forEach bodies are edited in a nested modal sub-canvas; the body
 // is persisted as schema-shape `{ nodes, edges }` on the loop node's
 // data. UI does not allow nesting a loop inside a loop body (runtime
@@ -247,6 +248,20 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
     setSelectedId(id);
   }
 
+  function addPersistNode() {
+    const id = nextNodeId(nodes, "ps");
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "persistNode",
+        position: { x: 80 + nds.length * 60, y: 80 + nds.length * 40 },
+        data: { type: "persist", nodeId: id, inputFrom: "agent.input" },
+      },
+    ]);
+    setSelectedId(id);
+  }
+
   function deleteSelected() {
     if (selectedEdgeId) {
       setEdges((eds) => eds.filter((e) => e.id !== selectedEdgeId));
@@ -456,6 +471,14 @@ function BackboneFlowEditorInner({ agent, equips, onClose }: Props) {
               style={{ borderColor: "rgb(52 211 153 / 0.6)", color: "rgb(52 211 153)", background: "rgb(52 211 153 / 0.12)" }}
             >
               + Transform
+            </button>
+            <button
+              type="button"
+              onClick={addPersistNode}
+              className="px-3 py-1.5 border-2 font-label text-[10px] tracking-[0.25em] uppercase"
+              style={{ borderColor: "rgb(251 191 36 / 0.6)", color: "rgb(251 191 36)", background: "rgb(251 191 36 / 0.12)" }}
+            >
+              + Persist
             </button>
             <button
               type="button"
