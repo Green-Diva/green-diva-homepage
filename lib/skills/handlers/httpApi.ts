@@ -31,6 +31,17 @@
 //       timeoutMs?: number,                // default 600_000 (10min)
 //       successWhen: Condition,            // terminate poll loop & return response
 //       failureWhen?: Condition | Condition[], // terminate poll loop & throw
+//       progressPath?: string,             // dot-path inside the latest poll
+//                                          //   response to a 0-100 numeric
+//                                          //   progress (e.g. Meshy: "progress").
+//                                          //   When present, the handler invokes
+//                                          //   HandlerContext.onProgress on each
+//                                          //   poll so the frontend can render
+//                                          //   mid-run progress. No-op if path
+//                                          //   isn't found or value isn't numeric.
+//       progressLabelPath?: string,        // dot-path to a string stage label
+//                                          //   (e.g. Meshy: "status"). Passed
+//                                          //   alongside percent to onProgress.
 //     },
 //
 //     responseTransform?: unknown,         // template applied AFTER polling/download
@@ -57,13 +68,23 @@
 //   - url / queryTemplate / bodyTemplate / headers: variable scope is the
 //     RAW skill input. So {{relicSlug}} resolves input.relicSlug.
 //   - polling.url / polling.headers / responseTransform: scope is wrapped
-//     as { input, response }. Use {{input.relicSlug}} and {{response.taskId}}.
+//     as { input, response, initialResponse }. Use {{input.relicSlug}},
+//     {{response.X}} (LATEST poll body, mutates each iteration), or
+//     {{initialResponse.X}} (FIRST POST body, frozen). Polling URLs that
+//     need a task id from the initial submit MUST use initialResponse —
+//     the latest poll body usually doesn't carry the submit-time field
+//     (e.g. Meshy POST returns { result: "<taskId>" } but GET returns
+//     { status, id, ... } with no `result`), and falling through to ""
+//     would silently rewrite the URL to a list endpoint.
 //   New skills should prefer the wrapped style consistently — Phase 3 UI
 //   will hide the raw style behind a typed form so the inconsistency
 //   stops mattering.
 
 import { HandlerError, type SkillHandler } from "../types";
-import { applyTemplate as applySharedTemplate } from "@/lib/agent-service/template";
+import {
+  applyTemplate as applySharedTemplate,
+  parseTemplate,
+} from "@/lib/agent-service/template";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
@@ -229,6 +250,10 @@ async function pollUntilDone(opts: {
   authHeaders: Record<string, string>;
   responseType: "json" | "text";
   perRequestTimeoutMs: number;
+  // Best-effort progress emitter — fired after each successful poll iteration
+  // when the skill's handlerConfig declares polling.progressPath. Errors
+  // thrown by the callback are swallowed so telemetry can't break a run.
+  onProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
 }): Promise<unknown> {
   const polling = isObject(opts.config.polling) ? opts.config.polling : null;
   if (!polling) return opts.initialResponse;
@@ -255,6 +280,19 @@ async function pollUntilDone(opts: {
   if (!pollUrlTemplate) {
     throw new HandlerError("HTTP_API: polling.url is required", "INVALID_CONFIG");
   }
+  // Parse the poll-URL template once so we can sanity-check each iteration
+  // (sanity guard b — see fix notes). If any referenced path resolves to
+  // null/undefined/empty-string, the template engine would silently
+  // substitute "" and we'd hit the wrong endpoint (e.g. Meshy LIST). Better
+  // to fail loudly on iteration 2 than poll a wrong URL for 24h.
+  const pollUrlParsed = parseTemplate(pollUrlTemplate);
+  if (!pollUrlParsed.ok) {
+    throw new HandlerError(
+      `HTTP_API: polling.url has malformed template (${pollUrlParsed.error} at offset ${pollUrlParsed.offset})`,
+      "INVALID_CONFIG",
+    );
+  }
+  const pollUrlRefs = pollUrlParsed.refs;
   const pollMethod = (typeof polling.method === "string" ? polling.method : "GET").toUpperCase();
   const intervalMs =
     typeof polling.intervalMs === "number" ? polling.intervalMs : DEFAULT_POLL_INTERVAL_MS;
@@ -264,14 +302,45 @@ async function pollUntilDone(opts: {
   const pollExtraHeaders = isObject(polling.headers)
     ? Object.fromEntries(Object.entries(polling.headers).map(([k, v]) => [k, String(v)]))
     : {};
+  const progressPath =
+    typeof polling.progressPath === "string" ? polling.progressPath : null;
+  const progressLabelPath =
+    typeof polling.progressLabelPath === "string" ? polling.progressLabelPath : null;
 
-  // Each poll iteration uses the LATEST response as the {{response.X}}
-  // scope so URL templates that need the task id from the first response
-  // (or any iterating field) keep resolving correctly.
+  // Scope keys:
+  //   `response`        — LATEST poll body, mutates each iteration. Use
+  //                       for fields that the server updates between polls
+  //                       (status, progress, etc.).
+  //   `initialResponse` — FIRST POST body, frozen for the lifetime of the
+  //                       loop. Use for submit-time fields like the task
+  //                       id that don't appear on subsequent GETs.
+  // Pre-2026-05-13 only `response` existed, which produced silent URL
+  // corruption for the Meshy flow (POST returns {result: id}; GET poll
+  // returns {status, id} with no `result`).
   let lastResponse = opts.initialResponse;
   while (Date.now() < overallDeadline) {
     await sleep(intervalMs);
-    const scope = { input: opts.input, response: lastResponse };
+    const scope = {
+      input: opts.input,
+      response: lastResponse,
+      initialResponse: opts.initialResponse,
+    };
+
+    // Sanity guard (b): every {{...}} ref in polling.url must resolve to a
+    // non-empty value. Otherwise we'd silently rewrite to a different
+    // endpoint and burn the poll budget. Look up via applyTemplate's
+    // whole-string form to preserve type semantics.
+    for (const ref of pollUrlRefs) {
+      const resolved = applyTemplate(`{{${ref}}}`, scope);
+      if (resolved === undefined || resolved === null || resolved === "") {
+        throw new HandlerError(
+          `HTTP_API: polling.url reference {{${ref}}} resolved to empty — refusing to poll a corrupted URL. ` +
+            `Use {{initialResponse.X}} for fields that only appear on the initial POST response.`,
+          "INVALID_CONFIG",
+        );
+      }
+    }
+
     const url = String(applyTemplate(pollUrlTemplate, scope));
     const headers = {
       ...opts.authHeaders,
@@ -284,6 +353,51 @@ async function pollUntilDone(opts: {
       timeoutMs: opts.perRequestTimeoutMs,
       responseType: opts.responseType,
     });
+
+    // Sanity guard (c): polling expects a JSON object with status fields.
+    // If we got an array (likely hit a list endpoint via URL corruption)
+    // or a primitive, fail loudly — successWhen / failureWhen path lookups
+    // would otherwise silently return undefined and we'd loop forever.
+    // text responses are exempt (responseType="text" callers parse on
+    // their own).
+    if (
+      opts.responseType === "json" &&
+      !isObject(lastResponse)
+    ) {
+      throw new HandlerError(
+        `HTTP_API: polling response is not a JSON object (got ${
+          Array.isArray(lastResponse) ? "array" : typeof lastResponse
+        }) — likely wrong endpoint. URL=${url}`,
+        "PROVIDER_ERROR",
+      );
+    }
+
+    // Best-effort intra-step progress emit. Fires after each successful poll
+    // (including the iteration that hits successWhen — the frontend sees the
+    // 100% tick before SUCCESS lands). Errors swallowed so telemetry can't
+    // break the run.
+    if (opts.onProgress && (progressPath || progressLabelPath)) {
+      const snap: { percent?: number; label?: string } = {};
+      if (progressPath) {
+        const raw = getPath(lastResponse, progressPath);
+        if (typeof raw === "number" && Number.isFinite(raw)) {
+          // Clamp to a sane 0-100; some providers self-report >100 briefly.
+          snap.percent = Math.max(0, Math.min(100, Math.round(raw)));
+        }
+      }
+      if (progressLabelPath) {
+        const raw = getPath(lastResponse, progressLabelPath);
+        if (typeof raw === "string" && raw.length > 0) snap.label = raw.slice(0, 64);
+      }
+      if (snap.percent !== undefined || snap.label !== undefined) {
+        try {
+          await opts.onProgress(snap);
+        } catch (e) {
+          console.warn("[httpApi] polling onProgress threw, swallowing", e);
+        }
+      }
+    }
+
     if (matchesCondition(lastResponse, successCond)) return lastResponse;
     if (matchesAny(lastResponse, failureCond)) {
       const reason =
@@ -361,7 +475,7 @@ async function maybeDownload(
   };
 }
 
-export const httpApi: SkillHandler = async (input, config) => {
+export const httpApi: SkillHandler = async (input, config, ctx) => {
   const url = typeof config.url === "string" ? config.url : null;
   if (!url) throw new HandlerError("HTTP_API: url missing in handlerConfig", "INVALID_CONFIG");
 
@@ -450,6 +564,7 @@ export const httpApi: SkillHandler = async (input, config) => {
     authHeaders: auth.headers,
     responseType: responseType === "binary" ? "json" : responseType,
     perRequestTimeoutMs: timeoutMs,
+    onProgress: ctx?.onProgress,
   });
 
   // Download (no-op if not configured). Attach to a sibling field on the

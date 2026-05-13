@@ -445,6 +445,13 @@ model AgentJob {
   // Per-step execution log: array of { stepId, skillId, durationMs, ... }
   // Phase 3/4 runtimes append to this; Phase 2 leaves it empty.
   runLog       Json            @default(dbgenerated("'[]'::jsonb"))
+  // Intra-step progress snapshot — populated by long-running skill handlers
+  // (currently HTTP_API polling) via onProgress callback threaded from the
+  // runner. percent is 0-100; label is a free-form stage string (e.g. Meshy's
+  // status "PENDING"/"IN_PROGRESS"/"SUCCEEDED" or task_type). Frontend renders
+  // both verbatim. Both nullable: most skills never emit. Cleared on retry.
+  progressPercent Int?
+  progressLabel   String?
   attempts     Int             @default(0)
   maxAttempts  Int             @default(3)
   startedAt    DateTime?

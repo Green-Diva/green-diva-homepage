@@ -84,7 +84,16 @@ function actualType(v: unknown): string {
   return typeof v;
 }
 
-export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeResult> {
+export async function invokeSkill(
+  skill: Skill,
+  input: unknown,
+  opts?: {
+    // Forwarded to HandlerContext.onProgress for long-running handlers
+    // (HTTP_API polling). Backbone skill executor wires this from
+    // ExecutorCtx.onSkillProgress. Optional — most callers don't supply.
+    onProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
+  },
+): Promise<InvokeResult> {
   const inputErrs = validate(skill.inputSchema, input);
   if (inputErrs.length > 0) {
     return {
@@ -107,7 +116,7 @@ export async function invokeSkill(skill: Skill, input: unknown): Promise<InvokeR
   let output: unknown;
   try {
     const cfg = (skill.handlerConfig ?? {}) as Record<string, unknown>;
-    output = await handler(input, cfg, { skillId: skill.id });
+    output = await handler(input, cfg, { skillId: skill.id, onProgress: opts?.onProgress });
   } catch (e) {
     if (e instanceof HandlerError) {
       logError("skill:invoke", e.code, `${skill.id} (${skill.kind}): ${e.message}`);

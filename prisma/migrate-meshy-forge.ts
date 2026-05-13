@@ -42,7 +42,11 @@ const SKILL_MESHY_HTTP = {
       model_type: "{{opts.modelType}}",
     },
     polling: {
-      url: "https://api.meshy.ai/openapi/v1/image-to-3d/{{response.result}}",
+      // {{initialResponse.result}} — task id from the initial POST body.
+      // Meshy GET poll bodies don't carry `result`, so using {{response.X}}
+      // would silently rewrite the URL to the LIST endpoint on iteration 2
+      // (see lib/skills/handlers/httpApi.ts pollUntilDone notes).
+      url: "https://api.meshy.ai/openapi/v1/image-to-3d/{{initialResponse.result}}",
       method: "GET",
       intervalMs: 10_000,
       timeoutMs: 15 * 60_000,
@@ -52,6 +56,12 @@ const SKILL_MESHY_HTTP = {
         { path: "status", equals: "EXPIRED" },
         { path: "status", equals: "CANCELED" },
       ],
+      // Meshy reports 0-100 in `progress` and a stage string in `status`
+      // (PENDING / IN_PROGRESS / SUCCEEDED / FAILED). Handler emits both
+      // to AgentJob.progressPercent / progressLabel so AssetTabs can show
+      // a live bar instead of an indefinite spinner.
+      progressPath: "progress",
+      progressLabelPath: "status",
     },
     download: {
       urlPath: "model_urls.glb",

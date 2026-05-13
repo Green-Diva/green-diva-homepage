@@ -51,7 +51,9 @@ export async function executeSkillNode(
   const stepInput = ctx.resolveRef(node.inputFrom);
   const startedAt = new Date();
   const startMs = Date.now();
-  const invokeResult = await invokeSkill(equip.skill, stepInput);
+  const invokeResult = await invokeSkill(equip.skill, stepInput, {
+    onProgress: ctx.onSkillProgress,
+  });
   const endedAt = new Date();
 
   if (!invokeResult.ok) {
