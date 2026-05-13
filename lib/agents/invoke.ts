@@ -75,6 +75,13 @@ export async function executeAgent(opts: {
   // settles, lets the caller persist intermediate progress so long-running
   // skills (e.g. 30s Gemini call) don't keep the UI stuck on one number.
   onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
+  // Intra-step progress hook (MECHANICAL only, HTTP_API polling). Fires
+  // inside a single skill node (e.g. Meshy's 3-min image-to-3D poll loop).
+  // Runner uses this to write AgentJob.progressPercent / progressLabel
+  // so the frontend can render a mid-run % bar instead of an indefinite
+  // spinner. AUTONOMOUS path doesn't wire this yet — orchestrator's
+  // invokeSkill call site would need the same opts.onProgress threading.
+  onSkillProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
 }): Promise<AgentRunResult> {
   if (opts.mode === "MECHANICAL") {
     return runBackbone({
@@ -82,6 +89,7 @@ export async function executeAgent(opts: {
       input: opts.input,
       pipelineConfig: opts.pipelineConfigOverride ?? opts.agent.pipelineConfig,
       onProgress: opts.onProgress,
+      onSkillProgress: opts.onSkillProgress,
     });
   }
   if (opts.mode === "AUTONOMOUS") {

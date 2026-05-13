@@ -31,6 +31,10 @@ type JobSummary = {
   // shows the retry block. Late agent success still writes back via the
   // runner hook, so the relic eventually picks up the asset on its own.
   slaMs: number | null;
+  // Intra-step progress so a refresh mid-run restores the % bar without
+  // waiting for the next poll-tick. Both null until a handler emits.
+  progressPercent: number | null;
+  progressLabel: string | null;
 };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
@@ -55,9 +59,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       errorMessage: string | null;
       startedAt: Date | null;
       createdAt: Date;
+      progressPercent: number | null;
+      progressLabel: string | null;
     }>
   >`
-    SELECT id, "sceneKey", status::text AS status, "errorMessage", "startedAt", "createdAt"
+    SELECT id, "sceneKey", status::text AS status, "errorMessage", "startedAt", "createdAt",
+           "progressPercent", "progressLabel"
     FROM "AgentJob"
     WHERE "sceneKey" IN ('relic.enhance2d', 'relic.create3d')
       AND input->>'_relicId' = ${id}
@@ -77,6 +84,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       errorMessage: r.errorMessage,
       startedAt: r.startedAt?.toISOString() ?? null,
       slaMs: getScene(key)?.slaMs ?? null,
+      progressPercent: r.progressPercent,
+      progressLabel: r.progressLabel,
     };
   }
 

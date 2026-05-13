@@ -54,6 +54,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       finishedAt: true,
       attempts: true,
       maxAttempts: true,
+      progressPercent: true,
+      progressLabel: true,
     },
   });
   if (!job) return NextResponse.json({ error: "job not found" }, { status: 404 });
@@ -77,6 +79,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     finishedAt: job.finishedAt,
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,
+    // Intra-step progress from long-running skill handlers (currently
+    // HTTP_API polling — Meshy reports 0-100 + status string per ~10s poll).
+    // Both null until the handler emits the first snapshot.
+    progressPercent: job.progressPercent,
+    progressLabel: job.progressLabel,
     // Business-level SLA from scene definition. Frontend treats RUNNING
     // past `startedAt + slaMs` as "agent didn't return in time" so the
     // user isn't stuck staring at a spinner indefinitely. Late writeback

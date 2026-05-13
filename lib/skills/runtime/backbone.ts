@@ -51,6 +51,11 @@ export async function runBackbone(opts: {
   // the same percentage for the duration of a long step. Errors thrown by
   // the callback are swallowed — progress reporting must never break a run.
   onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
+  // Intra-step skill progress hook — fires inside a long-running handler
+  // (currently HTTP_API polling). Distinct from `onProgress` which fires
+  // between DAG nodes. Threaded through ExecutorCtx → invokeSkill →
+  // HandlerContext.onProgress.
+  onSkillProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
   // INTERNAL — recursive sub-DAG invocations from loop / forEach set these.
   // _internalEquips: skip the DB equip lookup (parent already has it).
   // _depth: track nesting for MAX_LOOP_DEPTH enforcement.
@@ -120,6 +125,7 @@ export async function runBackbone(opts: {
       input: subOpts.input,
       pipelineConfig: subOpts.body,
       onProgress: opts.onProgress,
+      onSkillProgress: opts.onSkillProgress,
       _internalEquips: equipBySlot,
       _depth: depth + 1,
       _runLog: runLog,
@@ -133,6 +139,7 @@ export async function runBackbone(opts: {
     depth,
     stepIdPrefix,
     onProgress: opts.onProgress,
+    onSkillProgress: opts.onSkillProgress,
     resolveRef,
     runLog,
     emitProgress,

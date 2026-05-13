@@ -41,7 +41,16 @@ type JobState =
   // even if the AgentJob is still RUNNING — the user gets a "didn't return
   // in time" message + retry, the agent keeps polling in the background, and
   // late writeback (if Meshy ever finishes) still updates the relic.
-  | { kind: "running"; jobId: string; startedAt: number; slaMs: number | null }
+  | {
+      kind: "running";
+      jobId: string;
+      startedAt: number;
+      slaMs: number | null;
+      // Intra-step progress from the handler (e.g. Meshy reports 0-100 +
+      // status string). Both null until the first poll-tick fires.
+      progressPercent?: number | null;
+      progressLabel?: string | null;
+    }
   | { kind: "error"; message: string };
 
 const POLL_MS = 3000;
@@ -101,8 +110,24 @@ export default function AssetTabs({
         const r = await fetch(`/api/relics/${relicId}/active-jobs`, { credentials: "include" });
         if (!r.ok || cancelled) return;
         const data = (await r.json()) as {
-          enhance: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null; slaMs: number | null } | null;
-          model: { jobId: string; status: string; errorMessage: string | null; startedAt: string | null; slaMs: number | null } | null;
+          enhance: {
+            jobId: string;
+            status: string;
+            errorMessage: string | null;
+            startedAt: string | null;
+            slaMs: number | null;
+            progressPercent: number | null;
+            progressLabel: string | null;
+          } | null;
+          model: {
+            jobId: string;
+            status: string;
+            errorMessage: string | null;
+            startedAt: string | null;
+            slaMs: number | null;
+            progressPercent: number | null;
+            progressLabel: string | null;
+          } | null;
         };
         const restore = (
           j: typeof data.enhance,
@@ -118,7 +143,14 @@ export default function AssetTabs({
               setter({ kind: "error", message: t.relicCollection.generateSlaExceeded });
               return;
             }
-            setter({ kind: "running", jobId: j.jobId, startedAt, slaMs: j.slaMs });
+            setter({
+              kind: "running",
+              jobId: j.jobId,
+              startedAt,
+              slaMs: j.slaMs,
+              progressPercent: j.progressPercent,
+              progressLabel: j.progressLabel,
+            });
           } else if (j.status === "FAILED" || j.status === "CANCELLED") {
             setter({ kind: "error", message: j.errorMessage ?? `job ${j.status.toLowerCase()}` });
           }
@@ -176,6 +208,8 @@ export default function AssetTabs({
           errorMessage?: string | null;
           startedAt?: string | null;
           slaMs?: number | null;
+          progressPercent?: number | null;
+          progressLabel?: string | null;
         };
         if (data.status === "SUCCESS") {
           if (e.kind === "running" && e.jobId === running.jobId) setEnhanceJob({ kind: "idle" });
@@ -190,6 +224,28 @@ export default function AssetTabs({
           if (m.kind === "running" && m.jobId === running.jobId) setModelJob({ kind: "error", message: msg });
           return;
         }
+        // Apply intra-step progress (HTTP_API polling emits it ~every 10s).
+        // Pin percent monotonically — Meshy occasionally dips back when it
+        // switches stages, which looks broken in the UI. Label can move
+        // freely so users see stage transitions.
+        const newPercent = typeof data.progressPercent === "number" ? data.progressPercent : null;
+        const newLabel = typeof data.progressLabel === "string" ? data.progressLabel : null;
+        if (newPercent !== null || newLabel !== null) {
+          const apply = (prev: JobState): JobState => {
+            if (prev.kind !== "running" || prev.jobId !== running.jobId) return prev;
+            const prevPct = prev.progressPercent ?? -1;
+            const nextPct =
+              newPercent !== null && newPercent >= prevPct ? newPercent : prev.progressPercent;
+            return {
+              ...prev,
+              progressPercent: nextPct ?? null,
+              progressLabel: newLabel ?? prev.progressLabel ?? null,
+            };
+          };
+          if (e.kind === "running" && e.jobId === running.jobId) setEnhanceJob(apply);
+          if (m.kind === "running" && m.jobId === running.jobId) setModelJob(apply);
+        }
+
         // SLA watchdog — agent is still RUNNING but business-level budget is
         // gone. Trust scene.slaMs (from the API) over the stale value the
         // running state was created with, so a config change takes effect
@@ -429,8 +485,21 @@ function GenerateBlock({
           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-secondary/15 to-transparent animate-[scan_2.4s_linear_infinite]" />
           <p className="font-label text-[11px] tracking-[0.3em] uppercase text-secondary z-10 relative">
             {runningLabel}
+            {typeof jobState.progressPercent === "number" ? (
+              <span className="ml-2 tabular-nums">{jobState.progressPercent}%</span>
+            ) : null}
           </p>
-          <p className="text-[11px] text-on-surface-variant/70 z-10 relative">{etaText}</p>
+          {typeof jobState.progressPercent === "number" ? (
+            <div className="z-10 relative mx-auto h-[2px] w-32 bg-secondary/15 overflow-hidden">
+              <div
+                className="h-full bg-secondary/70 transition-[width] duration-500"
+                style={{ width: `${jobState.progressPercent}%` }}
+              />
+            </div>
+          ) : null}
+          <p className="text-[11px] text-on-surface-variant/70 z-10 relative">
+            {jobState.progressLabel ? jobState.progressLabel : etaText}
+          </p>
         </>
       ) : jobState.kind === "error" ? (
         <>

@@ -11,6 +11,13 @@ export type SkillHandler = (
 
 export type HandlerContext = {
   skillId: string;
+  // Optional intra-step progress callback for long-running handlers
+  // (currently HTTP_API polling). Called best-effort — handler should
+  // swallow errors. percent is 0-100 (clamped by consumer); label is a
+  // free-form stage string. Caller threads this from the backbone runner
+  // so it lands on AgentJob.progressPercent / progressLabel for the
+  // frontend to render mid-run. Skills that don't emit (most) cost nothing.
+  onProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
   // Future: agentId / jobId / runId / abortSignal
 };
 

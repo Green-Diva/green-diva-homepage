@@ -135,6 +135,11 @@ export type ExecutorCtx = {
   depth: number;
   stepIdPrefix: string;
   onProgress?: (info: { runLog: AgentRunLogEntry[] }) => void | Promise<void>;
+  // Intra-step progress callback for long-running skill handlers (HTTP_API
+  // polling). Plumbed verbatim into HandlerContext.onProgress via the skill
+  // executor. Separate from `onProgress` above which fires between DAG
+  // nodes — this one fires inside a single node.
+  onSkillProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
   resolveRef: (ref: SourceRef) => unknown;
   runLog: AgentRunLogEntry[];
   emitProgress: () => Promise<void>;

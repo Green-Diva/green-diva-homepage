@@ -64,8 +64,28 @@ export async function runAgentJob(jobId: string): Promise<void> {
         attempts: { increment: 1 },
         errorCode: null,
         errorMessage: null,
+        progressPercent: null,
+        progressLabel: null,
       },
     });
+
+    // Intra-step progress: HTTP_API polling fires this per poll iteration.
+    // Best-effort persist to AgentJob so the frontend's /asset-job poll
+    // returns a fresh % every few seconds. Swallow errors (Prisma down,
+    // job already terminal, etc.) — telemetry must never break a run.
+    const onSkillProgress = async (snap: { percent?: number; label?: string }) => {
+      try {
+        await prisma.agentJob.update({
+          where: { id: jobId },
+          data: {
+            ...(snap.percent !== undefined ? { progressPercent: snap.percent } : {}),
+            ...(snap.label !== undefined ? { progressLabel: snap.label } : {}),
+          },
+        });
+      } catch (e) {
+        console.warn(`[agent-job:run] ${jobId} progress write failed (swallowed):`, e);
+      }
+    };
 
     let result: AgentRunResult;
     try {
@@ -73,6 +93,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
         agent: job.agent,
         mode: job.mode,
         input: job.input,
+        onSkillProgress,
       });
     } catch (e) {
       // Catastrophic — dispatcher itself threw (invalid mode, prisma down).
