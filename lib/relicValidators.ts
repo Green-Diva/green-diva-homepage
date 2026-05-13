@@ -47,6 +47,19 @@ export const relicCreateSchema = z.object({
   primaryImagePath: slugScopedPath.optional().nullable(),
   enhancedImagePath: slugScopedPath.optional().nullable(),
   candidateImages: z.array(candidateImageSchema).max(40).optional().nullable(),
+  materials: z
+    .array(
+      z.object({
+        kind: z.enum(["webpage", "image", "document", "archive"]),
+        url: z.string().url().max(2048).optional(),
+        path: slugScopedPath.optional(),
+        originalName: z.string().max(256).optional(),
+        addedAt: z.string().max(64).optional(),
+      }),
+    )
+    .max(20)
+    .optional()
+    .nullable(),
   // Status transitions: AWAITING_REVIEW → READY happens via the dedicated
   // /confirm endpoint, but admin can manually flip via PATCH too (e.g. to
   // re-park a relic to PARTIAL after a botched edit).

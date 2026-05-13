@@ -141,6 +141,10 @@ model Relic {
   // network images), with admin's per-item delete + primary toggle state.
   // See lib/skills/handlers/internal/smartImagePicker.ts for shape.
   candidateImages    Json?
+  // Admin-curated supporting materials: webpage URLs, document/image/archive
+  // uploads. Array of { kind, url?, path?, originalName?, addedAt }. Files
+  // live under private/relics/<slug>/materials/.
+  materials          Json?
   // The full DAG runLog from the most recent agent invocation, for the
   // admin trace viewer. Bounded by AgentJob limits upstream.
   pipelineTrace      Json?

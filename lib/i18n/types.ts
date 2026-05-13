@@ -303,6 +303,7 @@ export interface Dictionary {
     draftPreviewTitle: string;
     draftPreviewSubtitle: string;
     draftPreviewAbandon: string;
+    draftPreviewPostStoreHint: string;
     draftPreviewSaveAndStore: string;
     draftPreviewStoring: string;
     draftAbandonConfirm: string;
@@ -653,9 +654,30 @@ export interface Dictionary {
     candidateGalleryEmpty: string;
     candidateGalleryDeletedTitle: string; // {{n}}
     candidateGalleryRestore: string;
+    modTitleUser: string;
+    modTitleNetwork: string;
+    modTitleMaterials: string;
+    modEmptyUser: string;
+    modEmptyNetwork: string;
+    modComingSoon: string;
     candidateGallerySourceUser: string;
     candidateGallerySourceNet: string;
     candidateGalleryPrimary: string;
+    candidateGalleryAdd: string;
+    candidateGalleryDeleteConfirm: string;
+    materialKindWebpage: string;
+    materialKindImage: string;
+    materialKindDocument: string;
+    materialKindArchive: string;
+    materialAddTitle: string;
+    materialKindPickerLabel: string;
+    materialContentLabel: string;
+    materialChooseFile: string;
+    materialReplaceFile: string;
+    materialAddConfirm: string;
+    materialMissingUrl: string;
+    materialInvalidUrl: string;
+    materialMissingFile: string;
     candidateGalleryDelete: string;
     candidateGalleryPreviewLabel: string;
     candidateGalleryClose: string;

@@ -37,6 +37,10 @@ type Props = {
   classifEn: string;
   iconKey?: string | null;
   rarity?: "COMMON" | "RARE" | "EPIC" | "LEGENDARY" | "SPECIAL";
+  /** Unsaved primary path (from form state). When set, the thumbnail
+   * resolves via /candidate?path=… instead of /primary so admin can
+   * preview a re-ordered/replaced primary before saving. */
+  primaryPathOverride?: string | null;
   /** edit mode + admin only: enables 2D/3D trigger buttons */
   isAdmin: boolean;
   /** Slug for "view in detail page" link in edit mode */
@@ -58,6 +62,7 @@ export default function AssetCard({
   classifEn,
   iconKey,
   rarity,
+  primaryPathOverride,
   isAdmin,
   detailSlug,
   onAssetUpdated,
@@ -210,7 +215,9 @@ export default function AssetCard({
   const isDraft = mode === "draft";
   const primaryUrl = isDraft
     ? `/api/relic-drafts/${resourceId}/primary`
-    : `/api/relics/${resourceId}/primary`;
+    : primaryPathOverride
+      ? `/api/relics/${resourceId}/candidate?path=${encodeURIComponent(primaryPathOverride)}`
+      : `/api/relics/${resourceId}/primary`;
   const enhancedThumbUrl = `/api/relics/${resourceId}/enhanced`;
   const model3dGated = !hasEnhanced && !hasModel;
 
@@ -250,10 +257,6 @@ export default function AssetCard({
         {/* Asset chips — compact inline */}
         <div className="flex items-center gap-2 shrink-0 pl-3 ml-auto border-l border-primary/15">
           <AssetChip
-            label={t.relicCollection.tabOriginal}
-            done={hasPrimary}
-          />
-          <AssetChip
             label={t.relicCollection.tab2dEnhance}
             done={hasEnhanced}
             running={enhanceJob.kind === "running"}
@@ -265,7 +268,6 @@ export default function AssetCard({
             etaText={t.relicCollection.enhanceEta}
             startLabel={t.relicCollection.enhanceStart}
             runningLabel={t.relicCollection.enhanceRunning}
-            thumbnailWhenReady={enhancedThumbUrl}
             t={t}
           />
           <AssetChip
@@ -282,11 +284,6 @@ export default function AssetCard({
             runningLabel={t.relicCollection.create3dRunning}
             disabledByGate={model3dGated && !hasModel}
             gateMessage={t.relicCollection.tab3dRequires2d}
-            detailHref={
-              hasModel && detailSlug && !isDraft
-                ? `/relic-collection/${detailSlug}?view=model3d`
-                : undefined
-            }
             t={t}
           />
         </div>

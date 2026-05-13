@@ -40,7 +40,10 @@ const iconKey = z
   .min(1)
   .max(64)
   .regex(/^[a-z][a-z0-9_]*$/, "必须是 Material Symbols 名（小写字母 / 数字 / 下划线）");
-const RARITIES = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"] as const;
+// Keep aligned with lib/relicValidators.ts RARITIES + DB enum Rarity +
+// DEFAULT_METADATA_PROMPT in lib/skills/relic-prompts.ts. UNCOMMON is
+// not a real grade in this system; SPECIAL is.
+const RARITIES = ["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"] as const;
 
 // — relic.generateDraftMetadata —
 // Sync. Triggered from the draft pipeline's GENERATE_METADATA step

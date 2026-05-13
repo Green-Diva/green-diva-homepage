@@ -39,6 +39,38 @@ export default function MetaFields({
   }
   return (
     <div className="grid grid-cols-2 gap-4">
+      <Field label={t.adminRelics.fIcon}>
+        <div className="relative">
+          <input
+            type="text"
+            value={value.iconKey}
+            onChange={(e) => set("iconKey", e.target.value)}
+            disabled={disabled}
+            placeholder="inventory_2"
+            className={inputClass + " pr-9"}
+          />
+          <span
+            className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-primary text-[20px] pointer-events-none"
+            style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
+          >
+            {value.iconKey || "inventory_2"}
+          </span>
+        </div>
+      </Field>
+      <Field label={t.adminRelics.fRarity}>
+        <select
+          value={value.rarity}
+          onChange={(e) => set("rarity", e.target.value as Rarity)}
+          disabled={disabled}
+          className={inputClass}
+        >
+          {RARITIES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </Field>
       <Field label={t.adminRelics.fNameEn}>
         <input
           type="text"
@@ -78,38 +110,6 @@ export default function MetaFields({
           disabled={disabled}
           className={inputClass}
         />
-      </Field>
-      <Field label={t.adminRelics.fRarity}>
-        <select
-          value={value.rarity}
-          onChange={(e) => set("rarity", e.target.value as Rarity)}
-          disabled={disabled}
-          className={inputClass}
-        >
-          {RARITIES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t.adminRelics.fIcon}>
-        <div className="relative">
-          <input
-            type="text"
-            value={value.iconKey}
-            onChange={(e) => set("iconKey", e.target.value)}
-            disabled={disabled}
-            placeholder="inventory_2"
-            className={inputClass + " pr-9"}
-          />
-          <span
-            className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-primary text-[20px] pointer-events-none"
-            style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
-          >
-            {value.iconKey || "inventory_2"}
-          </span>
-        </div>
       </Field>
     </div>
   );

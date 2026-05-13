@@ -307,31 +307,41 @@ export default function RelicDraftPanel({ slot, existingDraftId, onClose }: Prop
       }}
       className="fixed inset-0 z-[200] flex items-start justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
     >
-      <div className="relative w-full max-w-3xl mt-12 mb-12 border border-primary/40 bg-surface-container/95 shadow-[0_0_42px_rgba(140,255,225,0.18)] p-6 sm:p-8 space-y-6">
-        <div className="flex items-baseline justify-between gap-4">
-          <div>
-            <h2 className="text-primary text-2xl tracking-wider">
-              {stage === "preview"
-                ? t.relicCollection.draftPreviewTitle
-                : stage === "failed"
+      <div
+        className={[
+          "relative w-full mt-12 mb-12 border border-primary/40 bg-surface-container/95",
+          "shadow-[0_0_42px_rgba(140,255,225,0.18)] p-6 sm:p-8 space-y-6",
+          // Preview stage hosts the 2-column editor; widen to match RelicForm.
+          stage === "preview" ? "max-w-6xl" : "max-w-3xl",
+        ].join(" ")}
+      >
+        {/* Preview stage owns its own title and bottom-bar 放弃 button —
+            skip the entire panel header in that stage to match RelicForm's
+            bottom-only pattern (no duplicate cancel paths). */}
+        {stage !== "preview" ? (
+          <div className="flex items-baseline justify-between gap-4">
+            <div>
+              <h2 className="text-primary text-2xl tracking-wider">
+                {stage === "failed"
                   ? t.relicCollection.draftFailedTitle
                   : stage === "waiting"
                     ? t.relicCollection.draftWaitingTitle
                     : t.relicCollection.draftPanelTitle}
-            </h2>
-            <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/75 mt-1">
-              {slotLabel}
-            </p>
+              </h2>
+              <p className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/75 mt-1">
+                {slotLabel}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={cancelHandler}
+              disabled={!canDismiss}
+              className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/75 hover:text-on-surface disabled:opacity-40"
+            >
+              {t.relicCollection.draftPanelCancel}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={cancelHandler}
-            disabled={!canDismiss}
-            className="font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant/75 hover:text-on-surface disabled:opacity-40"
-          >
-            {t.relicCollection.draftPanelCancel}
-          </button>
-        </div>
+        ) : null}
 
         {stage === "upload" ? (
           <form onSubmit={submitUpload} className="space-y-6">
@@ -550,6 +560,7 @@ export default function RelicDraftPanel({ slot, existingDraftId, onClose }: Prop
         {stage === "preview" && draftId && draft ? (
           <DraftPreviewBody
             draftId={draftId}
+            slot={typeof draft.slot === "number" ? draft.slot : undefined}
             initial={draft.generatedMetadata ?? {}}
             busy={busy}
             error={error}

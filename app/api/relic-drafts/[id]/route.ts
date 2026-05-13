@@ -89,6 +89,11 @@ export async function PATCH(
   setStr("loreZh", 4000);
   setStr("loreEn", 4000);
   setStr("primaryImagePath", 500);
+  // Password for SPECIAL relics — stored verbatim in generatedMetadata
+  // until /confirm hashes it onto Relic.passwordHash. min 4 chars to match
+  // relicCreateSchema; we don't enforce here to allow draft saves while
+  // admin is still typing.
+  setStr("password", 128);
 
   if ("rarity" in body) {
     const v = body.rarity;

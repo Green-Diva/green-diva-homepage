@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AuthError, requireAdmin } from "@/lib/auth";
@@ -83,6 +84,16 @@ export async function POST(
       return NextResponse.json({ error: `metadata missing ${k}` }, { status: 409 });
     }
   }
+  // SPECIAL rarity must come with a password (hashed onto Relic.passwordHash).
+  // Mirrors the post-creation transition rule in /api/relics/[id] PATCH.
+  const rawPassword = typeof meta.password === "string" ? meta.password : "";
+  if (meta.rarity === "SPECIAL" && rawPassword.length < 4) {
+    return NextResponse.json(
+      { error: "SPECIAL rarity requires a passphrase (≥4 chars)" },
+      { status: 400 },
+    );
+  }
+  const passwordHash = rawPassword.length >= 4 ? await bcrypt.hash(rawPassword, 12) : null;
 
   // Allocate the new slug. crypto.randomBytes is fine here — collisions on
   // the @unique slug field would surface as a P2002 in the transaction.
@@ -152,6 +163,7 @@ export async function POST(
           archivePath: typeof newArchivePath === "string" ? newArchivePath : null,
           draftNote: draft.draftNote,
           status: "PROCESSING",
+          passwordHash,
         },
         select: { id: true, slug: true, nameEn: true },
       });
