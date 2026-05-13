@@ -356,17 +356,18 @@ export default function AssetTabs({
         />
       </div>
 
-      {/* Tab content — symmetric padding so content (image / 3D model) is
-          truly centered. Tab strip overlays absolutely on top-right and does
-          not consume layout space. */}
-      <div className="absolute inset-0 p-6 flex items-center justify-center">
+      {/* Tab content — image/model capped at 80% of frame height. Tab strip
+          (~34px tall at top-2) offsets the centering region so the gap from
+          the asset's top to the tab strip equals the gap from its bottom to
+          the frame border. */}
+      <div className="absolute inset-0 px-6 pt-[34px] pb-0 flex items-center justify-center">
         {active === "original" ? (
           hasPrimary ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={`/api/relics/${relicId}/primary`}
               alt={alt}
-              className="w-full h-full object-contain"
+              className="max-h-[80%] max-w-full object-contain"
               style={{
                 // Soft radial mask fades the photo's edges into the spotlight
                 // backdrop, visually unifying with the 2D enhanced (transparent
@@ -387,7 +388,7 @@ export default function AssetTabs({
             <img
               src={`/api/relics/${relicId}/enhanced`}
               alt={alt}
-              className="w-full h-full object-contain"
+              className="max-h-[80%] max-w-full object-contain"
             />
           ) : (
             <GenerateBlock
@@ -403,7 +404,9 @@ export default function AssetTabs({
         ) : (
           // model3d
           hasModel ? (
-            <RelicViewer modelUrl={`/api/relics/${relicId}/model`} alt={alt} t={t} />
+            <div className="h-[80%] aspect-square max-w-full">
+              <RelicViewer modelUrl={`/api/relics/${relicId}/model`} alt={alt} t={t} />
+            </div>
           ) : (
             <GenerateBlock
               admin={isAdmin}
