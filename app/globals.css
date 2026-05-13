@@ -1130,3 +1130,18 @@ html[lang="zh"] li:not([class*="leading-"]) {
   }
 }
 
+
+/* Global cursor:pointer for clickable elements — Tailwind v4 / Chromium
+   stopped defaulting button cursor to pointer in 2024-08, restore the
+   classical convention so every interactive control feels clickable
+   without adding `cursor-pointer` everywhere. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}

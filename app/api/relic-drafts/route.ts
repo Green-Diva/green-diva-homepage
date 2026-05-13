@@ -22,18 +22,16 @@ import {
 import { runDraftPipeline } from "@/lib/relics/pipeline/draft/runner";
 import { ensureServerInit } from "@/lib/server-init";
 
+// Image-only uploads, cap = USER UPLOADS grid MAX_SLOTS so server-side
+// limit matches the visible curation slots. Non-image / archive types
+// removed 2026-05-14 — additional materials go through the post-creation
+// 其他资料 module instead.
 const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
 const MAX_PER_FILE_BYTES = 100 * 1024 * 1024;
-const MAX_FILES = 30;
+const MAX_FILES = 8;
 const MAX_DESCRIPTION = 2000;
 const ALLOWED_EXTS = new Set([
-  ".zip",
   ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".gif", ".bmp", ".tiff",
-  ".pdf",
-  ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-  ".txt", ".md", ".rtf", ".csv", ".json",
-  ".mp3", ".m4a", ".wav",
-  ".mp4", ".mov", ".webm",
 ]);
 
 function sanitizeName(name: string): string {
@@ -129,9 +127,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "upload too large" }, { status: 413 });
   }
 
-  const isSingleZip =
-    filesRaw.length === 1 && path.extname(filesRaw[0].name).toLowerCase() === ".zip";
-
   // Slot must be free in BOTH tables — Relic occupies a slot once confirmed,
   // RelicDraft holds it during preview.
   const [existingRelic, existingDraft] = await Promise.all([
@@ -173,32 +168,27 @@ export async function POST(req: NextRequest) {
   await fs.mkdir(sourceAbs, { recursive: true });
   await fs.mkdir(derivedAbs, { recursive: true });
 
-  let archiveRelative: string | null = null;
+  const archiveRelative: string | null = null;
   try {
-    if (isSingleZip) {
-      const archiveFileName = `archive-${Date.now()}.zip`;
-      const archiveAbs = path.join(sourceAbs, archiveFileName);
-      const buf = Buffer.from(await filesRaw[0].arrayBuffer());
-      await fs.writeFile(archiveAbs, buf);
-      archiveRelative = `/${workspaceRel}/source/${archiveFileName}`;
-    } else {
-      await fs.mkdir(extractedAbs, { recursive: true });
-      const usedNames = new Set<string>();
-      for (const f of filesRaw) {
-        let name = sanitizeName(f.name);
-        if (usedNames.has(name)) {
-          const ext = path.extname(name);
-          const stem = name.slice(0, name.length - ext.length);
-          let i = 1;
-          while (usedNames.has(`${stem} (${i})${ext}`)) i++;
-          name = `${stem} (${i})${ext}`;
-        }
-        usedNames.add(name);
-        const dst = path.join(extractedAbs, name);
-        if (!dst.startsWith(extractedAbs)) continue;
-        const buf = Buffer.from(await f.arrayBuffer());
-        await fs.writeFile(dst, buf);
+    // Image-only upload — drop each file directly into source/extracted/.
+    // No zip handling: that path was removed 2026-05-14 to match the 8-image
+    // USER UPLOADS limit.
+    await fs.mkdir(extractedAbs, { recursive: true });
+    const usedNames = new Set<string>();
+    for (const f of filesRaw) {
+      let name = sanitizeName(f.name);
+      if (usedNames.has(name)) {
+        const ext = path.extname(name);
+        const stem = name.slice(0, name.length - ext.length);
+        let i = 1;
+        while (usedNames.has(`${stem} (${i})${ext}`)) i++;
+        name = `${stem} (${i})${ext}`;
       }
+      usedNames.add(name);
+      const dst = path.join(extractedAbs, name);
+      if (!dst.startsWith(extractedAbs)) continue;
+      const buf = Buffer.from(await f.arrayBuffer());
+      await fs.writeFile(dst, buf);
     }
   } catch (e) {
     console.error("[api/relic-drafts] write failed", e);

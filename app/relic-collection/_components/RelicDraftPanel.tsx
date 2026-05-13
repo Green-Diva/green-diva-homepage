@@ -28,15 +28,8 @@ import DraftPreviewBody, { type DraftMetadata } from "./DraftPreviewBody";
 
 const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
 const MAX_PER_FILE_BYTES = 100 * 1024 * 1024;
-const MAX_FILES = 30;
-const ACCEPT_ATTR = [
-  ".zip",
-  "image/*",
-  ".pdf",
-  ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-  ".txt", ".md", ".rtf", ".csv", ".json",
-  "audio/*", "video/*",
-].join(",");
+const MAX_FILES = 8;
+const ACCEPT_ATTR = "image/*";
 // Polling cadence while waiting for the agent. The server now writes
 // progress at ~5 distinct points (extract start/done, summary, research,
 // pick), so a faster poll keeps the bar lively without thrashing the DB.
@@ -315,10 +308,10 @@ export default function RelicDraftPanel({ slot, existingDraftId, onClose }: Prop
           stage === "preview" ? "max-w-6xl" : "max-w-3xl",
         ].join(" ")}
       >
-        {/* Preview stage owns its own title and bottom-bar 放弃 button —
-            skip the entire panel header in that stage to match RelicForm's
+        {/* Preview + upload stages both have a bottom-bar 取消 button —
+            skip the panel-level top-right cancel to match RelicForm's
             bottom-only pattern (no duplicate cancel paths). */}
-        {stage !== "preview" ? (
+        {stage !== "preview" && stage !== "upload" ? (
           <div className="flex items-baseline justify-between gap-4">
             <div>
               <h2 className="text-primary text-2xl tracking-wider">
@@ -431,14 +424,14 @@ export default function RelicDraftPanel({ slot, existingDraftId, onClose }: Prop
                 type="button"
                 onClick={() => !submitting && onClose()}
                 disabled={submitting}
-                className="px-4 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant hover:text-on-surface disabled:opacity-40"
+                className="px-4 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant border border-transparent hover:text-on-surface hover:border-on-surface-variant/40 hover:bg-on-surface/5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {t.relicCollection.draftPanelCancel}
               </button>
               <button
                 type="submit"
                 disabled={submitting || files.length === 0}
-                className="px-6 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-background bg-secondary hover:bg-secondary/90 disabled:bg-on-surface-variant/30 disabled:text-on-surface-variant disabled:cursor-not-allowed"
+                className="px-6 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-background bg-secondary hover:bg-secondary/90 cursor-pointer disabled:bg-on-surface-variant/30 disabled:text-on-surface-variant disabled:cursor-not-allowed"
               >
                 {submitting
                   ? t.relicCollection.draftPanelSubmitting

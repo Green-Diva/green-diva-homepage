@@ -198,160 +198,63 @@ Finalize phase (Relic, 由 confirm 触发):
 | `enhance2d` | admin 点「生成」→ POST `/enhance-2d` (薄壳 → `dispatchScene("relic.enhance2d", ...)`) | SceneBinding 路由到 RELIC-FORGE-001 (mode=2dEnhance 分支)；AgentJob 异步跑 fal cutout + `persist` 原语；runner 数据驱动 writeback hook 按 leaf output `_relicWriteback` 写 `Relic.enhancedImagePath` |
 | `model3d` | **依赖 enhancedImagePath**，没有则 disable + 提示"请先生成 2D 增强"；有了点「生成」→ POST `/create-3d` | dispatchScene 路由到 RELIC-FORGE-001 (mode=3dCreate 分支)；AgentJob 异步跑 Meshy submit + poll + download + `persist` 原语（喂透明 PNG），写 `Relic.modelPath` |
 
+## Relic 资料模型 + admin 编辑契约（2026-05-14）
+
+跨 DB / agent prompt / API / 资料包打包的硬约束。改动这块前先看完。
+
+**1. `Relic.materials` Json 列 + 文件落点**
+
+- shape: `{ kind: "webpage"|"image"|"document"|"archive", url?, path?, originalName?, addedAt }[]`，max 20
+- 文件路径: `private/relics/<slug>/materials/<kind>-<ts>-<rand>.<ext>`
+- 端点: `POST /api/relics/[id]/material`（admin，50MB，三类扩展名白名单）+ `GET ...?path=&download=1`
+- 改 kind 枚举 / 路径前缀 / 文件命名要同步 `lib/relicValidators.ts` + `OtherMaterialsGrid` + 资料包打包
+
+**2. RARITIES 必须四处对齐**
+
+`["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"]` 同时出现在：
+
+- `lib/relicValidators.ts`（`RARITIES` const）
+- `lib/relics/scenes.ts`（draft-metadata + regen-metadata 的 outputSchema）
+- `lib/skills/relic-prompts.ts`（DEFAULT_METADATA_PROMPT 的 JSON shape 段）
+- Prisma `Rarity` enum
+
+不一致 → agent 输出合法值被 scene outputSchema 拒，整条 draft pipeline `SCENE_OUTPUT_INVALID`。曾踩坑：scenes.ts 写成 `[COMMON, UNCOMMON, RARE, EPIC, LEGENDARY]`，agent 返回 SPECIAL 直接挂。
+
+**3. SPECIAL 密码转换规则（两条入库路径必须一致）**
+
+- `PATCH /api/relics/[id]`（编辑）：SPECIAL → 非 SPECIAL 自动 `passwordHash = null`；非 SPECIAL → SPECIAL 且无新密码 + 无遗留 hash → 400
+- `POST /api/relic-drafts/[id]/confirm`（新增）：`meta.rarity === "SPECIAL"` 必带 password (≥4 chars)，bcrypt 12 rounds 哈希
+- 前端 `RelicForm` + `DraftPreviewBody` 都按 `rarity === "SPECIAL"` 显隐密码输入框
+
+任一端少一条 → 出现"创建/编辑能走通但密码丢失"或"SPECIAL 没密码就能存"。
+
+**4. RelicForm 提交必须排除三个 path 字段**
+
+`modelPath` / `archivePath` / `derivedArchivePath` 绝不 round-trip。三者各有严格 regex 验证（`/^\/[a-z0-9-]+\/derived-\d+\.zip$/` 等），不是表单字段，legacy 值往返触发 `VALIDATION_FAILED`。曾踩坑导致全部保存失败。
+
+**5. 资料包打包目录契约（admin 下载工作流依赖，重命名前看清楚）**
+
+- `GET /api/relics/[id]/archive`（原始资料包）: `source/` + `uploads/`（cand-user-* 后补图）+ `materials/` + `materials/urls.txt`
+- `GET /api/relics/[id]/derived`（归档资料包）: `info/intro.md` + `candidates/` + `network/` + `materials/` + `materials/websites.md` + `enhanced/` + `model/` + `metadata.json`
+
+**6. formKind / formReason 已彻底退场（2026-05-14）**
+
+`Relic.formKind` / `Relic.formReason` 列 + `RelicFormKind` enum 全删（迁移 `migrate-drop-form-classification.ts`），scene outputSchema / DEFAULT_METADATA_PROMPT / runner writeback allowlist / AssetTabs 默认 tab 逻辑联动改完。AssetTabs 默认 tab 回退为 `enhanced > model3d > original`。看到老 commit / 老 prompt 提到 formKind 直接删，不要复活。
+
 ---
 
 ## Agent Service + Forge Agents
 
-**Site-wide agent dispatch layer.** 任何模块通过 `dispatchScene` / `callScene` 调用"满足某 scene 需求的 agent"，不知道也不关心是哪个 agent / 怎么配的。Endpoint 是薄壳（< 30 行），admin 在 `/agent-control?tab=scenes` 改 SceneBinding 即可换 agent，0 commit。
+详见 **[docs/agent-service.md](docs/agent-service.md)**。要点：
 
-### 三层路由链路（2026-05-12 all-in 后）
+- `dispatchScene` / `callScene` 是 site-wide 派发入口；endpoint 是薄壳（< 30 行），admin 在 `/agent-control?tab=scenes` 换 SceneBinding 即可换 agent，0 commit
+- 三层路由：`scene.contextSchema → scene.prepareAgentInput → SceneBinding → executeAgent → scene.outputSchema`
+- 当前 2 个 forge 覆盖 5 个 `relic.*` scenes：**RELIC-FORGE-001**（4-way mode branch，绑 generate-draft-metadata / regen-metadata / enhance2d / create3d）+ **PICKER-FORGE-001**（绑 smart-image-pick）
+- backbone DAG 6 种节点：`skill` / `branch` / `loop` / `forEach` / `transform` / `persist`（后五种是 runtime 原语，不占装备槽）
+- **责任边界**：Skill = 原子外部 IO；Agent = scene 契约塑形（末尾 transform 节点产 `_relicWriteback`）；runtime 原语 = 同进程基础设施
+- 异步回写靠 [`runner.ts::maybeWriteRelicAsset`](lib/skills/runtime/runner.ts)：leaf output 含 `_relicWriteback: { id, fields }` → 按 15 字段 allowlist 写 Relic 列
+- IO 留在 pipeline / endpoint 层（`scanWorkspace` / `readRelicImageAsDataUri` / `stageUserCandidates`），agent DAG 不再有 INTERNAL handler。详见 [docs/pipeline-input-pattern.md](docs/pipeline-input-pattern.md)
 
-```
-浏览器 → POST /api/relics/[id]/enhance-2d              ← endpoint 永不变
-              ↓
-        dispatchScene("relic.enhance2d", { relicId, ... })
-              ↓
-        scene.contextSchema.parse(ctx)                  [代码 / Zod]
-              ↓
-        scene.prepareAgentInput(ctx, actor)             [代码 / 同步纯函数,默认 identity]
-              ↓
-        SceneBinding 表 (DB)：admin 改 agentId (纯路由)
-              ↓
-        executeAgent → backbone DAG → handler (HTTP_API / LLM_PROMPT / MCP_SERVER)
-              ↓
-        scene.outputSchema.safeParse(leaf.output) → SCENE_OUTPUT_INVALID 或继续
-```
-
-> **2026-05-12 改造要点**：`SceneBinding.inputMap` (DB Json 模板) 退场，ctx → agent.input 改由 `scene.prepareAgentInput(ctx, actor)` 在 `lib/<module>/scenes.ts` 内 own。SceneBinding 现在是真"纯路由表"（`{ sceneKey, agentId, enabled, notes }`）。换 agent 仍是 0 commit，但**改 agent.input 形状变成 git PR**——这是把 scene 契约固化到代码层的代价（详见 [`SceneDefinition.prepareAgentInput`](lib/agent-service/types.ts) 注释）。
-
-### 术语对照（避免歧义）
-
-- **技能池（skill pool）** = 某个 agent 当前已装备且可用（ONLINE）的 skills 集合。Backbone 与 Orchestrator 使用的是同一个技能池，不是两套独立池。
-- **equippedSkillIndex（仅 Orchestrator 运行时）** = 从技能池临时构建的"工具名 -> Skill"索引，用于 LLM 发起 tool call 后快速定位 skill；它不是第二份 skill 数据，也不是额外配置面。（旧文档术语 `toolMap`）
-- **SceneBinding** = "scene -> agent"路由配置（不是 skill 路由）。skill 的归属关系由 `AgentSkillEquip` 决定。
-
-### Forge agents
-
-每个 forge 专职一个能力域，DAG 由 HTTP_API + LLM_PROMPT skill 组装；控制流 / 数据塑形由 backbone 原语 (loop / forEach / transform) 表达，**没有 INTERNAL handler**。
-
-**2026-05-12 合并**：原 LORE-FORGE-001 / CUTOUT-FORGE-001 / MESHY-FORGE-001 三个单一职责 agent 合并成 **RELIC-FORGE-001** —— 一个 4-way mode branch 的 omni-agent，绑 4 个 relic.* scene。**2026-05-13**：save-asset-relic skill 退役为 backbone `persist` 原语，RELIC-FORGE-001 槽位从 6 降到 5（slot 5 留空）。PICKER-FORGE-001 同步把 save-network-asset 收编进 persist 原语，槽位从 4 降到 3（slot 3 留空）。
-
-| Forge | 职责 | 槽位结构 |
-|---|---|---|
-| **RELIC-FORGE-001** | Relic 全生命周期（绑 `relic.generate-draft-metadata` + `relic.regen-metadata` + `relic.enhance2d` + `relic.create3d` 4 个 scene） | 顶层 mode-branch on `input.mode`,4 个 case 分别路由到 4 条独立链:<br>① `initial` → loreEn (slot 0, Gemini grounding+vision) → loreZh (slot 1, Gemini text) → metadata-init (slot 2, Gemini json+vision) → **wrap-research transform** (产 `{ research: {...} }`)<br>② `regenMetadata` → metadata-regen (slot 2,复用同一 skill,flat shape 直接 leaf)<br>③ `2dEnhance` → cutout (slot 3, fal-cutout-http) → **save-cutout (persist 原语)** → **shape-cutout transform** (产 `{ enhancedImagePath, _relicWriteback }`)<br>④ `3dCreate` → meshy (slot 4, meshy-3d-http) → **save-meshy (persist 原语)** → **shape-meshy transform** (产 `{ modelPath, taskId, previewImageUrl, _relicWriteback }`)<br>**`agent.input.{userBrief,fileSummary,imageAbsPaths,textExcerpts}` 由 [`scanWorkspace`](lib/relics/pipeline/scanWorkspace.ts) 预填;`imageDataUri` 由 endpoint 用 [`readRelicImageAsDataUri`](lib/relics/readImageAsDataUri.ts) 预编码;`mode` 和 `kind` 由 [scene.prepareAgentInput](lib/relics/scenes.ts) 注入**。 |
-| **PICKER-FORGE-001** | 智能选图（绑 `relic.smart-image-pick` scene） | branch(useUserImage) → user-only：transform；net 路径：transform(buildLoopInit) → loop(maxIter:2, exitWhen refinedQueryNext=="") { serp(HTTP_API QueryParam auth, slot 1) → transform(filter) → forEach(maxItems:3) { dl(HTTP_API binary, slot 2) → **save (persist 原语)** → transform(mkCand) } → transform(prepVision) → vision(LLM_PROMPT gemini multi-image, slot 4) → transform(applyVerdicts) → transform(mergeIter) } → transform(mergeFinal)。**`agent.input.{userCandidates,referenceImageAbs}` 由 pipeline 层 [`stageUserCandidates`](lib/relics/pipeline/stageUserCandidates.ts) 预 copy + probe 后注入**。 |
-
-**Skill / Agent / 原语 责任边界（不可越界）**：
-
-- **Skill = 原子外部 IO**：一个 skill 只做一次外部调用（一次 HTTP / 一次 LLM 调用），输出 raw 响应字段。**不要**在 skill 的 `responseTransform` 里组装 `_relicWriteback`、不要拼 scene-shape 字段、不要嵌业务编排逻辑——skill 不应该"知道"自己服务于哪个 relic / 哪个 scene。
-- **Runtime 原语（persist / transform / loop / forEach / branch）= 同进程基础设施**：不占 skill 槽，不计入装备上限，admin 在 BackboneFlowEditor 里直接拖。`persist` 是 2026-05-13 加入的数据持久化原语——把 base64 写到 `private/relics/<slug>/derived/`，输出 `{ savedPath, absPath, bytes, contentType }`。它与 runner 的 `_relicWriteback` hook 对称（一个是 file persistence、一个是 DB-column persistence，两个都是 runtime infrastructure）。
-- **Agent = 封装 + scene 契约塑形**：agent 的末尾 `transform` 节点（如 `wrap-research` / `shape-output`）负责把 skill / 原语 的输出 + `agent.input.*` 合并成 scene `outputSchema` 期望的 shape，包括 `_relicWriteback` 这种 runner 用的回写信封。**Agent 是契约 owner，skill / 原语 是工具**。
-- 历史教训：persist 之前被建模成 HTTP_API skill (`save-asset-relic` / `save-network-asset`)，调的"外部 API"是我们自己的 `/api/internal/save-asset` + HMAC-derived token。这其实是数据持久化基础设施套了一层 HTTP 壳，占着 skill 槽不放。2026-05-13 一次性纠正——endpoint、token 派生、middleware 豁免链路全部退役。
-
-**"看起来重复的 skill 何时不该合"判断规则**：只看 `provider` / `model` / `authEnv` 几行相同**不算冗余**，4 个维度任一不同就**不要合**：
-
-1. **modality**（`grounding` / `imagePathsField` / `responseFormat`）——`handlerConfig` 是静态 DB 字段，**不能按 runtime input 切**。强合会被迫总跑重型 modality（白烧配额）或永久降级（丢功能）。
-2. **inputSchema**——决定 AUTONOMOUS 下 LLM 看到的 tool 签名。合并的 schema 会让 LLM 看不出"什么时候该传哪些字段"。
-3. **systemPrompt 语义任务**——研究 / 改写 / 翻译 / 抽取是不同任务，合一个 prompt 上下文切换成本高，输出质量降。
-4. **延迟 / 配额画像**——重型（带 grounding/vision，~3-8s + Search API）和轻量（纯 text，<2s）合一起会让所有调用都按重型计费。
-
-范例：`gemini-lore-en` 和 `gemini-lore-zh` 共享 provider/model/authEnv，但 modality（grounding+vision vs 纯 text）、inputSchema（4 字段 vs 1 字段）、prompt 语义（研究+创作 vs 改写+精炼）、延迟画像全不同——它们是 DAG 的相邻步骤，不是 skill 的冗余。真想"看着不那么乱"，应该走 backbone editor 的 sub-pipeline 折叠（未来功能），不是改 skill 层。
-
-**IO 放哪里：现状 = pipeline/endpoint 层做完，agent 接 ready-to-use 输入**
-
-所有 forge 走"pipeline-准备"路径，agent DAG 不再有 INTERNAL handler。LORE-FORGE 的 `scanWorkspace`、CUTOUT/MESHY 的 `readRelicImageAsDataUri`、PICKER 的 `stageUserCandidates` 都是这个 pattern：把 FS / Prisma 接触面留在 pipeline / endpoint 层，agent 只做 HTTP+LLM 编排。**规则 + helper 命名约定 + 反模式清单**见 [docs/pipeline-input-pattern.md](docs/pipeline-input-pattern.md)。新加 scene 前先读那一篇。
-
-**反模式（已彻底拒绝）**：单一 INTERNAL 同时干 Prisma 查 + FS 扫 + 字符串拼装 + LLM-friendly 塑形（已删 `relic-files-summary`），或单一 INTERNAL 编排"双轮 vision filter + 跨轮 score 合并"业务流（已删 `relic-smart-image-pick`，重写为 PICKER-FORGE DAG）。
-
-### 5 个 relic.* scenes
-
-| Scene | invocation | 当前 binding | 触发位置 |
-|---|---|---|---|
-| `relic.generate-draft-metadata` | sync (callScene) | RELIC-FORGE-001 (mode=initial) | [generateMetadata pipeline step](lib/relics/pipeline/steps/generateMetadata.ts) |
-| `relic.smart-image-pick` | sync (callScene) | PICKER-FORGE-001 | 同 generateMetadata step（在 draft-metadata 之后） |
-| `relic.regen-metadata` | sync | RELIC-FORGE-001 (mode=regenMetadata) | [regen-metadata endpoint](app/api/relics/[id]/regen-metadata/route.ts) |
-| `relic.enhance2d` | async (dispatchScene) | RELIC-FORGE-001 (mode=2dEnhance) | [enhance-2d endpoint](app/api/relics/[id]/enhance-2d/route.ts) |
-| `relic.create3d` | async | RELIC-FORGE-001 (mode=3dCreate) | [create-3d endpoint](app/api/relics/[id]/create-3d/route.ts) |
-
-### Pipeline-step / endpoint 解耦（scene 契约模型）
-
-**Scene 输出契约 = 代码层 authoritative，不在 DB**。每个 scene 在 [`lib/relics/scenes.ts`](lib/relics/scenes.ts) 用 Zod 声明完整 `outputSchema`（含 regex / enum / length 等结构性硬约束），dispatch.ts (sync) + runner.ts (async) 在 leaf 输出后强制 `safeParse`，不符返回 `SCENE_OUTPUT_INVALID` 并阻断 writeback hook。
-
-Pipeline step / endpoint 直接读 `result.output.<scene-shape-fields>`——因为 scene 契约保证 shape 一定对。Agent 内部怎么实现 scene 契约是 agent 自己的事——通常在 backbone DAG 末尾加一个 `transform` JSONata 节点把上游 leaf 输出塑形成契约 shape（参考 4 个 forge agent 的 wrap-research / shape-output 节点）。
-
-**换 agent 不动 binding**：admin 在 SceneBindingEditor 把 SceneBinding.agentId 改到新 agent 时，新 agent 的末尾 leaf 必须满足同一个 scene contract（在 BackboneFlowEditor 里看 scene contract 提示 + Test Run 验证）。SceneBinding 表只剩 `{ sceneKey, agentId, enabled, notes }` —— 纯路由，**不再有 outputMap**（2026-05-11 退场）**也不再有 inputMap**（2026-05-12 退场，改由 `scene.prepareAgentInput` 在代码层 own）。
-
-### `prepareAgentInput` 是"标准信封"，不是 agent 适配器
-
-`scene.prepareAgentInput(ctx, actor)` 输出的 `agent.input` 形状由 scene 单方面决定，**对所有候选 agent 一视同仁**。允许做的只有三类：
-
-1. 字段重命名（`relicId` → `_relicId` 这种全站协议）
-2. 注入跨 agent 共享的常量（`mode: "initial"` / `kind: "model"` 这种 scene 自己的语义 discriminator）
-3. 简单包装（裹一层 `{ research: ... }`）
-
-**反模式（破坏 scene 契约）**：
-
-- ❌ "新 agent 想要字段叫 `imgUri` 不叫 `imageDataUri`，改 prepareAgentInput 一下" —— 让新 agent 在它 DAG 入口加 `transform` 翻译，**不动信封**。
-- ❌ 在 prepareAgentInput 里跑 fetch / Prisma / FS —— 它是同步纯函数，IO 留在 caller（pipeline / endpoint 层，参考 `scanWorkspace` / `readRelicImageAsDataUri` / `stageUserCandidates`）。
-- ❌ 数组 map/filter/zip / 多源合并 / 控制流 —— 那是 agent 内部 transform 节点的活。
-
-经验法则：**prepareAgentInput 函数体 ≤ 10 行**。超了多半是把 agent 适配逻辑误塞进信封了——挪到该 agent 的 DAG 入口 transform 节点。
-
-### BackboneFlowEditor 装饰节点视觉模型
-
-`/agent-control` BackboneFlowEditor 的 DAG 画布周围自动注入装饰节点（read-only，不参与 buildConfig 序列化），反映 runtime 真实流：
-
-```
-BEGIN_sceneA ─dash─┐                                            ┌─dash─→ END_sceneA
-BEGIN_sceneB ─dash─┼─→ AGENT.INPUT ─solid─→ [DAG] ─solid─→ AGENT.OUTPUT ─dash─→ END_sceneB
-BEGIN_sceneC ─dash─┘     (单点收敛)                             └─dash─→ END_sceneC
-```
-
-- **BEGIN / END**：每个绑定 scene 一个，展示该 scene 的 ctx fields / outputSchema fields。**多个 = 候选 alternative**，不是并发流（一次 invocation 只有一个 BEGIN→END 被实际命中）。
-- **AGENT.INPUT / AGENT.OUTPUT**：单点收敛节点。反映"一次 invocation = 1 个 input + 1 个 output"的本质。
-- **边样式语义**：
-  - `dashed` sky / pink = 候选关系（"这些 scene 可能触发" / "这些 schema 可能校验"）
-  - `solid` sky / pink = 实际运行时数据流（agent.input 进入 DAG / leaf output 离开 DAG）
-- **拓扑设计动机**（2026-05-12 改造）：原"每个 BEGIN 连所有根、每个 leaf 连所有 END"的 N×M 模型在 RELIC-FORGE-001 这种 4-scene 多 leaf 场景下退化成 16 根交叉乱线，且暗示了错误的语义（并发数据流）。收敛节点模型把边数从 N×M 压成 N+M+2，且视觉直接表达 runtime 行为。
-
-代码：[`topology.ts::buildIoNodes/buildIoEdges`](app/agent-control/components/backbone/topology.ts) + [`DecorativeNodes.tsx`](app/agent-control/components/backbone/nodes/DecorativeNodes.tsx) 的 5 个 view (`BeginNodeView` / `EndNodeView` / `AgentBoundaryView` / `AgentInputNodeView` / `AgentOutputNodeView`)。
-
-### 异步 writeback hook（数据驱动）
-
-[`runner.ts::maybeWriteRelicAsset`](lib/skills/runtime/runner.ts) 单一数据驱动路径：agent leaf output 含 `_relicWriteback: { id, fields }` → 按 **15 字段 allowlist**（`enhancedImagePath` / `modelPath` / `loreZh` 等）写 Relic 列。CUTOUT/MESHY 等 async 路径的 leaf transform 必须在产出 scene-shape 字段同时保留 `_relicWriteback`（scene outputSchema 用 `.passthrough()` 允许该字段穿过校验）。**不要**依赖 `input.mode` 字段做回写路由。
-
-### `persist` primitive (取代旧 save-asset 端点)
-
-2026-05-13: `POST /api/internal/save-asset` 端点 + `INTERNAL_SERVICE_TOKEN` HMAC 派生 + middleware 豁免链路**整体退役**。文件持久化改由 backbone `persist` 原语节点（与 `transform` / `loop` / `forEach` / `branch` 并列的 6 种节点类型之一）在 runtime 进程内直接调 [`lib/relics/persistAsset.ts`](lib/relics/persistAsset.ts)。
-
-- 节点形状：`{ id, type: "persist", inputFrom, position? }`，无 node-level config。
-- 输入契约：inputFrom 解析为 `{ relicSlug, kind, base64, contentType?, ext? }`。通常 inputFrom 用 merge ref：`relicSlug` / `kind` 从 `agent.input` 拉（scene.prepareAgentInput 注入），`base64` / `contentType` 从上游 download skill 拉。
-- 输出契约：`{ savedPath, absPath, bytes, contentType }`。下游 `transform` 节点用 `savedPath` 组装 `_relicWriteback`，runner hook 再写回 Relic 列。
-- 文件落点：`private/relics/<slug>/derived/<kind>-<ts>.<ext>`。Path-traversal 双重防护（regex + path.resolve 边界检查）。
-- **为什么是 runtime 原语而不是 skill**：它和 runner 的 `_relicWriteback` 是同一类基础设施——DB 列持久化 + 文件持久化都是 runtime infrastructure，不是外部能力。占着 skill 槽不对称，且套 HMAC 鉴权环路完全是冗余（同进程调自己）。
-
-### Loop / forEach / transform / persist primitives
-
-backbone DAG v2 节点共 6 种 type：`skill` / `branch` / `loop` / `forEach` / `transform` / `persist`。除 `skill` 外都是 runtime 原语，不占装备槽。
-
-- **`loop`**：Body 自包含 sub-DAG，每次 iteration 用前次 leaf output 作 input；遇到 exitWhen 匹配 / 达 maxIterations 退出。aggregate=`"last"`(default)/`"concat-array"`。
-- **`forEach`**：Body 同 sub-DAG 模式，每次 iteration 接 array 中一项；body 入口 `agent.input = { item, index, total }`。aggregate=`"concat-array"`(default)/`"last"`。`maxItems` 1-50 截断。
-- **`transform`**：纯 [JSONata](https://docs.jsonata.org) 表达式 evaluate inputFrom-resolved value，无外部调用 / 无 sub-DAG。用于 zip / map / filter / reduce / merge object。表达式在 validateAndNormalize 时 parse-once（malformed 表达式立即报 PIPELINE_INVALID，不等到 runtime）。
-- **`persist`** (2026-05-13)：数据持久化原语，见上一段。输入 `{ relicSlug, kind, base64, contentType?, ext? }`，输出 `{ savedPath, absPath, bytes, contentType }`。同进程写 `private/relics/<slug>/derived/`。
-
-`MAX_LOOP_DEPTH = 2` 同时约束 loop + forEach 的递归深度（共享预算）。runtime 里 `runBackbone` 通过 `_internalEquips` / `_depth` / `_runLog` / `_stepIdPrefix` internal opts 递归调自身处理 loop / forEach body — 不抽 helper、不破坏现有 DAG。
-
-**Editor**：[`BackboneFlowEditor.tsx`](app/agent-control/components/BackboneFlowEditor.tsx) 主画布工具栏 `+ Skill / + Branch / + Loop / + ForEach / + Transform / + Persist` 六个按钮；loop / forEach 节点点 panel 里"▷ Edit Loop Body" / "▷ Edit forEach Body" 弹 `BodySubCanvasEditor` modal（同一 React Flow，header copy + 配色按 `kind` prop 切）。Sub-canvas 工具栏 `+ Skill / + Branch / + Transform / + Persist`（**不允许** 嵌套 loop/forEach 进 body — 想做 depth-2 走 Advanced raw JSON）。Transform 节点 panel 是 JSONata 表达式 textarea，链接到官方文档。Persist 节点 panel 只有 inputFrom 编辑器 + 契约提示。
-
-详见 [backbone.ts](lib/skills/runtime/backbone.ts)。
-
-### Agent export/import
-
-`GET /api/agents/[id]/export` 返回 `green-diva-agent-export-v1` JSON envelope（agent meta + DAG + 全部装备 skill 完整定义 + slot）。`POST /api/agents/import` 处理 codename 冲突（409 + 显式 newCodename rename）+ skill slug 冲突（`reuse` 默认 / `rename` 自动 `-imp-N` 后缀）。新 agent `deployedAt = null` — admin 测试后自己 deploy。
-
-### LORE-FORGE prompt 默认值
-
-`DEFAULT_LORE_EN_PROMPT` / `DEFAULT_LORE_ZH_PROMPT` / `DEFAULT_METADATA_PROMPT` 在 [`lib/skills/relic-prompts.ts`](lib/skills/relic-prompts.ts)（无 `server-only`，让 migrate scripts 也能 import）。LORE-FORGE 的 3 个 LLM_PROMPT skill 在 migrate-lore-forge 创建时 seed 这些 prompt 作为 systemPrompt 默认值；admin 在 SkillLibrary 改 `handlerConfig.systemPrompt` 即覆盖。
 
 ## Agent Control 装备界面（`/agent-control`）
 
@@ -495,118 +398,17 @@ mode 差异**只活在 Agent 层**，决定"如何串联 skills"：
 
 ## 命名规约（跨层契约）
 
-`/agent-control` 的后端 / API / type 系统跨几个层有几条已固化的命名规则。**新加端点 / type / 字段时一律按这里来**，旧代码看到不一致的不要随手"对齐"——多数已经是 back-compat 兜底。
+完整清单见 **[docs/naming-conventions.md](docs/naming-conventions.md)**。硬规则（违反就出错）：
 
-### 2026-05-11 命名收敛清单
-
-下面这些在 2026-05-11 一并改了，每条都带 back-compat 路径，**新代码用新名**：
-
-| 旧 | 新 | back-compat |
-|---|---|---|
-| `SceneError.code` 字段 | `SceneError.errorCode` | `code` getter 保留至 2026-06 |
-| `invokeAgent()` | `executeAgent()` | `invokeAgent` 作为 deprecated re-export 保留至 2026-06 |
-| scene key `relic.draft-metadata` | `relic.generate-draft-metadata` | `registerSceneAlias` 解析旧 key，DB 一次性 migrate-rename-scene-keys.ts 重写 |
-| `Agent.endedAt` (DB column) | `Agent.finishedAt` (Prisma 字段) | Prisma `@map("endedAt")` —— DB column 名暂未改，仅 TS 字段名换 |
-| pipelineConfig JSON 中 `equipSlot` 字段 | `slotIndex`（对齐 `AgentSkillEquip.slotIndex` 列） | migrate-rename-equipslot.ts 一次性 JSON 重写（递归 loop/forEach body） |
-
-### 2026-05-12 SceneBinding.inputMap 退役（all-in）
-
-| 旧 | 新 | back-compat |
-|---|---|---|
-| `SceneBinding.inputMap` (DB Json, `{{ctx.X}}` / `{{actor.X}}` 模板) | `scene.prepareAgentInput(ctx, actor)` (代码层同步函数, `lib/<module>/scenes.ts`) | DB 列由 [migrate-drop-inputmap.ts](prisma/migrate-drop-inputmap.ts) 一次性 dump + DROP COLUMN；无运行时 back-compat，新代码直接走 scene.prepareAgentInput |
-| `applyTemplate(binding.inputMap, ...)` (dispatch.ts / sample-run.ts) | `scene.prepareAgentInput(ctx, actor) ?? ctx` | applyTemplate 函数本身保留——仍被 skill handlers (httpApi / llmPrompt) 用于 `{{input.X}}` 模板 |
-| `AgentErrorCode.TEMPLATE_ERROR` | `DISPATCH_FAILED` (prepareAgentInput throw 时) | TEMPLATE_ERROR 枚举值保留，仅用于历史 AgentJob 行的类型兼容 |
-| `SceneBindingRow.inputMap` (page.tsx / types.ts 序列化) | 字段删除 | — |
-| `SceneBindingEditor` 的 Input Map (JSON) textarea + JSON 校验 | 编辑器只剩 agent / enabled / notes | — |
-| `BackboneFlowEditor` 多 scene 场景下基于 inputMap 静态求值 branch 的 BEGIN/END 反向连接 | 改用 `AGENT.INPUT`/`AGENT.OUTPUT` 单点收敛节点 | BEGINs → AGENT.INPUT → DAG → AGENT.OUTPUT → ENDs;dashed=候选关系,solid=实际运行时数据流。详见下方"装饰节点视觉模型"段 |
-
-**取舍说明**：admin 不再能 0-commit 改 ctx → agent.input 形状；改 scene 入参形状现在是 git PR。这是把 scene 契约固化到代码层换来的：完整 TS 推导 + 单一 source of truth + agent 可移植性增强。详见 [`SceneDefinition.prepareAgentInput`](lib/agent-service/types.ts) 注释。
-
-API 错误响应统一同期落地（[lib/api-error.ts](lib/api-error.ts)）；详见下面段。
-
-### API 错误响应 shape
-
-**统一格式**（[lib/api-error.ts](lib/api-error.ts)）：
-
-```jsonc
-{ "ok": false, "errorCode": "<DOMAIN>_<STATE>", "errorMessage": "<human>", "error": "<alias>" }
-```
-
-`error` 字段是 errorMessage 的 back-compat alias，给老前端 fetch 用，**2026-06 后删**。新代码读 `errorCode` / `errorMessage`。
-
-写错误响应用 3 个 helper，**不要再 `NextResponse.json({ error })`**：
-
-```ts
-import { respondError, respondAuthError, respondValidationError } from "@/lib/api-error";
-
-if (e instanceof AuthError) return respondAuthError(e);
-if (!parsed.success) return respondValidationError(parsed.error.flatten());
-return respondError(AgentErrorCode.NOT_FOUND, "agent not found", 404);
-```
-
-### Error code 命名
-
-- **唯一来源**：所有 error code 从 [`lib/agent-errors.ts`](lib/agent-errors.ts) 的 `AgentErrorCode` enum 取。`respondError` / `AgentRunResult.errorCode` / `SkillInvokeResult.errorCode` / `SceneError.errorCode` 全部收紧为 `AgentErrorCode` 类型——写 raw string tsc 直接报错。新加 code = 在 enum 加一项 + 在 [`lib/agent-errors-i18n.ts`](lib/agent-errors-i18n.ts) 加一行中文 hint（`DIAGNOSTIC_HINTS_ZH` 是 `Record<AgentErrorCode, string>`，少一条 tsc 报错）。
-- 全大写下划线 `<DOMAIN>_<STATE>`：`SLOT_EMPTY` / `SKILL_OFFLINE` / `SCENE_OUTPUT_INVALID` / `AGENT_MISSING` / `BRANCH_NO_MATCH`
-- DOMAIN 候选：`AUTH` / `VALIDATION` / `NOT_FOUND` / `CONFLICT` / `SCENE` / `AGENT` / `SKILL` / `SLOT` / `SCHEMA` / `RUNTIME` / `PROVIDER` / `INTERNAL`
-- STATE 候选：`REQUIRED` / `FORBIDDEN` / `FAILED` / `INVALID` / `MISSING` / `EMPTY` / `OFFLINE` / `TIMEOUT` / `DISABLED` / `NOT_DEPLOYED` / `CONFLICT`
-- **历史遗留不跟规约的**：`TIMEOUT` / `INPUT_SCHEMA_VIOLATION` / `OUTPUT_SCHEMA_VIOLATION` / `HANDLER_ERROR` / `PROVIDER_ERROR` 等——**不要重命名**，client catch 块可能在做字符串 compare。新加的必须跟规约。
-- **日志统一前缀**：runtime / handler 失败路径用 [`logError(source, code, message, data?)`](lib/agent-errors.ts) helper，输出 `[source:CODE] message` 格式（如 `[backbone:SLOT_EMPTY] node "X": ...`），方便 grep 定位。`LogSource` 类型枚举所有来源标签。
-
-### Error 字段名：`errorCode` 不是 `code`
-
-所有 discriminated-union failure type 都用 `errorCode` 字段（`AgentRunResult` / `SkillInvokeResult` / `SceneError` / API response）。`SceneError.code` 保留为 deprecated getter，**2026-06 后删**——catch 块写 `e.errorCode`，不写 `e.code`。
-
-### 三个 input* 字段不是同义词（不要统一）
-
-容易混淆，但分别属于三个层、三件不同事：
-
-| 字段 | 位置 | 含义 |
-|---|---|---|
-| `inputMapping` | v1 pipelineConfig step ([validators.ts](lib/validators.ts)) | legacy 线性 pipeline 的入参引用，仅 back-compat |
-| `inputFrom` | v2 DAG 节点 ([validators.ts](lib/validators.ts)) | DAG node 的入参 source-ref (`"agent.input"` / `"<id>.output"` / `{merge}`) |
-| `prepareAgentInput` | SceneDefinition ([lib/relics/scenes.ts](lib/relics/scenes.ts)) | scene ctx → agent.input 的同步函数（2026-05-12 取代旧 SceneBinding.inputMap DB 模板） |
-
-记不住的话：**"前一个节点叫什么"是 inputFrom，"外部 ctx 怎么映射进来"是 scene 自己的 prepareAgentInput**。
-
-### JSON 字段后缀分类（Prisma model 上的 `Json` 列）
-
-| 后缀 | 用途 | 例子 |
-|---|---|---|
-| `*Config` | 声明性配置 (DAG / 模型 / 模板) | `pipelineConfig` / `dispatcherConfig` / `handlerConfig` |
-| `*Log` / `*Trace` | 执行记录数组 (按时间顺序) | `runLog` / `pipelineTrace` |
-| `*Map` | template / 映射对象 | `intentSceneKeys` array 等（`SceneBinding.inputMap` 已于 2026-05-12 退役） |
-| `*Metadata` / `*Snapshot` | 快照 / 镜像 | `generatedMetadata` (RelicDraft) |
-
-新 Json 列按这条规则命名；不要起 `*Data` / `*Info` 这种含义模糊的后缀。
-
-### 文件命名：`<verb>.ts` vs `<noun>.ts`
-
-- **verb 文件 = 公开入口**：`invoke.ts` / `dispatch.ts`——一个文件只有一个主导出，名字就是该入口动词
-- **noun 文件 = 内部引擎 / registry / types**：`backbone.ts` / `orchestrator.ts` / `runner.ts` / `registry.ts` / `types.ts`——存机制 / 数据 / 配置
-
-barrel `index.ts` 仅在需要明确 public surface 的 package 用（[lib/agent-service/index.ts](lib/agent-service/index.ts) 是范例）；纯内部模块（`lib/skills/runtime/`）不必有。
-
-### 动态段 segment `[id]` vs `[skillId]`
-
-Next.js 嵌套路由约定：
-
-- 第一层 `[id]`——通用占位（资源主键）
-- 第二层及以下用具名（`[skillId]` / `[jobId]` / `[sceneKey]`）以消歧义——同一 handler 文件能拿到多个 `params.X`
-
-API path segment 风格：**static 段一律 kebab-case**（`dry-run` / `sample-run` / `test-invoke` / `enhance-2d`）；**dynamic 段一律 camelCase**（`[skillId]`）。新加路由跟着这条。
-
-### 同义但不同名的"测试执行" endpoint
-
-三个名字（**不要重命名**，client UI 已经写死）：
-
-| 资源 | endpoint | 用途 |
-|---|---|---|
-| Skill | `POST /api/skills/[id]/test-invoke` | SkillEditor "Test Invoke" 按钮——验 handlerConfig + schema |
-| Scene | `POST /api/scene-bindings/[sceneKey]/sample-run` | SceneBindingEditor "Sample Run"——验 prepareAgentInput + 绑定 agent |
-| Agent | `POST /api/agents/[id]/dry-run` | BackboneFlowEditor "Test Run"——验 DAG 整体执行 |
-
-三者都是同步、admin-only、不建 AgentJob、不写库。区别在**测的层级不同**：skill / scene / agent。
+- **Error code 必须从 [`lib/agent-errors.ts`](lib/agent-errors.ts) 的 `AgentErrorCode` enum 取**——TS 类型已收紧，写 raw string tsc 报错；新加 code 必须在 enum + `DIAGNOSTIC_HINTS_ZH` (`lib/agent-errors-i18n.ts`) 同步加项
+- **API 错误响应统一格式** `{ ok: false, errorCode, errorMessage, error }`，用 `respondError` / `respondAuthError` / `respondValidationError` 写，不要再 `NextResponse.json({ error })`
+- **失败 type 用 `errorCode` 字段不是 `code`**——`SceneError.code` getter 已 deprecated，2026-06 后删
+- **API path**：static 段 kebab-case (`dry-run` / `test-invoke`)，dynamic 段 camelCase (`[skillId]`)；第一层 `[id]`，第二层及以下用具名（消歧义）
+- **三个 input\* 字段不要统一**：`inputMapping`（v1 legacy）/ `inputFrom`（v2 DAG node）/ `prepareAgentInput`（scene ctx→agent.input）
+- **Json 列后缀**：`*Config` / `*Log` / `*Trace` / `*Map` / `*Metadata` / `*Snapshot`——不要起 `*Data` / `*Info`
+- **文件命名**：`<verb>.ts` = 公开入口（`invoke.ts` / `dispatch.ts`），`<noun>.ts` = 内部引擎 / registry / types
+- **三个不同名的"测试执行" endpoint** 不要重命名（UI 已 hardcode）：skill = `test-invoke` / scene = `sample-run` / agent = `dry-run`
+- **2026-05-11 + 2026-05-12 命名收敛**：`SceneError.code → errorCode` / `invokeAgent → executeAgent` / `relic.draft-metadata → relic.generate-draft-metadata` / `equipSlot → slotIndex` / `SceneBinding.inputMap` 退役（改用 `scene.prepareAgentInput`），均带 back-compat 路径
 
 ## Prisma db push 与生产迁移范式
 
