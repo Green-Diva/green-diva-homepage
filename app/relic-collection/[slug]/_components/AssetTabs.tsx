@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Dictionary } from "@/lib/i18n/types";
+import Meshy3dConfigModal, { type Meshy3dOptions } from "@/app/admin/relics/Meshy3dConfigModal";
 
 // RelicViewer is a heavy import (model-viewer custom element). Lazy-load
 // so the original-tab path doesn't pay for it.
@@ -75,6 +76,7 @@ export default function AssetTabs({
   const [active, setActive] = useState<TabKey>(defaultTab);
   const [enhanceJob, setEnhanceJob] = useState<JobState>({ kind: "idle" });
   const [modelJob, setModelJob] = useState<JobState>({ kind: "idle" });
+  const [show3dConfig, setShow3dConfig] = useState(false);
 
   const setTab = useCallback(
     (next: TabKey) => {
@@ -240,12 +242,14 @@ export default function AssetTabs({
     }
   }
 
-  async function startCreate3d() {
+  async function startCreate3d(opts: Meshy3dOptions) {
     setModelJob({ kind: "running", jobId: "...", startedAt: Date.now(), slaMs: null });
     try {
       const r = await fetch(`/api/relics/${relicId}/create-3d`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
       });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
@@ -348,7 +352,7 @@ export default function AssetTabs({
             <GenerateBlock
               admin={isAdmin}
               jobState={modelJob}
-              onStart={startCreate3d}
+              onStart={() => setShow3dConfig(true)}
               etaText={t.relicCollection.create3dEta}
               startLabel={t.relicCollection.create3dStart}
               runningLabel={t.relicCollection.create3dRunning}
@@ -357,6 +361,16 @@ export default function AssetTabs({
           )
         )}
       </div>
+      {show3dConfig ? (
+        <Meshy3dConfigModal
+          t={t}
+          onCancel={() => setShow3dConfig(false)}
+          onConfirm={(opts) => {
+            setShow3dConfig(false);
+            void startCreate3d(opts);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
