@@ -27,8 +27,6 @@ export type DraftMetadata = {
   classifZh?: string;
   classifEn?: string;
   rarity?: "COMMON" | "RARE" | "EPIC" | "LEGENDARY" | "SPECIAL";
-  formKind?: "TWO_D" | "THREE_D" | null;
-  formReason?: string | null;
   loreZh?: string | null;
   loreEn?: string | null;
   primaryImagePath?: string | null;
@@ -72,8 +70,6 @@ export default function DraftPreviewBody({
       classifZh: initial.classifZh ?? "",
       rarity: initial.rarity ?? "COMMON",
       iconKey: initial.iconKey ?? "",
-      formKind: initial.formKind ?? null,
-      formReason: initial.formReason ?? "",
     },
     loreEn: initial.loreEn ?? "",
     loreZh: initial.loreZh ?? "",
@@ -92,8 +88,6 @@ export default function DraftPreviewBody({
       classifZh: state.meta.classifZh,
       rarity: state.meta.rarity,
       iconKey: state.meta.iconKey || null,
-      formKind: state.meta.formKind,
-      formReason: state.meta.formReason || null,
       loreEn: state.loreEn || null,
       loreZh: state.loreZh || null,
       primaryImagePath: state.primaryImagePath,
@@ -124,6 +118,8 @@ export default function DraftPreviewBody({
         nameEn={state.meta.nameEn}
         classifZh={state.meta.classifZh}
         classifEn={state.meta.classifEn}
+        iconKey={state.meta.iconKey}
+        rarity={state.meta.rarity}
         isAdmin={false}
         t={t}
       />

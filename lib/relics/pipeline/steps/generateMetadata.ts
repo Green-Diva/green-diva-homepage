@@ -2,8 +2,7 @@
 //
 // Calls the RELIC-SCRIBE-001 agent in `mode: "initial"` and writes its DAG
 // outputs back into the Relic row:
-//   - research.output → titles / subtitles / icon / rarity / formKind /
-//     formReason (from decisionReason) / loreZh / loreEn
+//   - research.output → titles / subtitles / icon / rarity / loreZh / loreEn
 //   - pick.output    → candidateImages, recommendedPrimaryPath → primaryImagePath
 //
 // Graceful-degradation policy: this step NEVER fails the pipeline. If the
@@ -14,7 +13,7 @@
 // (degraded) — failed first-time generation must NOT show as pending review.**
 
 import "server-only";
-import type { Rarity, RelicFormKind, Prisma } from "@prisma/client";
+import type { Rarity, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { AgentRunLogEntry } from "@/lib/agents/invoke";
 import { callScene, SceneError } from "@/lib/agent-service";
@@ -38,7 +37,7 @@ import { stageUserCandidates } from "../stageUserCandidates";
 //
 // Expected shape from draft-metadata:
 //   { research: { titleZh, titleEn, subtitleZh, subtitleEn, icon,
-//                 rarity, formKind, decisionReason, loreZh, loreEn,
+//                 rarity, decisionReason, loreZh, loreEn,
 //                 useUserImage, networkImageQuery } }
 // Expected shape from smart-image-pick:
 //   { recommendedPrimaryPath, candidates: [...] }
@@ -85,8 +84,6 @@ export type GenerateMetadataResult = {
     classifZh: string;
     classifEn: string;
     rarity: Rarity;
-    formKind: RelicFormKind | null;
-    formReason: string | null;
     loreZh: string | null;
     loreEn: string | null;
     primaryImagePath: string | null;
@@ -111,16 +108,6 @@ function pickRarity(v: unknown): Rarity {
     if (RARITY_VALUES.includes(upper)) return upper;
   }
   return FALLBACK.rarity;
-}
-
-function pickFormKind(v: unknown): RelicFormKind | null {
-  if (v === "TWO_D" || v === "THREE_D") return v;
-  if (typeof v === "string") {
-    const norm = v.trim().toUpperCase().replace(/[-_\s]/g, "");
-    if (norm === "2D" || norm === "TWOD" || norm === "TWO" || norm === "TWOD2D") return "TWO_D";
-    if (norm === "3D" || norm === "THREED" || norm === "THREE") return "THREE_D";
-  }
-  return null;
 }
 
 function shapeCandidates(raw: unknown): CandidateImage[] | null {
@@ -162,10 +149,6 @@ function shapeMetadata(
   // Slice caps match cell truncate width budget (with small overshoot buffer).
   const classifZh = pickString(meta.subtitleZh ?? meta.classifZh, FALLBACK.classifZh, 10);
   const classifEn = pickString(meta.subtitleEn ?? meta.classifEn, FALLBACK.classifEn, 18);
-  const formKind = pickFormKind(meta.formKind);
-  const formReason = typeof meta.decisionReason === "string"
-    ? pickString(meta.decisionReason, "", 500) || null
-    : null;
   const loreZh = typeof meta.loreZh === "string" && meta.loreZh.trim()
     ? meta.loreZh.trim().slice(0, 4000)
     : null;
@@ -186,8 +169,6 @@ function shapeMetadata(
     classifZh,
     classifEn,
     rarity: pickRarity(meta.rarity),
-    formKind,
-    formReason,
     loreZh,
     loreEn,
     primaryImagePath,
@@ -390,8 +371,6 @@ export async function stepGenerateMetadata(
       rarity: outcome.applied.rarity,
       // Only overwrite optional fields when the agent actually produced a value
       // (preserves admin manual edits when the DAG missed a node).
-      ...(outcome.applied.formKind !== null ? { formKind: outcome.applied.formKind } : {}),
-      ...(outcome.applied.formReason !== null ? { formReason: outcome.applied.formReason } : {}),
       ...(outcome.applied.loreZh !== null ? { loreZh: outcome.applied.loreZh } : {}),
       ...(outcome.applied.loreEn !== null ? { loreEn: outcome.applied.loreEn } : {}),
       ...(outcome.applied.primaryImagePath !== null

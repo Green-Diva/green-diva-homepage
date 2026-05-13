@@ -10,7 +10,7 @@
 //   admin clicks "生成" → POST /create-3d → poll /asset-job → router.refresh().
 //
 // Tab state via URL ?view= so back/forward feels right; default chosen by
-// formKind + asset availability.
+// asset availability (enhanced > model3d > original).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,7 +29,6 @@ type Props = {
   hasPrimary: boolean;
   hasEnhanced: boolean;
   hasModel: boolean;
-  formKind: "TWO_D" | "THREE_D" | null;
   alt: string;
   isAdmin: boolean;
   t: Dictionary;
@@ -61,7 +60,6 @@ export default function AssetTabs({
   hasPrimary,
   hasEnhanced,
   hasModel,
-  formKind,
   alt,
   isAdmin,
   t,
@@ -69,18 +67,16 @@ export default function AssetTabs({
   const router = useRouter();
   const params = useSearchParams();
 
-  // Default tab: prefer the asset matching formKind if present; else fall
-  // back to whatever exists, or original.
+  // Default tab: prefer the richest existing asset; else original.
   const defaultTab = useMemo<TabKey>(() => {
     const requested = params.get("view");
     if (requested === "enhance2d" || requested === "original" || requested === "model3d") {
       return requested;
     }
-    if (formKind === "THREE_D" && hasModel) return "model3d";
-    if (formKind === "TWO_D" && hasEnhanced) return "enhance2d";
-    if (formKind === "THREE_D" && hasEnhanced) return "enhance2d"; // 3D wants enhanced as fallback
+    if (hasModel) return "model3d";
+    if (hasEnhanced) return "enhance2d";
     return "original";
-  }, [params, formKind, hasModel, hasEnhanced]);
+  }, [params, hasModel, hasEnhanced]);
 
   const [active, setActive] = useState<TabKey>(defaultTab);
   const [enhanceJob, setEnhanceJob] = useState<JobState>({ kind: "idle" });

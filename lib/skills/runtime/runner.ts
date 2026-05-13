@@ -352,8 +352,6 @@ const ALLOWED_WRITEBACK_FIELDS = new Set<string>([
   "enhancedImagePath",
   "modelPath",
   "primaryImagePath",
-  "formKind",
-  "formReason",
   "loreZh",
   "loreEn",
   "nameZh",

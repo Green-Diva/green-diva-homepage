@@ -95,9 +95,9 @@ const SKILL_METADATA = {
   nameZh: "Gemini 元数据派生",
   icon: "psychology",
   descriptionEn:
-    "Reads bilingual lore + reference images and emits the 9-field metadata JSON (title/subtitle/icon/rarity/formKind + image-pick decision). Used by both initial and regen modes.",
+    "Reads bilingual lore + reference images and emits the metadata JSON (title/subtitle/icon/rarity + image-pick decision). Used by both initial and regen modes.",
   descriptionZh:
-    "读双语圣记 + 参考图,输出 9 字段元数据 JSON(title/subtitle/icon/rarity/formKind + 选图决策)。initial 与 regen 两种 mode 都用。",
+    "读双语圣记 + 参考图,输出元数据 JSON(title/subtitle/icon/rarity + 选图决策)。initial 与 regen 两种 mode 都用。",
   kind: "LLM_PROMPT" as const,
   handlerConfig: {
     provider: "gemini",

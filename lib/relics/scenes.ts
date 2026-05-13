@@ -41,7 +41,6 @@ const iconKey = z
   .max(64)
   .regex(/^[a-z][a-z0-9_]*$/, "必须是 Material Symbols 名（小写字母 / 数字 / 下划线）");
 const RARITIES = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"] as const;
-const FORM_KINDS = ["TWO_D", "THREE_D"] as const;
 
 // — relic.generateDraftMetadata —
 // Sync. Triggered from the draft pipeline's GENERATE_METADATA step
@@ -84,7 +83,6 @@ export const relicDraftMetadataScene = registerScene({
         subtitleEn: englishStarting(2, 160),
         icon: iconKey,
         rarity: z.enum(RARITIES),
-        formKind: z.enum(FORM_KINDS),
         decisionReason: z.string().max(500).optional(),
         useUserImage: z.boolean().optional(),
         networkImageQuery: z.string().max(200).optional(),
@@ -186,8 +184,8 @@ export const relicRegenMetadataScene = registerScene({
   module: "relic",
   label: { en: "Regenerate Metadata", zh: "重新生成元数据" },
   description: {
-    en: "Re-derive title/subtitle/icon/rarity/formKind from existing lore + optional admin feedback.",
-    zh: "基于现有圣记和可选反馈，重新派生标题/副标题/图标/稀有度/形态。",
+    en: "Re-derive title/subtitle/icon/rarity from existing lore + optional admin feedback.",
+    zh: "基于现有圣记和可选反馈，重新派生标题/副标题/图标/稀有度。",
   },
   contextSchema: z.object({
     relicSlug: z.string().min(1),
@@ -209,7 +207,6 @@ export const relicRegenMetadataScene = registerScene({
       subtitleEn: englishStarting(2, 160),
       icon: iconKey,
       rarity: z.enum(RARITIES),
-      formKind: z.enum(FORM_KINDS),
     })
     .passthrough(),
   invocation: "sync",

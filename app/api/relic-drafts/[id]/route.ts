@@ -14,7 +14,6 @@ import { resolveRelicAsset } from "@/lib/relicStorage";
 import { ensureServerInit } from "@/lib/server-init";
 
 const RARITY_VALUES = ["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"] as const;
-const FORM_KIND_VALUES = ["TWO_D", "THREE_D"] as const;
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -87,7 +86,6 @@ export async function PATCH(
   setStr("nameEn", 80);
   setStr("classifZh", 64);
   setStr("classifEn", 80);
-  setStr("formReason", 500);
   setStr("loreZh", 4000);
   setStr("loreEn", 4000);
   setStr("primaryImagePath", 500);
@@ -96,13 +94,6 @@ export async function PATCH(
     const v = body.rarity;
     if (typeof v === "string" && (RARITY_VALUES as readonly string[]).includes(v)) {
       next.rarity = v;
-    }
-  }
-  if ("formKind" in body) {
-    const v = body.formKind;
-    if (v === null) next.formKind = null;
-    else if (typeof v === "string" && (FORM_KIND_VALUES as readonly string[]).includes(v)) {
-      next.formKind = v;
     }
   }
   if ("candidateImages" in body) {

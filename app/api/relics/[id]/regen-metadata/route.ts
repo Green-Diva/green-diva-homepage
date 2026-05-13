@@ -7,7 +7,7 @@
 // the chosen values.
 //
 // Body: `{ feedback?: string }`
-// Returns: `{ titleZh, titleEn, subtitleZh, subtitleEn, icon, rarity, formKind }`
+// Returns: `{ titleZh, titleEn, subtitleZh, subtitleEn, icon, rarity }`
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -92,6 +92,5 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     subtitleEn: typeof out.subtitleEn === "string" ? out.subtitleEn : "",
     icon: typeof out.icon === "string" ? out.icon : "",
     rarity: typeof out.rarity === "string" ? out.rarity : "COMMON",
-    formKind: typeof out.formKind === "string" ? out.formKind : null,
   });
 }

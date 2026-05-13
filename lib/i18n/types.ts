@@ -302,8 +302,6 @@ export interface Dictionary {
     draftFailedAbandon: string;
     draftPreviewTitle: string;
     draftPreviewSubtitle: string;
-    draftPreviewFormKind: string;
-    draftPreviewFormReason: string;
     draftPreviewAbandon: string;
     draftPreviewSaveAndStore: string;
     draftPreviewStoring: string;

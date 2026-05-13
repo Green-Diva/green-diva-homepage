@@ -140,11 +140,6 @@ export async function POST(
           iconKey: typeof meta.iconKey === "string" ? meta.iconKey : null,
           loreEn: typeof meta.loreEn === "string" ? meta.loreEn : null,
           loreZh: typeof meta.loreZh === "string" ? meta.loreZh : null,
-          formKind:
-            meta.formKind === "TWO_D" || meta.formKind === "THREE_D"
-              ? meta.formKind
-              : null,
-          formReason: typeof meta.formReason === "string" ? meta.formReason : null,
           primaryImagePath: typeof newPrimary === "string" ? newPrimary : null,
           candidateImages:
             newCandidates === null || newCandidates === undefined

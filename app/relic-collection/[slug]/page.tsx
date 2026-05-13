@@ -337,7 +337,6 @@ export default async function RelicDetailPage({
                   hasPrimary={!!relic.primaryImagePath}
                   hasEnhanced={!!relic.enhancedImagePath}
                   hasModel={!!relic.modelPath}
-                  formKind={relic.formKind}
                   alt={name}
                   isAdmin={isAdmin}
                   t={t}

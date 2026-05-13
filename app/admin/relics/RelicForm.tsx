@@ -15,7 +15,6 @@ import { useT } from "@/lib/i18n/client";
 import CandidateImageGallery, {
   type CandidateImage,
 } from "./CandidateImageGallery";
-import RegenMetadataPreview from "./RegenMetadataPreview";
 import AssetCard from "./AssetCard";
 import MetaFields, { type MetaFieldsValue } from "./MetaFields";
 import LoreFields from "./LoreFields";
@@ -57,8 +56,6 @@ const EMPTY: FormState = {
     classifZh: "",
     rarity: "COMMON",
     iconKey: "",
-    formKind: null,
-    formReason: "",
   },
   loreEn: "",
   loreZh: "",
@@ -136,8 +133,6 @@ export default function RelicForm({
             classifZh: d.classifZh ?? "",
             rarity: d.rarity,
             iconKey: d.iconKey ?? "",
-            formKind: d.formKind ?? null,
-            formReason: d.formReason ?? "",
           },
           loreEn: d.loreEn ?? "",
           loreZh: d.loreZh ?? "",
@@ -170,8 +165,6 @@ export default function RelicForm({
             classifZh: d.classifZh ?? "",
             rarity: d.rarity,
             iconKey: d.iconKey ?? "",
-            formKind: d.formKind ?? null,
-            formReason: d.formReason ?? "",
           },
           loreEn: d.loreEn ?? "",
           loreZh: d.loreZh ?? "",
@@ -206,8 +199,6 @@ export default function RelicForm({
       classifZh: state.meta.classifZh.trim(),
       rarity: state.meta.rarity,
       iconKey: state.meta.iconKey || null,
-      formKind: state.meta.formKind,
-      formReason: state.meta.formReason || null,
       loreEn: state.loreEn || null,
       loreZh: state.loreZh || null,
       ...(state.candidateImages !== null ? { candidateImages: state.candidateImages } : {}),
@@ -272,6 +263,8 @@ export default function RelicForm({
             nameEn={state.meta.nameEn}
             classifZh={state.meta.classifZh}
             classifEn={state.meta.classifEn}
+            iconKey={state.meta.iconKey}
+            rarity={state.meta.rarity}
             isAdmin
             detailSlug={state.slug}
             onAssetUpdated={() => void refetchRelic()}
@@ -329,29 +322,10 @@ export default function RelicForm({
           t={t}
         />
 
-        {/* §5 候选图集 + §6 重新生成 — only meaningful when editing an existing
+        {/* §5 候选图集 — only meaningful when editing an existing
             relic that came through the AI pipeline */}
         {isEdit && initial && state.candidateImages !== null ? (
           <div className="space-y-3 border-t border-primary/10 pt-4">
-            <RegenMetadataPreview
-              relicId={initial.id}
-              onApply={(r) => {
-                setState((s) => ({
-                  ...s,
-                  meta: {
-                    ...s.meta,
-                    nameZh: r.titleZh || s.meta.nameZh,
-                    nameEn: r.titleEn || s.meta.nameEn,
-                    classifZh: r.subtitleZh || s.meta.classifZh,
-                    classifEn: r.subtitleEn || s.meta.classifEn,
-                    iconKey: r.icon || s.meta.iconKey,
-                    rarity: (RARITIES as readonly string[]).includes(r.rarity)
-                      ? (r.rarity as MetaFieldsValue["rarity"])
-                      : s.meta.rarity,
-                  },
-                }));
-              }}
-            />
             <CandidateImageGallery
               relicId={initial.id}
               candidates={state.candidateImages}
@@ -368,25 +342,28 @@ export default function RelicForm({
           </div>
         ) : null}
 
-        {/* §7 解锁密码 — folded */}
-        <details className="border border-primary/15 bg-surface-container/20">
-          <summary className="cursor-pointer px-3 py-2 font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant hover:text-primary select-none">
-            {isEdit && initial?.hasPassword
-              ? t.adminRelics.fPasswordKeep
-              : t.adminRelics.fPassword}
-          </summary>
-          <div className="p-3 border-t border-primary/10">
+        {/* §7 圣印密语 — only when rarity = SPECIAL.
+            New SPECIAL (no retained password) → required input.
+            Existing SPECIAL with passwordHash → optional (leave blank to keep). */}
+        {state.meta.rarity === "SPECIAL" ? (
+          <div className="border border-primary/15 bg-surface-container/20 p-3 space-y-2">
+            <label className="block font-label text-[10px] tracking-[0.25em] uppercase text-on-surface-variant">
+              {isEdit && initial?.hasPassword
+                ? t.adminRelics.fPasswordKeep
+                : t.adminRelics.fPassword}
+            </label>
             <input
               type="password"
               autoComplete="new-password"
               value={state.password}
               onChange={(e) => set("password", e.target.value)}
               disabled={pending}
+              required={!(isEdit && initial?.hasPassword)}
               className={inputClass}
-              placeholder={state.meta.rarity === "SPECIAL" ? "•••••••" : "—"}
+              placeholder="•••••••"
             />
           </div>
-        </details>
+        ) : null}
 
         {error ? (
           <p role="alert" className="font-label text-[11px] tracking-[0.2em] uppercase text-error">

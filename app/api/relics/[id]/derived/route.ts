@@ -17,7 +17,7 @@ import { pipelineDirsForSlug } from "@/lib/relics/pipeline/context";
 //                             or recursively-packed source/extracted/*)
 //   - derived/                everything in derived/ except old PACK_DERIVED
 //                             snapshots (cand-*, enhanced-*, model-*, …)
-//   - metadata.json           full relic snapshot (lore, formKind, candidates,
+//   - metadata.json           full relic snapshot (lore, candidates,
 //                             enhancedImagePath, modelPath, …) at request time
 export async function GET(
   _req: NextRequest,
@@ -71,8 +71,6 @@ export async function GET(
       classifZh: relic.classifZh,
       rarity: relic.rarity,
       iconKey: relic.iconKey,
-      formKind: relic.formKind,
-      formReason: relic.formReason,
       loreEn: relic.loreEn,
       loreZh: relic.loreZh,
       status: relic.status,

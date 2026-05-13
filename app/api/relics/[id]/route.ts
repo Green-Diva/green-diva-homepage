@@ -53,9 +53,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   // capture before-state for diff log
   const before = await prisma.relic.findUnique({
     where: { id },
-    select: { id: true, slug: true, nameEn: true, slot: true, rarity: true },
+    select: { id: true, slug: true, nameEn: true, slot: true, rarity: true, passwordHash: true },
   });
   if (!before) return NextResponse.json({ error: "not found" }, { status: 404 });
+  // Rarity transition: SPECIAL → non-SPECIAL clears any retained passwordHash;
+  // non-SPECIAL → SPECIAL without a fresh password is rejected (admin must
+  // supply a passphrase to lock the relic).
+  if ("rarity" in data && data.rarity && data.rarity !== before.rarity) {
+    if (data.rarity !== "SPECIAL" && before.rarity === "SPECIAL") {
+      update.passwordHash = null;
+    }
+    if (data.rarity === "SPECIAL" && before.rarity !== "SPECIAL" && !before.passwordHash && !("password" in data && data.password)) {
+      return NextResponse.json(
+        { error: "transitioning to SPECIAL requires a passphrase" },
+        { status: 400 },
+      );
+    }
+  }
   try {
     await prisma.relic.update({ where: { id }, data: update });
     // Determine which kind of edit this was for the audit log

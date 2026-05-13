@@ -87,7 +87,6 @@ const WRAP_RESEARCH_EXPRESSION = `{
     "subtitleEn": meta.subtitleEn,
     "icon": meta.icon,
     "rarity": meta.rarity,
-    "formKind": meta.formKind,
     "decisionReason": meta.decisionReason,
     "useUserImage": meta.useUserImage,
     "networkImageQuery": meta.networkImageQuery,

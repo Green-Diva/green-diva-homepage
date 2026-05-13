@@ -2,7 +2,7 @@
 
 // §2 命名与分类 — naming + classification block shared between
 // DraftPreviewBody (review modal) and RelicForm (admin edit modal).
-// Owns: nameEn/Zh, classifEn/Zh, rarity, iconKey, formKind, formReason.
+// Owns: nameEn/Zh, classifEn/Zh, rarity, iconKey.
 
 import type { Dictionary } from "@/lib/i18n/types";
 
@@ -16,8 +16,6 @@ export type MetaFieldsValue = {
   classifZh: string;
   rarity: Rarity;
   iconKey: string;
-  formKind: "TWO_D" | "THREE_D" | null;
-  formReason: string;
 };
 
 const inputClass =
@@ -96,42 +94,22 @@ export default function MetaFields({
         </select>
       </Field>
       <Field label={t.adminRelics.fIcon}>
-        <input
-          type="text"
-          value={value.iconKey}
-          onChange={(e) => set("iconKey", e.target.value)}
-          disabled={disabled}
-          placeholder="inventory_2"
-          className={inputClass}
-        />
-      </Field>
-      <Field label={t.relicCollection.draftPreviewFormKind}>
-        <select
-          value={value.formKind ?? ""}
-          onChange={(e) =>
-            set(
-              "formKind",
-              e.target.value === ""
-                ? null
-                : (e.target.value as "TWO_D" | "THREE_D"),
-            )
-          }
-          disabled={disabled}
-          className={inputClass}
-        >
-          <option value="">—</option>
-          <option value="TWO_D">2D</option>
-          <option value="THREE_D">3D</option>
-        </select>
-      </Field>
-      <Field label={t.relicCollection.draftPreviewFormReason}>
-        <input
-          type="text"
-          value={value.formReason}
-          onChange={(e) => set("formReason", e.target.value)}
-          disabled={disabled}
-          className={inputClass + " italic text-on-surface/70"}
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={value.iconKey}
+            onChange={(e) => set("iconKey", e.target.value)}
+            disabled={disabled}
+            placeholder="inventory_2"
+            className={inputClass + " pr-9"}
+          />
+          <span
+            className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-primary text-[20px] pointer-events-none"
+            style={{ fontVariationSettings: "'FILL' 0, 'wght' 200" }}
+          >
+            {value.iconKey || "inventory_2"}
+          </span>
+        </div>
       </Field>
     </div>
   );

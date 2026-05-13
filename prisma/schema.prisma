@@ -99,14 +99,6 @@ model Session {
   @@index([userId])
 }
 
-// Drives detail-page rendering. Set by the Form Classifier skill in the
-// relic scribe agent's DAG. Null = legacy / not yet classified — frontend
-// falls back to the old "show all photos" treatment.
-enum RelicFormKind {
-  TWO_D
-  THREE_D
-}
-
 enum Rarity {
   COMMON
   RARE
@@ -149,12 +141,6 @@ model Relic {
   // network images), with admin's per-item delete + primary toggle state.
   // See lib/skills/handlers/internal/smartImagePicker.ts for shape.
   candidateImages    Json?
-  // Recommended default tab on the detail page ("TWO_D" / "THREE_D").
-  // Set by Gemini Researcher; admin can override via direct edit.
-  formKind           RelicFormKind?
-  // Plain-language reason for the form classification, surfaced as italic
-  // text under the title on the detail page.
-  formReason         String?
   // The full DAG runLog from the most recent agent invocation, for the
   // admin trace viewer. Bounded by AgentJob limits upstream.
   pipelineTrace      Json?

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const RARITIES = ["COMMON", "RARE", "EPIC", "LEGENDARY", "SPECIAL"] as const;
-export const FORM_KINDS = ["TWO_D", "THREE_D"] as const;
 
 // Slug-scoped relative path inside private/relics (the /<slug>/... format
 // emitted by handlers). Resolved server-side via resolveRelicAsset() which
@@ -48,8 +47,6 @@ export const relicCreateSchema = z.object({
   primaryImagePath: slugScopedPath.optional().nullable(),
   enhancedImagePath: slugScopedPath.optional().nullable(),
   candidateImages: z.array(candidateImageSchema).max(40).optional().nullable(),
-  formKind: z.enum(FORM_KINDS).optional().nullable(),
-  formReason: z.string().max(500).optional().nullable(),
   // Status transitions: AWAITING_REVIEW → READY happens via the dedicated
   // /confirm endpoint, but admin can manually flip via PATCH too (e.g. to
   // re-park a relic to PARTIAL after a botched edit).
