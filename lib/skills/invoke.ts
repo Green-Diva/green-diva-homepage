@@ -92,6 +92,11 @@ export async function invokeSkill(
     // (HTTP_API polling). Backbone skill executor wires this from
     // ExecutorCtx.onSkillProgress. Optional — most callers don't supply.
     onProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
+    // Resume-checkpoint plumbing for HTTP_API submit-then-poll skills.
+    // Backbone skill executor only supplies these for the matching stepId
+    // — see executors/skill.ts.
+    onSubmitted?: (initialResponse: unknown) => void | Promise<void>;
+    resumeInitialResponse?: unknown;
   },
 ): Promise<InvokeResult> {
   const inputErrs = validate(skill.inputSchema, input);
@@ -116,7 +121,12 @@ export async function invokeSkill(
   let output: unknown;
   try {
     const cfg = (skill.handlerConfig ?? {}) as Record<string, unknown>;
-    output = await handler(input, cfg, { skillId: skill.id, onProgress: opts?.onProgress });
+    output = await handler(input, cfg, {
+      skillId: skill.id,
+      onProgress: opts?.onProgress,
+      onSubmitted: opts?.onSubmitted,
+      resumeInitialResponse: opts?.resumeInitialResponse,
+    });
   } catch (e) {
     if (e instanceof HandlerError) {
       logError("skill:invoke", e.code, `${skill.id} (${skill.kind}): ${e.message}`);

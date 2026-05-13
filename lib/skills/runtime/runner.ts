@@ -41,6 +41,42 @@ function jsonOrNull(v: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull 
   return v === undefined || v === null ? Prisma.JsonNull : (v as Prisma.InputJsonValue);
 }
 
+// Resume-checkpoint TTL. Meshy keeps async tasks ~24h server-side; capping at
+// 6h leaves headroom and avoids burning poll budget on a taskId that has
+// almost certainly been GC'd. Older checkpoints are dropped on read and the
+// resumed run does a fresh submit instead.
+const RESUME_TTL_MS = 6 * 60 * 60 * 1000;
+
+type ResumeCheckpoint = {
+  stepId: string;
+  skillId: string;
+  skillSlug: string;
+  initialResponse: unknown;
+  createdAt: string;
+};
+
+function readResumeCheckpoint(raw: unknown): ResumeCheckpoint | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const cp = raw as Record<string, unknown>;
+  if (
+    typeof cp.stepId !== "string" ||
+    typeof cp.skillId !== "string" ||
+    typeof cp.skillSlug !== "string" ||
+    typeof cp.createdAt !== "string"
+  ) {
+    return null;
+  }
+  const ageMs = Date.now() - new Date(cp.createdAt).getTime();
+  if (!Number.isFinite(ageMs) || ageMs > RESUME_TTL_MS) return null;
+  return {
+    stepId: cp.stepId,
+    skillId: cp.skillId,
+    skillSlug: cp.skillSlug,
+    initialResponse: cp.initialResponse,
+    createdAt: cp.createdAt,
+  };
+}
+
 export async function runAgentJob(jobId: string): Promise<void> {
   try {
     const job = await prisma.agentJob.findUnique({
@@ -56,6 +92,15 @@ export async function runAgentJob(jobId: string): Promise<void> {
       return;
     }
 
+    // Read persisted resume checkpoint before bumping status — the skill
+    // executor will skip the matching POST and jump straight into polling.
+    // Expired / malformed checkpoints are dropped here; the run falls back
+    // to a fresh submit.
+    const checkpoint = readResumeCheckpoint(job.resumeCheckpoint);
+    const resumeBySkillStepId = checkpoint
+      ? new Map<string, unknown>([[checkpoint.stepId, checkpoint.initialResponse]])
+      : undefined;
+
     await prisma.agentJob.update({
       where: { id: jobId },
       data: {
@@ -68,6 +113,35 @@ export async function runAgentJob(jobId: string): Promise<void> {
         progressLabel: null,
       },
     });
+
+    // Submit-checkpoint: HTTP_API submit-then-poll skills (e.g. Meshy) fire
+    // this after POST returns but before polling completes. We persist the
+    // initialResponse (carries the taskId) so a crashed / killed process can
+    // be resumed by `server-init.ts` without re-submitting. Best-effort —
+    // checkpoint write failures are swallowed; worst case is a duplicate
+    // submit on recovery, which is identical to the pre-checkpoint behavior.
+    const onSkillSubmitted = async (info: {
+      stepId: string;
+      skillId: string;
+      skillSlug: string;
+      initialResponse: unknown;
+    }) => {
+      try {
+        const cp: ResumeCheckpoint = {
+          stepId: info.stepId,
+          skillId: info.skillId,
+          skillSlug: info.skillSlug,
+          initialResponse: info.initialResponse,
+          createdAt: new Date().toISOString(),
+        };
+        await prisma.agentJob.update({
+          where: { id: jobId },
+          data: { resumeCheckpoint: cp as unknown as Prisma.InputJsonValue },
+        });
+      } catch (e) {
+        console.warn(`[agent-job:run] ${jobId} checkpoint write failed (swallowed):`, e);
+      }
+    };
 
     // Intra-step progress: HTTP_API polling fires this per poll iteration.
     // Best-effort persist to AgentJob so the frontend's /asset-job poll
@@ -94,6 +168,8 @@ export async function runAgentJob(jobId: string): Promise<void> {
         mode: job.mode,
         input: job.input,
         onSkillProgress,
+        onSkillSubmitted,
+        resumeBySkillStepId,
       });
     } catch (e) {
       // Catastrophic — dispatcher itself threw (invalid mode, prisma down).
@@ -107,6 +183,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
           errorCode: AgentErrorCode.AGENT_RUNTIME_ERROR,
           errorMessage: message.slice(0, 1000),
           finishedAt: new Date(),
+          resumeCheckpoint: Prisma.JsonNull,
         },
       });
       return;
@@ -138,6 +215,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
                 output: jsonOrNull(result.output),
                 runLog: result.runLog as unknown as Prisma.InputJsonValue,
                 finishedAt: new Date(),
+                resumeCheckpoint: Prisma.JsonNull,
               },
             });
             try {
@@ -163,6 +241,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
           output: jsonOrNull(result.output),
           runLog: result.runLog as unknown as Prisma.InputJsonValue,
           finishedAt: new Date(),
+          resumeCheckpoint: Prisma.JsonNull,
         },
       });
       // Data-driven writeback to Relic — agent leaf output's
@@ -219,6 +298,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
         errorMessage: message.slice(0, 1000),
         runLog: result.runLog as unknown as Prisma.InputJsonValue,
         finishedAt: new Date(),
+        resumeCheckpoint: Prisma.JsonNull,
       },
     });
     try {
@@ -237,6 +317,7 @@ export async function runAgentJob(jobId: string): Promise<void> {
           errorCode: AgentErrorCode.RUNNER_CRASH,
           errorMessage: e instanceof Error ? e.message.slice(0, 500) : "runner crashed",
           finishedAt: new Date(),
+          resumeCheckpoint: Prisma.JsonNull,
         },
       });
     } catch {

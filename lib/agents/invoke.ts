@@ -82,6 +82,20 @@ export async function executeAgent(opts: {
   // spinner. AUTONOMOUS path doesn't wire this yet — orchestrator's
   // invokeSkill call site would need the same opts.onProgress threading.
   onSkillProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
+  // Resume-checkpoint plumbing (MECHANICAL only). `onSkillSubmitted` fires
+  // after a submit-then-poll skill's POST half completes so the runner can
+  // persist taskId-bearing initialResponse; `resumeBySkillStepId` lets the
+  // runner replay a previously persisted submit on crash recovery (skill
+  // executor matches by prefixed stepId, skips POST, jumps into polling).
+  // AUTONOMOUS path doesn't carry checkpoints — orchestrator's tool-use
+  // loop doesn't have a stable per-step identity to key against.
+  onSkillSubmitted?: (info: {
+    stepId: string;
+    skillId: string;
+    skillSlug: string;
+    initialResponse: unknown;
+  }) => void | Promise<void>;
+  resumeBySkillStepId?: Map<string, unknown>;
 }): Promise<AgentRunResult> {
   if (opts.mode === "MECHANICAL") {
     return runBackbone({
@@ -90,6 +104,8 @@ export async function executeAgent(opts: {
       pipelineConfig: opts.pipelineConfigOverride ?? opts.agent.pipelineConfig,
       onProgress: opts.onProgress,
       onSkillProgress: opts.onSkillProgress,
+      onSkillSubmitted: opts.onSkillSubmitted,
+      resumeBySkillStepId: opts.resumeBySkillStepId,
     });
   }
   if (opts.mode === "AUTONOMOUS") {

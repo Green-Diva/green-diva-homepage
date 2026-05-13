@@ -56,6 +56,16 @@ export async function runBackbone(opts: {
   // between DAG nodes. Threaded through ExecutorCtx → invokeSkill →
   // HandlerContext.onProgress.
   onSkillProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
+  // Resume-checkpoint plumbing — only meaningful at top-level invocation.
+  // `onSkillSubmitted` fires after a submit-then-poll skill completes its
+  // POST half (before the polling blocks), letting the runner persist the
+  // initialResponse. `resumeBySkillStepId` is the inverse: a stepId → seed
+  // map the runner builds from the persisted checkpoint, used by the skill
+  // executor to skip the POST on recovery. Loop / forEach bodies don't
+  // propagate either — multi-iteration semantics make stepId mapping
+  // ambiguous and resume support is intentionally scoped to top-level.
+  onSkillSubmitted?: ExecutorCtx["onSkillSubmitted"];
+  resumeBySkillStepId?: Map<string, unknown>;
   // INTERNAL — recursive sub-DAG invocations from loop / forEach set these.
   // _internalEquips: skip the DB equip lookup (parent already has it).
   // _depth: track nesting for MAX_LOOP_DEPTH enforcement.
@@ -140,6 +150,11 @@ export async function runBackbone(opts: {
     stepIdPrefix,
     onProgress: opts.onProgress,
     onSkillProgress: opts.onSkillProgress,
+    // Only top-level invocations carry the checkpoint hooks. Sub-DAG
+    // recursion (runSubDag below) deliberately drops them so body skills
+    // can't checkpoint or resume.
+    onSkillSubmitted: stepIdPrefix === "" ? opts.onSkillSubmitted : undefined,
+    resumeBySkillStepId: stepIdPrefix === "" ? opts.resumeBySkillStepId : undefined,
     resolveRef,
     runLog,
     emitProgress,

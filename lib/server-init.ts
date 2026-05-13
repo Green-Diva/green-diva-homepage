@@ -1,5 +1,5 @@
 import "server-only";
-import type { RelicJobStep } from "@prisma/client";
+import { Prisma, type RelicJobStep } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { runRelicPipeline } from "@/lib/relics/pipeline";
 import { runDraftPipeline } from "@/lib/relics/pipeline/draft/runner";
@@ -100,21 +100,54 @@ async function recoverRelicDrafts(): Promise<void> {
 }
 
 async function recoverAgentJobs(): Promise<void> {
-  const cutoff = new Date(Date.now() - STALE_MS);
-  const stale = await prisma.agentJob.findMany({
-    where: { status: "RUNNING", updatedAt: { lt: cutoff } },
+  // Two-track recovery:
+  //
+  //   (a) Jobs carrying a resumeCheckpoint — recover IMMEDIATELY regardless
+  //       of staleness. The checkpoint says "submit succeeded, polling was
+  //       in flight when the process died". A fresh process can re-run the
+  //       DAG; the matching skill node skips its POST and continues polling
+  //       the persisted taskId, so we recover Meshy / similar async tasks
+  //       without burning another submit. Checkpoint TTL is enforced inside
+  //       the runner (6h) — older checkpoints fall back to a fresh submit.
+  //
+  //   (b) Jobs without a checkpoint — keep the original 10min stale
+  //       threshold. These are either pre-submit failures, non-polling
+  //       skills, or older runs predating the checkpoint feature; the
+  //       conservative threshold avoids stomping on jobs that the previous
+  //       process might still be working on.
+  const checkpointed = await prisma.agentJob.findMany({
+    where: { status: "RUNNING", resumeCheckpoint: { not: Prisma.JsonNull } },
     select: { id: true },
   });
-  if (stale.length === 0) return;
+  const cutoff = new Date(Date.now() - STALE_MS);
+  const stale = await prisma.agentJob.findMany({
+    where: {
+      status: "RUNNING",
+      updatedAt: { lt: cutoff },
+      resumeCheckpoint: { equals: Prisma.JsonNull },
+    },
+    select: { id: true },
+  });
 
-  console.warn(
-    `[server-init] resuming ${stale.length} stale RUNNING agent job(s) older than ${STALE_MS / 1000}s`,
-  );
+  const all = [...checkpointed, ...stale];
+  if (all.length === 0) return;
+
+  if (checkpointed.length > 0) {
+    console.warn(
+      `[server-init] resuming ${checkpointed.length} checkpointed agent job(s) (skipping stale threshold)`,
+    );
+  }
+  if (stale.length > 0) {
+    console.warn(
+      `[server-init] resuming ${stale.length} stale RUNNING agent job(s) older than ${STALE_MS / 1000}s`,
+    );
+  }
+
   await prisma.agentJob.updateMany({
-    where: { id: { in: stale.map((j) => j.id) } },
+    where: { id: { in: all.map((j) => j.id) } },
     data: { status: "PENDING", errorMessage: "auto-resumed after server restart" },
   });
-  for (const job of stale) {
+  for (const job of all) {
     void runAgentJob(job.id).catch((e) => {
       console.error(`[server-init] resumed agent-job crashed for ${job.id}`, e);
     });

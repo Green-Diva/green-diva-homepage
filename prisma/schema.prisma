@@ -452,6 +452,15 @@ model AgentJob {
   // both verbatim. Both nullable: most skills never emit. Cleared on retry.
   progressPercent Int?
   progressLabel   String?
+  // Resume checkpoint for async polling skills (currently HTTP_API with
+  // polling block, e.g. Meshy submit). Populated by runner after the skill's
+  // POST returns but before polling completes; cleared on terminal status.
+  // Shape: { stepId, skillSlug, initialResponse, createdAt }. On crash /
+  // server restart, server-init re-queues these immediately (skip the 10min
+  // stale threshold) and the skill handler skips the POST in favour of
+  // continuing the original poll. TTL 6h; older checkpoints fall back to
+  // a fresh submit. See lib/skills/runtime/runner.ts.
+  resumeCheckpoint Json?
   attempts     Int             @default(0)
   maxAttempts  Int             @default(3)
   startedAt    DateTime?

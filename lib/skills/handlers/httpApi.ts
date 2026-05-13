@@ -543,16 +543,37 @@ export const httpApi: SkillHandler = async (input, config, ctx) => {
   const binaryMaxBytes =
     typeof config.binaryMaxBytes === "number" ? config.binaryMaxBytes : undefined;
 
-  // Initial request.
-  const initialResponse = await fetchOnce({
-    url: resolvedUrl,
-    method,
-    headers,
-    body,
-    timeoutMs,
-    responseType,
-    binaryMaxBytes,
-  });
+  // Initial request — unless we're resuming a previously persisted submit.
+  // resumeInitialResponse is only meaningful for submit-then-poll skills
+  // (those with a `polling` block). If supplied without polling, the
+  // handler returns it as-is (which is what a fresh POST would do anyway),
+  // so passing it for a non-polling skill is a safe no-op.
+  const isResuming =
+    ctx?.resumeInitialResponse !== undefined && ctx?.resumeInitialResponse !== null;
+  const initialResponse = isResuming
+    ? ctx!.resumeInitialResponse
+    : await fetchOnce({
+        url: resolvedUrl,
+        method,
+        headers,
+        body,
+        timeoutMs,
+        responseType,
+        binaryMaxBytes,
+      });
+
+  // Submit-checkpoint emit: fires once after a fresh POST succeeds and
+  // before the polling loop blocks. Lets the runner persist taskId-bearing
+  // response so a crash mid-poll can resume without resubmitting. Skipped
+  // on resume (already persisted) and on non-polling skills (nothing to
+  // resume into). Errors swallowed — telemetry must never break a run.
+  if (!isResuming && isObject(config.polling) && ctx?.onSubmitted) {
+    try {
+      await ctx.onSubmitted(initialResponse);
+    } catch (e) {
+      console.warn("[httpApi] onSubmitted threw, swallowing", e);
+    }
+  }
 
   // Polling (no-op if not configured). Binary + polling combo was
   // rejected at the boundary above, so responseType narrows to text/json

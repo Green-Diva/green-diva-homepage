@@ -18,6 +18,15 @@ export type HandlerContext = {
   // so it lands on AgentJob.progressPercent / progressLabel for the
   // frontend to render mid-run. Skills that don't emit (most) cost nothing.
   onProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
+  // Resume support for async-task skills. When the handler completes the
+  // submit half of a submit-then-poll flow (currently HTTP_API with `polling`),
+  // it calls `onSubmitted(initialResponse)` so the caller can persist a
+  // resume checkpoint. On a subsequent retry/recovery, the caller supplies
+  // `resumeInitialResponse` — the handler skips the POST and proceeds
+  // straight into the polling loop using this as the seed response.
+  // Both are best-effort; handlers without a submit-then-poll shape ignore them.
+  onSubmitted?: (initialResponse: unknown) => void | Promise<void>;
+  resumeInitialResponse?: unknown;
   // Future: agentId / jobId / runId / abortSignal
 };
 

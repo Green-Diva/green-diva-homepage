@@ -140,6 +140,20 @@ export type ExecutorCtx = {
   // executor. Separate from `onProgress` above which fires between DAG
   // nodes — this one fires inside a single node.
   onSkillProgress?: (snap: { percent?: number; label?: string }) => void | Promise<void>;
+  // Resume checkpoint plumbing — only relevant for top-level skill nodes
+  // performing submit-then-poll (HTTP_API with `polling`). The skill
+  // executor calls `onSkillSubmitted` after the POST half completes so
+  // the runner can persist a resume marker, and reads back the persisted
+  // `resumeBySkillStepId` map keyed by the prefixed stepId to skip the
+  // POST on recovery. Loop / forEach body skills don't participate
+  // (multi-iteration semantics make checkpointing ambiguous).
+  onSkillSubmitted?: (info: {
+    stepId: string;
+    skillId: string;
+    skillSlug: string;
+    initialResponse: unknown;
+  }) => void | Promise<void>;
+  resumeBySkillStepId?: Map<string, unknown>;
   resolveRef: (ref: SourceRef) => unknown;
   runLog: AgentRunLogEntry[];
   emitProgress: () => Promise<void>;

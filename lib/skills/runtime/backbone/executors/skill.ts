@@ -51,8 +51,27 @@ export async function executeSkillNode(
   const stepInput = ctx.resolveRef(node.inputFrom);
   const startedAt = new Date();
   const startMs = Date.now();
+  // Resume support — only top-level skill nodes participate. ctx is shared
+  // across loop / forEach body invocations but resumeBySkillStepId is only
+  // populated for top-level stepIds (runner builds the map from the
+  // persisted resumeCheckpoint), so body skills naturally skip this path.
+  const prefixedStepId = ctx.stepIdPrefix + node.id;
+  const resumeInitialResponse = ctx.resumeBySkillStepId?.get(prefixedStepId);
+  const skillSlug = equip.skill.slug ?? equip.skill.id;
+  const skillId = equip.skill.id;
   const invokeResult = await invokeSkill(equip.skill, stepInput, {
     onProgress: ctx.onSkillProgress,
+    onSubmitted: ctx.onSkillSubmitted
+      ? async (initialResponse) => {
+          await ctx.onSkillSubmitted!({
+            stepId: prefixedStepId,
+            skillId,
+            skillSlug,
+            initialResponse,
+          });
+        }
+      : undefined,
+    resumeInitialResponse,
   });
   const endedAt = new Date();
 
