@@ -41,7 +41,7 @@ export default async function Home() {
     { label: t.nav.vigils, href: "/vigils" },
   ];
   return (
-    <div className="flex flex-col flex-1 w-full">
+    <div className="flex flex-col flex-1 w-full md:min-h-0">
       {/* TopAppBar */}
       <header className="w-full z-50 flex justify-between items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
@@ -81,7 +81,7 @@ export default async function Home() {
 
       <main className="flex-1 flex flex-col md:flex-row max-w-[1440px] w-full mx-auto md:min-h-0 md:overflow-hidden">
         {/* Left Side: Hero Information */}
-        <section className="w-full md:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-4 lg:grid lg:grid-rows-3 relative">
+        <section className="w-full md:w-[58%] px-5 py-6 md:px-10 md:py-5 flex flex-col gap-4 md:grid md:grid-rows-3 md:gap-4 relative md:min-h-0">
           {/* Sacred Divider — gradient line + center diamond glyph */}
           <div
             aria-hidden
@@ -95,7 +95,7 @@ export default async function Home() {
             <span className="block w-2 h-2 rotate-45 border border-primary/70 bg-background"></span>
           </div>
 
-          <div className="lg:row-span-2 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch w-full min-h-0">
+          <div className="md:row-span-2 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch w-full min-h-0">
             <div className="lg:col-span-7 space-y-6 max-w-[52ch] xl:max-w-[60ch]">
               <div className="space-y-3">
                 <span className="font-label text-secondary tracking-[0.3em] text-[11px] uppercase block">
@@ -162,7 +162,7 @@ export default async function Home() {
           </div>
 
           {/* Oracle loop videos — bottom row of left grid; transparent blend with background */}
-          <div className="lg:row-span-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-stretch">
+          <div className="md:row-span-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
             {[
               { src: "/videos/oracle-loop.mp4?v=2", label: t.oracleVideos.beginOffering, href: "/sacrifice" },
               { src: "/videos/oracle-shrine.mp4", label: t.oracleVideos.enterTemple, href: "/sanctuary" },

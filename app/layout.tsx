@@ -22,7 +22,7 @@ export default async function RootLayout({
   const dict = await getDictionary();
   return (
     <html lang={locale} className="dark">
-      <body className="font-body selection:bg-primary/30 selection:text-primary min-h-screen flex flex-col relative">
+      <body className="font-body selection:bg-primary/30 selection:text-primary min-h-screen md:h-screen md:overflow-hidden flex flex-col relative">
         {/* Global atmospheric backdrop */}
         <div
           aria-hidden
@@ -43,7 +43,7 @@ export default async function RootLayout({
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
         </div>
         <I18nProvider locale={locale} dict={dict}>
-          <div className="flex-1 flex flex-col w-full">{children}</div>
+          <div className="flex-1 flex flex-col w-full md:min-h-0">{children}</div>
           <SiteFooter />
         </I18nProvider>
       </body>
