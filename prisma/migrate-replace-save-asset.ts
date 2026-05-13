@@ -35,6 +35,23 @@ function isObject(v: unknown): v is RawNode {
  * of slot indices that were equipped with a retired skill row on this agent.
  * This avoids relying on the skill's slug surviving in the JSON.
  */
+// Persist primitive expects merge keys { relicSlug, kind, base64, contentType,
+// ext? }. The retired save-asset-relic skill's bodyTemplate read base64 from
+// `{{downloadBase64}}` / contentType from `{{downloadContentType}}` because
+// cutout / meshy skills emit those names. Rename when converting so persist
+// validation doesn't throw "base64: Required".
+function remapMergeKeys(inputFrom: unknown): unknown {
+  if (!isObject(inputFrom)) return inputFrom;
+  if (!isObject(inputFrom.merge)) return inputFrom;
+  const renamed: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(inputFrom.merge)) {
+    if (k === "downloadBase64") renamed.base64 = v;
+    else if (k === "downloadContentType") renamed.contentType = v;
+    else renamed[k] = v;
+  }
+  return { ...inputFrom, merge: renamed };
+}
+
 function rewriteNodes(nodes: unknown, slotsToReplace: Set<number>): { changed: boolean; nodes: unknown } {
   if (!Array.isArray(nodes)) return { changed: false, nodes };
   let changed = false;
@@ -42,11 +59,11 @@ function rewriteNodes(nodes: unknown, slotsToReplace: Set<number>): { changed: b
     if (!isObject(raw)) return raw;
     if (raw.type === "skill" && typeof raw.slotIndex === "number" && slotsToReplace.has(raw.slotIndex)) {
       changed = true;
-      // Replace: keep id / inputFrom / position; drop slotIndex; set type.
+      // Replace: keep id / position; drop slotIndex; set type; remap merge keys.
       const next: RawNode = {
         id: raw.id,
         type: "persist",
-        inputFrom: raw.inputFrom,
+        inputFrom: remapMergeKeys(raw.inputFrom),
       };
       if (isObject(raw.position)) next.position = raw.position;
       return next;
