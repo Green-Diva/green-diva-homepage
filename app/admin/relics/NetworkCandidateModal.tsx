@@ -166,9 +166,15 @@ export default function NetworkCandidateModal({
       // Bump phase label after a tick — UX cue that "scoring" is happening
       // even though it's all part of one server call.
       const phaseTimer = setTimeout(() => setSearchPhase("scoring"), 4000);
+      // Send the form's *current* primary (may differ from DB if admin
+      // re-picked primary in the draft without saving). Server validates it
+      // against the relic's candidateImages whitelist.
       const res = await fetch(`/api/relics/${relicId}/lens-search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          primaryImagePath ? { primaryImagePath } : {},
+        ),
       });
       clearTimeout(phaseTimer);
       if (!res.ok) {

@@ -50,7 +50,7 @@ function rateLimited(relicId: string): { limited: boolean; retryAfterSec: number
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(_req: NextRequest, ctx: Ctx) {
+export async function POST(req: NextRequest, ctx: Ctx) {
   let me;
   try {
     me = await requireAdmin();
@@ -62,10 +62,42 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params;
   const relic = await prisma.relic.findUnique({
     where: { id },
-    select: { id: true, slug: true, primaryImagePath: true },
+    select: { id: true, slug: true, primaryImagePath: true, candidateImages: true },
   });
   if (!relic) return respondError(AgentErrorCode.NOT_FOUND, "relic not found", 404);
-  if (!relic.primaryImagePath) {
+
+  // Optional body { primaryImagePath } — admin may have re-picked primary in
+  // the draft form without saving. Whitelist against candidateImages so we
+  // never let a caller point us at arbitrary slug-scoped paths.
+  let overridePath: string | undefined;
+  try {
+    const body = (await req.json().catch(() => ({}))) as { primaryImagePath?: unknown };
+    if (typeof body.primaryImagePath === "string" && body.primaryImagePath.length > 0) {
+      overridePath = body.primaryImagePath;
+    }
+  } catch {
+    // ignore — empty body is fine
+  }
+
+  let effectivePath = relic.primaryImagePath;
+  if (overridePath && overridePath !== relic.primaryImagePath) {
+    const candidates = Array.isArray(relic.candidateImages)
+      ? (relic.candidateImages as Array<{ path?: unknown; deleted?: unknown }>)
+      : [];
+    const allowed = candidates.some(
+      (c) => typeof c?.path === "string" && c.path === overridePath && c.deleted !== true,
+    );
+    if (!allowed) {
+      return respondError(
+        AgentErrorCode.VALIDATION_FAILED,
+        "primaryImagePath override not found in relic candidateImages",
+        400,
+      );
+    }
+    effectivePath = overridePath;
+  }
+
+  if (!effectivePath) {
     return respondError(
       AgentErrorCode.VALIDATION_FAILED,
       "relic has no primaryImagePath — pick a primary image first",
@@ -84,7 +116,7 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
     return res;
   }
 
-  const abs = resolveRelicAsset(relic.primaryImagePath);
+  const abs = resolveRelicAsset(effectivePath);
   if (!abs) {
     return respondError(
       AgentErrorCode.PATH_TRAVERSAL_BLOCKED,
