@@ -51,8 +51,6 @@ export async function POST(req: NextRequest) {
           mode: data.mode ?? "MECHANICAL",
           status: data.status ?? "STANDBY",
           avatarUrl: data.avatarUrl,
-          descriptionEn: data.descriptionEn ?? null,
-          descriptionZh: data.descriptionZh ?? null,
           syncLevel: data.syncLevel ?? 0,
           matrixLevel: data.matrixLevel ?? 1,
           chaosLevel: data.chaosLevel ?? 0,

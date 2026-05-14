@@ -122,6 +122,7 @@ function SceneClaimList({
   sceneBindings,
   selected,
   currentAgentId,
+  agentCapabilities,
   isMech,
   onChange,
 }: {
@@ -129,9 +130,11 @@ function SceneClaimList({
   sceneBindings: SceneBindingRow[];
   selected: string[];
   currentAgentId: string | null;
+  agentCapabilities: string[];
   isMech: boolean;
   onChange: (next: string[]) => void;
 }) {
+  const t = useT();
   const ownerBySceneKey = useMemo(() => {
     const m = new Map<string, { agentId: string; codename: string | null }>();
     for (const b of sceneBindings) {
@@ -139,6 +142,22 @@ function SceneClaimList({
     }
     return m;
   }, [sceneBindings]);
+
+  // Mirror SceneBindingEditor's `agentSatisfies`: a scene is bindable iff
+  // its requiredCapabilities ⊆ this agent's capabilities. Stale selected
+  // entries (claimed before the agent lost a tag) stay visible so admin
+  // can uncheck and remove them — same pattern as SceneBindingEditor's
+  // selectableAgents.
+  const visibleScenes = useMemo(() => {
+    const have = new Set(agentCapabilities);
+    const selectedSet = new Set(selected);
+    return sceneDefs.filter((s) => {
+      const eligible =
+        s.requiredCapabilities.length === 0 ||
+        s.requiredCapabilities.every((c) => have.has(c));
+      return eligible || selectedSet.has(s.key);
+    });
+  }, [sceneDefs, agentCapabilities, selected]);
 
   function toggle(key: string) {
     if (selected.includes(key)) onChange(selected.filter((k) => k !== key));
@@ -157,9 +176,17 @@ function SceneClaimList({
     );
   }
 
+  if (visibleScenes.length === 0) {
+    return (
+      <p className="mt-1 text-xs text-on-surface-variant/70">
+        {t.agentControl.sceneClaimNoMatch}
+      </p>
+    );
+  }
+
   return (
     <div className={`mt-1 rounded-md border ${accentBorder} bg-surface-container/40 divide-y divide-outline-variant/20`}>
-      {sceneDefs.map((s) => {
+      {visibleScenes.map((s) => {
         const isOn = selected.includes(s.key);
         const owner = ownerBySceneKey.get(s.key);
         const ownedByOther = owner && owner.agentId !== currentAgentId;
@@ -199,6 +226,17 @@ function SceneClaimList({
 }
 
 function blankFromInitial(initial: AgentRow | null) {
+  // Seed intentSceneKeys with the union of explicit intent claims AND
+  // sceneKeys this agent already has live SceneBinding rows for. This
+  // makes "already bound" scenes appear pre-checked in the editor —
+  // otherwise legacy agents (binding seeded by migration, intent never
+  // set) show the "当前已绑定到本 agent" tag with an empty checkbox.
+  const boundKeys = (initial?.boundScenes ?? [])
+    .filter((s) => s.via === "binding")
+    .map((s) => s.sceneKey);
+  const intentSeed = Array.from(
+    new Set([...(initial?.intentSceneKeys ?? []), ...boundKeys]),
+  );
   return {
     codename: initial?.codename ?? "",
     codenameZh: initial?.codenameZh ?? "",
@@ -209,9 +247,7 @@ function blankFromInitial(initial: AgentRow | null) {
     mode: (initial?.mode ?? "AUTONOMOUS") as AgentMode,
     status: (initial?.status ?? "STANDBY") as AgentStatus,
     avatarUrl: initial?.avatarUrl ?? "",
-    descriptionEn: initial?.descriptionEn ?? "",
-    descriptionZh: initial?.descriptionZh ?? "",
-    intentSceneKeys: initial?.intentSceneKeys ?? [],
+    intentSceneKeys: intentSeed,
   };
 }
 
@@ -247,7 +283,6 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
     ? "mt-1 w-full rounded-md border border-secondary/20 bg-surface-container text-sm text-on-surface focus:border-secondary/60 focus:outline-none transition-colors"
     : "mt-1 w-full rounded-md border border-primary/20 bg-surface-container text-sm text-on-surface focus:border-primary/60 focus:outline-none transition-colors";
   const inputCls = `${inputBase} h-10 px-3.5`;
-  const textareaCls = `${inputBase} min-h-[96px] px-3.5 py-2.5 leading-relaxed`;
   const labelCls = isMech
     ? "text-[11px] font-label uppercase tracking-[0.25em] text-secondary/70"
     : "text-[11px] font-label uppercase tracking-[0.25em] text-primary/60";
@@ -325,8 +360,6 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
       mode: values.mode,
       status: values.status,
       avatarUrl: values.avatarUrl.trim(),
-      descriptionEn: values.descriptionEn.trim() || null,
-      descriptionZh: values.descriptionZh.trim() || null,
       intentSceneKeys: values.intentSceneKeys,
     };
     if (mode === "create" && !body.codename) {
@@ -355,10 +388,30 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
   async function onDelete() {
     if (!initial) return;
     if (!confirm(format(t.agentControl.confirmRemove, { name: initial.codename }))) return;
-    const r = await fetch(`/api/agents/${initial.id}`, { method: "DELETE" });
+    // First attempt: no cascade. If the agent is bound to scenes the
+    // endpoint returns 409 + sceneKeys[] in the body, and we surface a
+    // second confirm listing the affected scenes before retrying with
+    // ?cascade=1 (atomic unbind + delete in one transaction).
+    let r = await fetch(`/api/agents/${initial.id}`, { method: "DELETE" });
+    if (r.status === 409) {
+      const j: { sceneKeys?: string[]; errorMessage?: string; error?: string } =
+        await r.json().catch(() => ({}));
+      if (Array.isArray(j.sceneKeys) && j.sceneKeys.length > 0) {
+        const confirmMsg = format(t.agentControl.confirmCascadeDelete, {
+          name: initial.codename,
+          n: String(j.sceneKeys.length),
+          scenes: j.sceneKeys.join("\n  • "),
+        });
+        if (!confirm(confirmMsg)) return;
+        r = await fetch(`/api/agents/${initial.id}?cascade=1`, { method: "DELETE" });
+      } else {
+        alert(`${t.agentControl.deleteFailed}: ${j.errorMessage ?? j.error ?? r.statusText}`);
+        return;
+      }
+    }
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      alert(`${t.agentControl.deleteFailed}: ${j.error ?? r.statusText}`);
+      alert(`${t.agentControl.deleteFailed}: ${j.errorMessage ?? j.error ?? r.statusText}`);
       return;
     }
     onSaved();
@@ -507,16 +560,6 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
               <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required />
             </label>
 
-            {/* Descriptions stack inside right column: EN on top, ZH below */}
-            <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.agentControl.fieldDescriptionEn}</span>
-              <textarea className={textareaCls} value={values.descriptionEn} onChange={(e) => update("descriptionEn", e.target.value)} maxLength={4000} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className={labelCls}>{t.agentControl.fieldDescriptionZh}</span>
-              <textarea className={textareaCls} value={values.descriptionZh} onChange={(e) => update("descriptionZh", e.target.value)} maxLength={4000} />
-            </label>
-
             {/* Scene-claim multi-select: drives BackboneFlowEditor's contract
                 hints during drafting, and is converted into real SceneBinding
                 rows at deploy time (with takeover from previous owners). */}
@@ -527,6 +570,7 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
                 sceneBindings={sceneBindings}
                 selected={values.intentSceneKeys}
                 currentAgentId={initial?.id ?? null}
+                agentCapabilities={initial?.capabilities ?? []}
                 isMech={isMech}
                 onChange={(next) => update("intentSceneKeys", next)}
               />

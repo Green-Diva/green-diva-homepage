@@ -1,21 +1,30 @@
 "use client";
 
+import type { EquipRow } from "../../../types";
 import type { ForEachNodeData } from "../types";
 import { InputFromEditor } from "./InputFromEditor";
+import { BodySkillsList } from "./BodySkillsList";
 
 export function ForEachNodePanel({
   data,
+  equipBySlot,
   sourceOptions,
   onPatch,
   onOpenBody,
 }: {
   data: ForEachNodeData;
+  equipBySlot: Map<number, EquipRow>;
   sourceOptions: string[];
   onPatch: (patch: Partial<ForEachNodeData>) => void;
   onOpenBody: (() => void) | null;
 }) {
   return (
     <>
+      <BodySkillsList
+        bodyNodes={data.body.nodes}
+        equipBySlot={equipBySlot}
+        accent="rgb(56 189 248)"
+      />
       <InputFromEditor
         value={data.inputFrom}
         sourceOptions={sourceOptions}

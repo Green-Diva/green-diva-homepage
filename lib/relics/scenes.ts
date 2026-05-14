@@ -95,8 +95,6 @@ export const relicDraftMetadataScene = registerScene({
     })
     .passthrough(),
   invocation: "sync",
-  // image-pick lives in a separate scene (relic.smart-image-pick) since
-  // the Phase 8 picker decomposition. LORE-FORGE no longer claims it.
   requiredCapabilities: ["lore-writing", "metadata-derivation"],
   // ctx → agent.input. Injects mode discriminator (LORE-FORGE branches
   // on `input.mode` to pick draft vs regen DAG path) + renames
@@ -114,67 +112,65 @@ export const relicDraftMetadataScene = registerScene({
 // Legacy alias — drop after SceneBinding.sceneKey rows have been migrated.
 registerSceneAlias("relic.draft-metadata", "relic.generate-draft-metadata");
 
-// — relic.smartImagePick —
-// Sync. Triggered by runScribeForWorkspace AFTER relic.draft-metadata so
-// the picker can use metadata-init's `useUserImage` / `networkImageQuery`
-// decision. Returns the candidate set + recommended primary path.
+// — relic.networkImageSearch —
+// Sync. Triggered by admin's "图片搜索" tab in NetworkCandidateModal
+// (app/api/relics/[id]/lens-search/route.ts).
 //
-// Pipeline-layer staging populates `userCandidates` + `referenceImageAbs`
-// via stageUserCandidates() before callScene; the picker agent never
-// touches the FS for user images.
-export const relicSmartImagePickScene = registerScene({
-  key: "relic.smart-image-pick",
+// The trigger endpoint reads the relic's primary image off disk twice:
+//   - once as raw base64 → passed to Vision API (referenceImageBase64)
+//   - once as a temp file copy in derived/lens-ref-*.<ext> → passed by
+//     abs path so the agent's vision-similarity-score (Gemini) skill can
+//     read it via imagePathsField (Gemini handler reads from disk paths)
+//
+// No _relicWriteback — admin reviews matches in the modal and per-pick
+// triggers POST /api/relics/[id]/candidate (JSON branch). Persistence is
+// not the agent's job here.
+export const relicNetworkImageSearchScene = registerScene({
+  key: "relic.network-image-search",
   module: "relic",
-  label: { en: "Smart Image Pick", zh: "智能选图" },
+  label: { en: "Network Image Reverse Search", zh: "网络反向图片搜索" },
   description: {
-    en: "Pick recommended primary image for a relic — user images plus optional SerpAPI search with two-round vision verification.",
-    zh: "为 relic 挑选推荐主图——用户图叠加可选 SerpAPI 搜索，含两轮视觉比对。",
+    en: "Reverse-image-search the relic's primary via Google Cloud Vision WEB_DETECTION; vision-score candidates with Gemini.",
+    zh: "用 Google Cloud Vision WEB_DETECTION 对主图反向搜索；Gemini 视觉打分候选。",
   },
   contextSchema: z.object({
-    workspaceSlug: z.string().min(1),
-    useUserImage: z.boolean(),
-    networkImageQuery: z.string().optional().default(""),
-    // Pre-staged by stageUserCandidates() — paths are already in derived/,
-    // dimensions probed, score seeded.
-    userCandidates: z.array(z.unknown()).default([]),
-    // Abs path to the largest user image — vision filter reference.
-    // null when there were no usable user images.
-    referenceImageAbs: z.string().nullable().default(null),
+    relicId: z.string().min(1),
+    relicSlug: z.string().min(1),
+    // Raw base64 of the relic's primary image (no `data:image/...;base64,`
+    // prefix). Vision API's `image.content` field expects bare base64.
+    referenceImageBase64: z.string().min(1),
+    // Abs path to a temp copy of the primary image in derived/. Gemini's
+    // vision skill (imagePathsField) reads from disk; we'd duplicate the
+    // base64 → temp-file dance via a persist primitive otherwise. The
+    // trigger endpoint owns this write to keep the agent DAG focused on
+    // outbound API calls.
+    referenceImageAbs: z.string().min(1),
   }),
   outputSchema: z
     .object({
-      candidates: z
+      matches: z
         .array(
-          z
-            .object({
-              path: z.string().min(1),
-              source: z.string().min(1),
-              score: z.number().min(0).max(1).optional(),
-              deleted: z.boolean().optional(),
-            })
-            .passthrough(),
+          z.object({
+            imageUrl: z.string().url(),
+            sourceUrl: z.string().url(),
+            thumbnailUrl: z.string().url().optional(),
+            title: z.string().max(300).optional(),
+            score: z.number().min(0).max(100),
+          }),
         )
-        .max(60),
-      recommendedPrimaryPath: z.string().min(1),
-      networkFetchAttempted: z.boolean().optional(),
-      networkFetchFailureReason: z.string().max(500).optional(),
-      visionFilterApplied: z.boolean().optional(),
-      visionFilterMatches: z.number().int().min(0).max(60).optional(),
-      visionFilterRounds: z.number().int().min(0).max(10).optional(),
-      refinedQueryUsed: z.string().max(200).optional(),
+        .max(20),
     })
     .passthrough(),
   invocation: "sync",
-  requiredCapabilities: ["image-pick"],
-  // ctx → agent.input. Pass-through — PICKER-FORGE's DAG already reads
-  // workspaceSlug / useUserImage / networkImageQuery / userCandidates /
-  // referenceImageAbs straight from agent.input.
+  // 120 s SLA — Vision API ~3 s + 8 sequential Gemini scoring calls
+  // (~5-8 s each) + 8 downloads. Empirically lands 50-90 s for the typical
+  // case. 60 s was too tight (timed out mid-scoring on first real test).
+  slaMs: 120_000,
+  requiredCapabilities: ["lens-reverse-search", "vision-scoring"],
   prepareAgentInput: (ctx) => ({
-    workspaceSlug: ctx.workspaceSlug,
-    useUserImage: ctx.useUserImage,
-    networkImageQuery: ctx.networkImageQuery,
-    userCandidates: ctx.userCandidates,
+    referenceImageBase64: ctx.referenceImageBase64,
     referenceImageAbs: ctx.referenceImageAbs,
+    relicSlug: ctx.relicSlug,
   }),
 });
 

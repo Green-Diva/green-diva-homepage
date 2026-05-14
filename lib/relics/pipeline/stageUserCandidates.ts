@@ -1,7 +1,6 @@
 // Pipeline staging — copy raw user images into derived/ as candidate
-// rows so the smart-image-pick agent receives ready-to-use candidate
-// data. Replaces the inline copy+probe loop that lived inside the old
-// relic-smart-image-pick INTERNAL handler.
+// rows for the draft pipeline. The largest candidate (by file size) is
+// chosen as `primaryImagePath` by the GENERATE_METADATA step.
 //
 // Boundary follows the same rule as scanWorkspace + readImageAsDataUri:
 // IO sits in the pipeline / endpoint layer; the agent DAG only sees
@@ -13,12 +12,10 @@
 //                            absPath }>
 //     - `path` is the public-style relative path Relic columns store
 //       ("/<slug>/derived/<filename>").
-//     - `absPath` is the on-disk absolute path; included so the picker
-//       agent's vision-filter LLM_PROMPT skill (imagePathsField) can
-//       read it directly without another endpoint round-trip.
+//     - `absPath` is the on-disk absolute path.
 //   referenceImageAbs: abs path of the largest user image (highest
-//     score), or null when there were no usable images. Used as the
-//     vision-filter reference (image[0]).
+//     score), or null when there were no usable images. Currently unused
+//     by the draft pipeline; kept for future image-similarity callers.
 
 import "server-only";
 import path from "node:path";

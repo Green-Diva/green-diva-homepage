@@ -28,7 +28,9 @@ import { useT } from "@/lib/i18n/client";
 import type { CandidateImage } from "./CandidateImageGallery";
 import ImageLightbox from "./ImageLightbox";
 
-const MAX_SLOTS = 8;
+// Shared with RelicForm so the network-candidate modal can cap selection
+// at the actual remaining slot count.
+export const MAX_SLOTS = 8;
 
 type Props = {
   relicId: string;
@@ -226,6 +228,8 @@ export default function CandidateThumbGrid({
       downloadUrl={`${assetUrlFor(relicId, previewCandidate.path)}&download=1`}
       downloadName={previewCandidate.originalFilename}
       caption={previewCandidate.originalFilename}
+      sourceUrl={previewCandidate.sourceUrl}
+      sourceUrlLabel={t.adminRelics.netSearchOpenSource}
       onClose={() => setPreviewPath(null)}
     />
   ) : null;

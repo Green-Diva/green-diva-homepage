@@ -361,8 +361,6 @@ model Agent {
   mode             AgentMode           @default(MECHANICAL)
   status           AgentStatus         @default(STANDBY)
   avatarUrl        String
-  descriptionEn    String?
-  descriptionZh    String?
   syncLevel        Float                @default(0)
   matrixLevel      Int                  @default(1)
   // Admin-controlled display order in the /agent-control roster.

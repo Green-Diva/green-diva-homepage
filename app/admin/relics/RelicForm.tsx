@@ -13,9 +13,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 import { type CandidateImage } from "./CandidateImageGallery";
-import CandidateThumbGrid from "./CandidateThumbGrid";
+import CandidateThumbGrid, { MAX_SLOTS as CAND_MAX_SLOTS } from "./CandidateThumbGrid";
 import OtherMaterialsGrid, { type Material } from "./OtherMaterialsGrid";
 import AddMaterialModal from "./AddMaterialModal";
+import NetworkCandidateModal from "./NetworkCandidateModal";
 import AssetCard from "./AssetCard";
 import MetaFields, { type MetaFieldsValue } from "./MetaFields";
 import LoreFields from "./LoreFields";
@@ -106,8 +107,8 @@ export default function RelicForm({
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const networkFileInputRef = useRef<HTMLInputElement | null>(null);
   const [materialModalOpen, setMaterialModalOpen] = useState(false);
+  const [networkModalOpen, setNetworkModalOpen] = useState(false);
 
   async function uploadCandidate(file: File, source: "user" | "network") {
     if (!initial) return;
@@ -435,40 +436,33 @@ export default function RelicForm({
 
             <AssetModule title={t.adminRelics.modTitleNetwork}>
               {isEdit && initial ? (
-                <>
-                  <input
-                    ref={networkFileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void uploadCandidate(f, "network");
-                      e.target.value = "";
-                    }}
-                  />
-                  <CandidateThumbGrid
-                    relicId={initial.id}
-                    candidates={(state.candidateImages ?? []).filter((c) => c.source === "network")}
-                    primaryPath={state.primaryImagePath}
-                    onChange={(next) => {
-                      const others = (state.candidateImages ?? []).filter((c) => c.source !== "network");
-                      setState((s) => ({
-                        ...s,
-                        candidateImages: [...others, ...next.candidates],
-                        // Network reorder/delete must not touch the relic's
-                        // primaryImagePath (which lives in the user module).
-                        primaryImagePath: s.primaryImagePath,
-                      }));
-                    }}
-                    onAddRequest={() => networkFileInputRef.current?.click()}
-                    disabled={pending || uploading}
-                    hidePrimary
-                    assetUrlFor={(rid, p) =>
-                      `/api/relics/${rid}/candidate?path=${encodeURIComponent(p)}`
-                    }
-                  />
-                </>
+                <CandidateThumbGrid
+                  relicId={initial.id}
+                  candidates={(state.candidateImages ?? []).filter((c) => c.source === "network")}
+                  primaryPath={state.primaryImagePath}
+                  onChange={(next) => {
+                    const others = (state.candidateImages ?? []).filter((c) => c.source !== "network");
+                    setState((s) => ({
+                      ...s,
+                      candidateImages: [...others, ...next.candidates],
+                      // Network reorder/delete must not touch the relic's
+                      // primaryImagePath (which lives in the user module).
+                      primaryImagePath: s.primaryImagePath,
+                    }));
+                  }}
+                  // Empty-slot click opens the dual-tab modal (manual URL
+                  // paste + Vision API reverse search). Local file upload
+                  // for "network" candidates is intentionally gone — a
+                  // network entry without a sourceUrl is semantically
+                  // broken; admins can still upload local files via the
+                  // user-module slot above.
+                  onAddRequest={() => setNetworkModalOpen(true)}
+                  disabled={pending || uploading}
+                  hidePrimary
+                  assetUrlFor={(rid, p) =>
+                    `/api/relics/${rid}/candidate?path=${encodeURIComponent(p)}`
+                  }
+                />
               ) : (
                 <EmptyModule label={t.adminRelics.modEmptyNetwork} />
               )}
@@ -523,6 +517,35 @@ export default function RelicForm({
           relicId={initial.id}
           onClose={() => setMaterialModalOpen(false)}
           onAdded={(m) => setState((s) => ({ ...s, materials: [...s.materials, m] }))}
+        />
+      ) : null}
+      {initial && networkModalOpen ? (
+        // Conditionally mounted so each open gets fresh local state — no
+        // need for a reset-on-open useEffect inside the modal.
+        <NetworkCandidateModal
+          relicId={initial.id}
+          primaryImagePath={state.primaryImagePath}
+          open
+          onClose={() => setNetworkModalOpen(false)}
+          // Cap selection at the grid's remaining capacity. The network
+          // ThumbGrid only renders the first MAX_SLOTS visible candidates,
+          // so anything past the cap would silently disappear from the
+          // ThumbGrid even if it landed in candidateImages.
+          remainingSlots={Math.max(
+            0,
+            CAND_MAX_SLOTS -
+              (state.candidateImages ?? []).filter(
+                (c) => c.source === "network" && !c.deleted,
+              ).length,
+          )}
+          onAdded={(added) =>
+            setState((s) => ({
+              ...s,
+              candidateImages: [...(s.candidateImages ?? []), ...added],
+              // Network adds never bump primaryImagePath (mirrors the
+              // hidePrimary semantics of the network CandidateThumbGrid).
+            }))
+          }
         />
       ) : null}
     </div>,

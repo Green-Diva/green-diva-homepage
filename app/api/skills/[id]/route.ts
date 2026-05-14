@@ -89,10 +89,33 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     throw e;
   }
   const { id } = await params;
+
+  // AgentSkillEquip.skill is `onDelete: Cascade` in the schema (legacy
+  // wrong default — the cascade silently strips the skill from any
+  // equipped agent's loadout, but the agent's pipelineConfig JSON still
+  // references the slotIndex → next invocation fails mid-DAG with
+  // SLOT_EMPTY). Pre-flight refusal mirrors the agent DELETE pattern:
+  // force admin to unequip first via /agent-control's agent editor.
+  const equips = await prisma.agentSkillEquip.findMany({
+    where: { skillId: id },
+    select: { agent: { select: { codename: true } } },
+  });
+  if (equips.length > 0) {
+    const agents = equips.map((e) => e.agent.codename).join(", ");
+    return respondError(
+      "CONFLICT",
+      `skill is equipped on ${equips.length} agent(s) — unequip first in /agent-control's agent editor: ${agents}`,
+      409,
+    );
+  }
+
   try {
     await prisma.skill.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return respondError("NOT_FOUND", "skill not found", 404);
+    }
     console.error("[skills] delete failed", e);
     return respondError("DELETE_FAILED", "delete failed", 500);
   }

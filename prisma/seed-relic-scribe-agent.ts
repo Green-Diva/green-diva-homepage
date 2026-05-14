@@ -133,10 +133,6 @@ async function main() {
     nameZh: "遗物执笔者",
     mode: "MECHANICAL" as const,
     avatarUrl,
-    descriptionEn:
-      "Reads an uploaded relic, writes its lore via Gemini-grounded web research, picks a primary image (user or network), and orchestrates 2D enhance + 3D create on demand.",
-    descriptionZh:
-      "读取上传的遗物,用 Gemini 联网调研写圣记,挑选主图(用户的或网络高清版),并按需驱动 2D 增强与 3D 立体化。",
     pipelineConfig: pipelineConfig as unknown as Prisma.InputJsonValue,
     dispatcherConfig: Prisma.JsonNull,
     deployedAt: new Date(),

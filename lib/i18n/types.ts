@@ -424,6 +424,7 @@ export interface Dictionary {
     edit: string;
     remove: string;
     confirmRemove: string; // {{name}}
+    confirmCascadeDelete: string; // {{name}} {{n}} {{scenes}}
     deleteFailed: string;
     emptyState: string;
     noAgentSelected: string;
@@ -437,9 +438,8 @@ export interface Dictionary {
     fieldNameZh: string;
     fieldStatus: string;
     fieldAvatar: string;
-    fieldDescriptionEn: string;
-    fieldDescriptionZh: string;
     fieldIntentScenes: string;
+    sceneClaimNoMatch: string;
     fieldSkillsJson: string;
     fieldSkillsHelp: string;
     save: string;
@@ -694,5 +694,39 @@ export interface Dictionary {
     fieldSubtitleEn: string;
     fieldIcon: string;
     fieldRarity: string;
+    // NetworkCandidateModal — manual add + reverse search (Vision API)
+    netModalTitle: string;
+    netTabManual: string;
+    netTabSearch: string;
+    netManualImageFile: string;
+    netManualChooseFile: string;
+    netManualReplaceFile: string;
+    netManualClearFile: string;
+    netManualSourceUrl: string;
+    netManualSourceUrlPlaceholder: string;
+    netManualSave: string;
+    netManualSaving: string;
+    netManualMissingFields: string;
+    netManualInvalidUrl: string;
+    netSearchPrimaryRequired: string;
+    netSearchStart: string;
+    netSearchSearching: string;
+    netSearchScoring: string;
+    netSearchEmpty: string;
+    netSearchHighCount: string;
+    netSearchHighEmpty: string;
+    netSearchScoreHigh: string;
+    netSearchScoreMid: string;
+    netSearchScoreLow: string;
+    netSearchShowLow: string;
+    netSearchHideLow: string;
+    netSearchImportSelected: string;
+    netSearchImporting: string;
+    netSearchOpenSource: string;
+    netSearchFailed: string;
+    netSearchTimeout: string;
+    netSlotsFull: string;
+    netSlotsRemaining: string;
+    netSlotsLimitReached: string;
   };
 }

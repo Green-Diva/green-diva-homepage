@@ -53,8 +53,6 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       nameZh: agent.nameZh,
       mode: agent.mode,
       avatarUrl: agent.avatarUrl,
-      descriptionEn: agent.descriptionEn,
-      descriptionZh: agent.descriptionZh,
       capabilities: agent.capabilities,
       pipelineConfig: agent.pipelineConfig,
       dispatcherConfig: agent.dispatcherConfig,

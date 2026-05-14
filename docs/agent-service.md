@@ -32,12 +32,11 @@
 
 每个 forge 专职一个能力域，DAG 由 HTTP_API + LLM_PROMPT skill 组装；控制流 / 数据塑形由 backbone 原语 (loop / forEach / transform) 表达，**没有 INTERNAL handler**。
 
-**2026-05-12 合并**：原 LORE-FORGE-001 / CUTOUT-FORGE-001 / MESHY-FORGE-001 三个单一职责 agent 合并成 **RELIC-FORGE-001** —— 一个 4-way mode branch 的 omni-agent，绑 4 个 relic.* scene。**2026-05-13**：save-asset-relic skill 退役为 backbone `persist` 原语，RELIC-FORGE-001 槽位从 6 降到 5（slot 5 留空）。PICKER-FORGE-001 同步把 save-network-asset 收编进 persist 原语，槽位从 4 降到 3（slot 3 留空）。
+**2026-05-12 合并**：原 LORE-FORGE-001 / CUTOUT-FORGE-001 / MESHY-FORGE-001 三个单一职责 agent 合并成 **RELIC-FORGE-001** —— 一个 4-way mode branch 的 omni-agent，绑 4 个 relic.* scene。**2026-05-13**：save-asset-relic skill 退役为 backbone `persist` 原语，RELIC-FORGE-001 槽位从 6 降到 5（slot 5 留空）。**2026-05-14**：PICKER-FORGE-001 + `relic.smart-image-pick` scene 整体退役，draft pipeline 改为「最大 user 候选作主图」的同步逻辑。
 
 | Forge | 职责 | 槽位结构 |
 |---|---|---|
 | **RELIC-FORGE-001** | Relic 全生命周期（绑 `relic.generate-draft-metadata` + `relic.regen-metadata` + `relic.enhance2d` + `relic.create3d` 4 个 scene） | 顶层 mode-branch on `input.mode`,4 个 case 分别路由到 4 条独立链:<br>① `initial` → loreEn (slot 0, Gemini grounding+vision) → loreZh (slot 1, Gemini text) → metadata-init (slot 2, Gemini json+vision) → **wrap-research transform** (产 `{ research: {...} }`)<br>② `regenMetadata` → metadata-regen (slot 2,复用同一 skill,flat shape 直接 leaf)<br>③ `2dEnhance` → cutout (slot 3, fal-cutout-http) → **save-cutout (persist 原语)** → **shape-cutout transform** (产 `{ enhancedImagePath, _relicWriteback }`)<br>④ `3dCreate` → meshy (slot 4, meshy-3d-http) → **save-meshy (persist 原语)** → **shape-meshy transform** (产 `{ modelPath, taskId, previewImageUrl, _relicWriteback }`)<br>**`agent.input.{userBrief,fileSummary,imageAbsPaths,textExcerpts}` 由 [`scanWorkspace`](../lib/relics/pipeline/scanWorkspace.ts) 预填;`imageDataUri` 由 endpoint 用 [`readRelicImageAsDataUri`](../lib/relics/readImageAsDataUri.ts) 预编码;`mode` 和 `kind` 由 [scene.prepareAgentInput](../lib/relics/scenes.ts) 注入**。 |
-| **PICKER-FORGE-001** | 智能选图（绑 `relic.smart-image-pick` scene） | branch(useUserImage) → user-only：transform；net 路径：transform(buildLoopInit) → loop(maxIter:2, exitWhen refinedQueryNext=="") { serp(HTTP_API QueryParam auth, slot 1) → transform(filter) → forEach(maxItems:3) { dl(HTTP_API binary, slot 2) → **save (persist 原语)** → transform(mkCand) } → transform(prepVision) → vision(LLM_PROMPT gemini multi-image, slot 4) → transform(applyVerdicts) → transform(mergeIter) } → transform(mergeFinal)。**`agent.input.{userCandidates,referenceImageAbs}` 由 pipeline 层 [`stageUserCandidates`](../lib/relics/pipeline/stageUserCandidates.ts) 预 copy + probe 后注入**。 |
 
 **Skill / Agent / 原语 责任边界（不可越界）**：
 
@@ -59,17 +58,17 @@
 
 所有 forge 走"pipeline-准备"路径，agent DAG 不再有 INTERNAL handler。LORE-FORGE 的 `scanWorkspace`、CUTOUT/MESHY 的 `readRelicImageAsDataUri`、PICKER 的 `stageUserCandidates` 都是这个 pattern：把 FS / Prisma 接触面留在 pipeline / endpoint 层，agent 只做 HTTP+LLM 编排。**规则 + helper 命名约定 + 反模式清单**见 [docs/pipeline-input-pattern.md](pipeline-input-pattern.md)。新加 scene 前先读那一篇。
 
-**反模式（已彻底拒绝）**：单一 INTERNAL 同时干 Prisma 查 + FS 扫 + 字符串拼装 + LLM-friendly 塑形（已删 `relic-files-summary`），或单一 INTERNAL 编排"双轮 vision filter + 跨轮 score 合并"业务流（已删 `relic-smart-image-pick`，重写为 PICKER-FORGE DAG）。
+**反模式（已彻底拒绝）**：单一 INTERNAL 同时干 Prisma 查 + FS 扫 + 字符串拼装 + LLM-friendly 塑形（已删 `relic-files-summary`），或单一 INTERNAL 编排"双轮 vision filter + 跨轮 score 合并"业务流（已删 `relic-smart-image-pick`；PICKER-FORGE DAG 重写后又于 2026-05-14 整体退役，draft pipeline 改回纯排序逻辑）。
 
-## 5 个 relic.* scenes
+## 4 个 relic.* scenes
 
 | Scene | invocation | 当前 binding | 触发位置 |
 |---|---|---|---|
 | `relic.generate-draft-metadata` | sync (callScene) | RELIC-FORGE-001 (mode=initial) | [generateMetadata pipeline step](../lib/relics/pipeline/steps/generateMetadata.ts) |
-| `relic.smart-image-pick` | sync (callScene) | PICKER-FORGE-001 | 同 generateMetadata step（在 draft-metadata 之后） |
 | `relic.regen-metadata` | sync | RELIC-FORGE-001 (mode=regenMetadata) | [regen-metadata endpoint](../app/api/relics/[id]/regen-metadata/route.ts) |
 | `relic.enhance2d` | async (dispatchScene) | RELIC-FORGE-001 (mode=2dEnhance) | [enhance-2d endpoint](../app/api/relics/[id]/enhance-2d/route.ts) |
 | `relic.create3d` | async | RELIC-FORGE-001 (mode=3dCreate) | [create-3d endpoint](../app/api/relics/[id]/create-3d/route.ts) |
+| `relic.network-image-search` | sync | LENS-FORGE-001 | [lens-search endpoint](../app/api/relics/[id]/lens-search/route.ts) |
 
 ## Pipeline-step / endpoint 解耦（scene 契约模型）
 

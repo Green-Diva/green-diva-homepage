@@ -1,15 +1,19 @@
 "use client";
 
+import type { EquipRow } from "../../../types";
 import type { BranchCase, LoopNodeData } from "../types";
 import { InputFromEditor } from "./InputFromEditor";
+import { BodySkillsList } from "./BodySkillsList";
 
 export function LoopNodePanel({
   data,
+  equipBySlot,
   sourceOptions,
   onPatch,
   onOpenBody,
 }: {
   data: LoopNodeData;
+  equipBySlot: Map<number, EquipRow>;
   sourceOptions: string[];
   onPatch: (patch: Partial<LoopNodeData>) => void;
   onOpenBody: (() => void) | null;
@@ -31,6 +35,11 @@ export function LoopNodePanel({
   }
   return (
     <>
+      <BodySkillsList
+        bodyNodes={data.body.nodes}
+        equipBySlot={equipBySlot}
+        accent="rgb(196 181 253)"
+      />
       <InputFromEditor
         value={data.inputFrom}
         sourceOptions={sourceOptions}

@@ -24,8 +24,6 @@ export interface AgentRow {
   mode: AgentMode;
   status: AgentStatus;
   avatarUrl: string;
-  descriptionEn: string | null;
-  descriptionZh: string | null;
   syncLevel: number;
   matrixLevel: number;
   chaosLevel: number;
@@ -35,6 +33,10 @@ export interface AgentRow {
   pipelineConfig: PipelineConfig | null;
   dispatcherConfig: DispatcherConfig | null;
   deployedAt: string | null;
+  // Capability tags this agent owns. Drives the scene-claim eligibility
+  // filter in AgentEditor (a scene is bindable iff its requiredCapabilities
+  // ⊆ this list). Edited via migration scripts, not the UI.
+  capabilities: string[];
   // Scene contracts this agent must satisfy. Server-derived from
   // SceneBinding rows joined with the registered scene definitions.
   // BackboneFlowEditor renders these as decorative BEGIN / END nodes

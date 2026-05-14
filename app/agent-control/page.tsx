@@ -112,8 +112,6 @@ export default async function AgentControlPage() {
     mode: a.mode,
     status: a.status,
     avatarUrl: a.avatarUrl,
-    descriptionEn: a.descriptionEn,
-    descriptionZh: a.descriptionZh,
     syncLevel: a.syncLevel,
     matrixLevel: a.matrixLevel,
     chaosLevel: a.chaosLevel,
@@ -130,6 +128,7 @@ export default async function AgentControlPage() {
     createdBy: a.createdBy,
     boundScenes: boundScenesByAgentId[a.id] ?? [],
     intentSceneKeys: a.intentSceneKeys,
+    capabilities: a.capabilities,
   }));
 
   // Helpers cast Prisma's loose JsonValue to the concrete shape SkillRow expects.
@@ -225,7 +224,7 @@ export default async function AgentControlPage() {
   const isAdmin = me.level >= ADMIN_LEVEL;
 
   return (
-    <div className="flex flex-col flex-1 w-full">
+    <div className="flex flex-col flex-1 w-full min-h-0">
       <header className="w-full z-50 grid grid-cols-[1fr_auto_1fr] items-center px-5 md:px-10 py-[10px] md:py-1 bg-background/90 backdrop-blur-xl border-b border-primary/20 shrink-0 gap-3">
         <Link
           href="/"

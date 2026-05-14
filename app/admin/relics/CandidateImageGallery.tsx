@@ -1,7 +1,7 @@
 "use client";
 
 // Multi-image curation block embedded in RelicForm. Renders the
-// Smart Image Picker's candidate set:
+// relic's candidate image set:
 //   - thumbnail (served via /api/relics/[id]/candidate?path=...)
 //   - source badge (user / network)
 //   - dimensions + filename

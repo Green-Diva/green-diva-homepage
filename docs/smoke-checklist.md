@@ -53,11 +53,11 @@
 
 | Scene | 最小 ctx | 期望 |
 |---|---|---|
-| `relic.draft-metadata` | `{ "workspaceSlug": "smoke-test", "userBrief": "", "fileSummary": "", "imageAbsPaths": [], "textExcerpts": "" }` | 同步返回，含 `research` + `pick` |
-| `relic.smart-image-pick` | `{ "workspaceSlug": "smoke-test", "useUserImage": true, "networkImageQuery": "", "userCandidates": [], "referenceImageAbs": null }` | 同步返回，user-only 分支 |
-| `relic.regen-metadata` | 同 draft-metadata | 同步返回 metadata 字段 |
+| `relic.generate-draft-metadata` | `{ "workspaceSlug": "smoke-test", "userBrief": "", "fileSummary": "", "imageAbsPaths": [], "textExcerpts": "" }` | 同步返回，含 `research` 包 |
+| `relic.regen-metadata` | 同上 | 同步返回 metadata 字段 |
 | `relic.enhance2d` | `{ "relicId": "...", "imageDataUri": "data:..." }` (需先创建一个 Relic) | 异步建 AgentJob |
 | `relic.create3d` | 同上 | 异步建 AgentJob |
+| `relic.network-image-search` | `{ "relicId": "...", "relicSlug": "...", "referenceImageBase64": "...", "referenceImageAbs": "..." }` | 同步返回 `matches` 数组 |
 
 **断了看哪里**：
 - "scene not registered" → `lib/scenes-init.ts` 没 import 对应 module。

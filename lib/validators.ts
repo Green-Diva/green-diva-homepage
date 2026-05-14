@@ -163,8 +163,8 @@ const dagLoopNodeSchema: z.ZodTypeAny = z.object({
 // `{ item, index, total }` (the body reads `agent.input.item` etc.).
 // Aggregate semantics same as loop: "last" returns the final iteration's
 // leaf output, "concat-array" concatenates all leaf outputs (default for
-// forEach). Use this when smartImagePicker-style "for each candidate URL,
-// download + vision-filter, then merge" is the natural shape.
+// forEach). Use this when "for each candidate, download + vision-filter,
+// then merge" is the natural shape.
 const dagForEachNodeSchema: z.ZodTypeAny = z.object({
   id: z.string().min(1).max(64).regex(STEP_ID_RE, "node id must match [a-zA-Z0-9_-]+"),
   type: z.literal("forEach"),
@@ -273,8 +273,6 @@ export const agentCreateSchema = z.object({
       (s) => /^https?:\/\//.test(s) || s.startsWith("/"),
       { message: "must be a URL or absolute path" },
     ),
-  descriptionEn: z.string().max(4000).optional().nullable(),
-  descriptionZh: z.string().max(4000).optional().nullable(),
   syncLevel: z.number().min(0).max(100).optional(),
   matrixLevel: z.number().int().min(1).max(99).optional(),
   // Derived stats — clients usually shouldn't write these directly,
@@ -559,8 +557,6 @@ const exportAgentMetaSchema = z.object({
   nameZh: z.string().min(1).max(80),
   mode: z.enum(["MECHANICAL", "AUTONOMOUS"]),
   avatarUrl: z.string().min(1).max(500),
-  descriptionEn: z.string().max(2000).nullable().optional(),
-  descriptionZh: z.string().max(2000).nullable().optional(),
   capabilities: z.array(z.string().min(1).max(64)).max(40).default([]),
   // pipelineConfig / dispatcherConfig validated on import as plain JSON;
   // re-validating against pipelineConfigSchema/dispatcherConfigSchema

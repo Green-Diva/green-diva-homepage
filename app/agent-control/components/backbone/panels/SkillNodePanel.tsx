@@ -30,7 +30,7 @@ export function SkillNodePanel({
             const eq = equipBySlot.get(i);
             return (
               <option key={i} value={i}>
-                Slot {i} · {eq ? eq.skill.nameEn : "(empty)"}
+                Slot {i + 1} · {eq ? eq.skill.nameEn : "(empty)"}
               </option>
             );
           })}

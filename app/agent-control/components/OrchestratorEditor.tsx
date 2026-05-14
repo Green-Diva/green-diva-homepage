@@ -441,7 +441,7 @@ export default function OrchestratorEditor({ agent, equips, onClose }: Props) {
                       className="border border-primary/15 rounded p-2 bg-surface-variant/10"
                     >
                       <div className="flex items-center gap-2 text-[11px]">
-                        <span className="font-mono text-primary/60">slot {e.slotIndex}</span>
+                        <span className="font-mono text-primary/60">slot {(e.slotIndex ?? 0) + 1}</span>
                         <span className="text-on-surface">{name}</span>
                         <span className="font-mono text-[9px] text-on-surface-variant/60 ml-auto">
                           {e.skill.kind}

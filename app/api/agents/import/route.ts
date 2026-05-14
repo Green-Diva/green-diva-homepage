@@ -216,8 +216,6 @@ export async function POST(req: NextRequest) {
           mode: payload.agent.mode,
           status: "STANDBY",
           avatarUrl: payload.agent.avatarUrl,
-          descriptionEn: payload.agent.descriptionEn ?? null,
-          descriptionZh: payload.agent.descriptionZh ?? null,
           capabilities: payload.agent.capabilities ?? [],
           pipelineConfig: jsonOrNull(payload.agent.pipelineConfig),
           dispatcherConfig: jsonOrNull(payload.agent.dispatcherConfig),

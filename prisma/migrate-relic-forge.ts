@@ -376,10 +376,6 @@ async function ensureRelicForgeAgent(
         nameEn: "Relic Forge",
         nameZh: "圣物熔炉",
         codenameZh: "圣物熔炉",
-        descriptionEn:
-          "Unified relic-lifecycle forge: lore + metadata + 2D cutout + 3D generation. Routes via input.mode discriminator (initial / regenMetadata / 2dEnhance / 3dCreate).",
-        descriptionZh:
-          "Relic 全生命周期熔炉:圣记 + 元数据 + 2D 抠图 + 3D 生成,按 input.mode 分支路由(initial / regenMetadata / 2dEnhance / 3dCreate)。",
       },
     });
     await prisma.agentSkillEquip.deleteMany({ where: { agentId: existing.id } });
@@ -408,10 +404,6 @@ async function ensureRelicForgeAgent(
         mode: "MECHANICAL",
         status: "ONLINE",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
-        descriptionEn:
-          "Unified relic-lifecycle forge: lore + metadata + 2D cutout + 3D generation. Routes via input.mode discriminator (initial / regenMetadata / 2dEnhance / 3dCreate).",
-        descriptionZh:
-          "Relic 全生命周期熔炉:圣记 + 元数据 + 2D 抠图 + 3D 生成,按 input.mode 分支路由(initial / regenMetadata / 2dEnhance / 3dCreate)。",
         capabilities: CAPABILITIES,
         pipelineConfig,
         deployedAt: new Date(),

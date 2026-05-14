@@ -67,6 +67,7 @@ export function NodePanel({
       ) : node.data.type === "loop" ? (
         <LoopNodePanel
           data={node.data}
+          equipBySlot={equipBySlot}
           sourceOptions={sourceOptions}
           onPatch={onPatch as (p: Partial<LoopNodeData>) => void}
           onOpenBody={onOpenLoopBody ? () => onOpenLoopBody(node.id) : null}
@@ -74,6 +75,7 @@ export function NodePanel({
       ) : node.data.type === "forEach" ? (
         <ForEachNodePanel
           data={node.data}
+          equipBySlot={equipBySlot}
           sourceOptions={sourceOptions}
           onPatch={onPatch as (p: Partial<ForEachNodeData>) => void}
           onOpenBody={onOpenLoopBody ? () => onOpenLoopBody(node.id) : null}

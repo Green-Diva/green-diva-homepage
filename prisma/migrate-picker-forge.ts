@@ -1,3 +1,18 @@
+// ⚠️ DEPRECATED 2026-05-14 — file kept for git history only.
+//
+// PICKER-FORGE-001 was permanently removed. This script is no longer in
+// the npm start chain (see package.json). The functionality has been
+// split:
+//   - download-network-image  → migrate-shared-network-skills.ts
+//   - SceneBinding cleanup    → migrate-picker-removal.ts
+//   - LENS-FORGE-001 search   → migrate-lens-forge.ts (different scene)
+//
+// To resurrect: re-add to package.json start chain BEFORE
+// migrate-picker-removal (otherwise the agent gets created and immediately
+// deleted) — and restore a SceneBinding for relic.smart-image-pick.
+//
+// Original purpose follows.
+//
 // Provisions PICKER-FORGE-001 — replaces the relic-smart-image-pick
 // INTERNAL handler with a 4-skill DAG built on the Phase 8 backbone
 // primitives (loop / forEach / transform).
@@ -661,10 +676,6 @@ async function ensureForgeAgent(
         mode: "MECHANICAL",
         status: "ONLINE",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
-        descriptionEn:
-          "Smart image-pick agent. Branches on useUserImage; network path runs a 2-iteration vision-filtered SerpAPI loop with refinedQuery carry-over. Built on backbone loop / forEach / transform primitives — no INTERNAL handler.",
-        descriptionZh:
-          "智能选图代理。按 useUserImage 分支;网络路径跑 2 轮带视觉过滤 + refinedQuery 传递的 SerpAPI 循环。基于 backbone loop / forEach / transform 原语 —— 不依赖 INTERNAL 处理器。",
         capabilities: ["image-pick"],
         pipelineConfig: TOP_LEVEL_PIPELINE as unknown as Prisma.InputJsonValue,
         deployedAt: new Date(),
