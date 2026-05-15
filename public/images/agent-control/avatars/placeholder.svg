@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 262 608" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0f10"/>
+      <stop offset="55%" stop-color="#0d1719"/>
+      <stop offset="100%" stop-color="#050708"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="55%">
+      <stop offset="0%" stop-color="#90decd" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#90decd" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#90decd" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#90decd" stroke-opacity="0.06" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="262" height="608" fill="url(#bg)"/>
+  <rect width="262" height="608" fill="url(#grid)"/>
+  <rect width="262" height="608" fill="url(#glow)"/>
+  <g transform="translate(131 230)" fill="none" stroke="#90decd" stroke-opacity="0.55" stroke-width="1.5">
+    <circle r="58"/>
+    <circle r="44" stroke-opacity="0.25"/>
+    <circle cx="0" cy="-8" r="22" stroke-opacity="0.8"/>
+    <path d="M -38 50 Q 0 18 38 50 L 38 92 L -38 92 Z" stroke-opacity="0.7"/>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" text-anchor="middle" fill="#90decd">
+    <text x="131" y="370" font-size="11" letter-spacing="3" fill-opacity="0.85">NO PORTRAIT</text>
+    <text x="131" y="390" font-size="9" letter-spacing="2" fill-opacity="0.5">AVATAR · PENDING</text>
+  </g>
+  <g stroke="#90decd" stroke-opacity="0.55" stroke-width="1" fill="none">
+    <path d="M 8 8 L 8 22 M 8 8 L 22 8"/>
+    <path d="M 254 8 L 254 22 M 254 8 L 240 8"/>
+    <path d="M 8 600 L 8 586 M 8 600 L 22 600"/>
+    <path d="M 254 600 L 254 586 M 254 600 L 240 600"/>
+  </g>
+</svg>
