@@ -80,25 +80,81 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   try {
-    const row = await prisma.sceneBinding.upsert({
+    // Intent sync (2026-05-15): when admin re-routes a scene from agent1
+    // to agent2 via this editor, also reconcile both agents' intent
+    // claims so the Tune Agent checkbox state matches the live binding.
+    // Without this, agent1 keeps a dangling intent (re-deploys re-take)
+    // and agent2 owns a binding it doesn't claim (re-deploy orphan-deletes
+    // it). All three writes happen in one txn so production never sees
+    // a half-synced state.
+    const existing = await prisma.sceneBinding.findUnique({
       where: { sceneKey },
-      create: {
-        sceneKey,
-        agentId: parsed.data.agentId,
-        enabled: parsed.data.enabled,
-        notes: parsed.data.notes ?? null,
-      },
-      update: {
-        agentId: parsed.data.agentId,
-        enabled: parsed.data.enabled,
-        notes: parsed.data.notes ?? null,
-      },
-      select: {
-        sceneKey: true,
-        agentId: true,
-        enabled: true,
-        updatedAt: true,
-      },
+      select: { agentId: true },
+    });
+    const oldAgentId = existing?.agentId ?? null;
+    const newAgentId = parsed.data.agentId;
+    const agentChanged = oldAgentId !== null && oldAgentId !== newAgentId;
+
+    const row = await prisma.$transaction(async (tx) => {
+      const upserted = await tx.sceneBinding.upsert({
+        where: { sceneKey },
+        create: {
+          sceneKey,
+          agentId: newAgentId,
+          enabled: parsed.data.enabled,
+          notes: parsed.data.notes ?? null,
+          customLabel: parsed.data.customLabel ?? null,
+        },
+        update: {
+          agentId: newAgentId,
+          enabled: parsed.data.enabled,
+          notes: parsed.data.notes ?? null,
+          customLabel: parsed.data.customLabel ?? null,
+        },
+        select: {
+          sceneKey: true,
+          agentId: true,
+          enabled: true,
+          updatedAt: true,
+        },
+      });
+
+      // Remove sceneKey from the prior owner's intent (Postgres scalar-list
+      // edits require a read-modify-write since Prisma has no "filter from
+      // array" op).
+      if (agentChanged) {
+        const old = await tx.agent.findUnique({
+          where: { id: oldAgentId! },
+          select: { intentSceneKeys: true },
+        });
+        if (old && old.intentSceneKeys.includes(sceneKey)) {
+          await tx.agent.update({
+            where: { id: oldAgentId! },
+            data: {
+              intentSceneKeys: {
+                set: old.intentSceneKeys.filter((k) => k !== sceneKey),
+              },
+            },
+          });
+        }
+      }
+
+      // Make sure the new owner claims it. Idempotent — only writes if
+      // the key isn't already there.
+      const next = await tx.agent.findUnique({
+        where: { id: newAgentId },
+        select: { intentSceneKeys: true },
+      });
+      if (next && !next.intentSceneKeys.includes(sceneKey)) {
+        await tx.agent.update({
+          where: { id: newAgentId },
+          data: {
+            intentSceneKeys: { set: [...next.intentSceneKeys, sceneKey] },
+          },
+        });
+      }
+
+      return upserted;
     });
     return NextResponse.json(row);
   } catch (e) {

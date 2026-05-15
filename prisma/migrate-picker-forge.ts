@@ -674,7 +674,7 @@ async function ensureForgeAgent(
         nameEn: "Picker Forge",
         nameZh: "选图熔炉",
         mode: "MECHANICAL",
-        status: "ONLINE",
+        status: "DEPLOYED",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
         capabilities: ["image-pick"],
         pipelineConfig: TOP_LEVEL_PIPELINE as unknown as Prisma.InputJsonValue,

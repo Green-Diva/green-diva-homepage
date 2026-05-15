@@ -77,6 +77,7 @@ export const DIAGNOSTIC_HINTS_ZH: Record<AgentErrorCode, string> = {
   DELETE_FAILED: "删除失败,可能有外键引用阻止,看 errorMessage。",
   SAVE_FAILED: "保存失败,看 errorMessage 里的具体原因。",
   DEPLOY_FAILED: "Deploy 失败,看 server log。",
+  DEPLOY_TEST_FAILED: "Deploy 阻塞:绑定的 scene 在 sampleCtx 测试上失败。看 runLog 定位是哪个 skill 节点炸了,修后再 Deploy。",
   INVOKE_FAILED: "Invoke 调用入口失败,看 errorMessage。",
   IMPORT_FAILED: "Agent 导入失败,通常 envelope 校验或 skill 冲突未解,看 errorMessage。",
   RETRY_FAILED: "Retry 入口失败,可能 job 已 terminal 或不允许重试。",

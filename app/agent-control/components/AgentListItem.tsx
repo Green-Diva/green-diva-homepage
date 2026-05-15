@@ -5,7 +5,7 @@ import { useT } from "@/lib/i18n/client";
 import { themeClass } from "@/lib/agentControl/theme";
 
 const STATUS_STYLES: Record<AgentRow["status"], { dot: string; label: keyof ReturnType<typeof useT>["agentControl"] }> = {
-  ONLINE: { dot: "bg-emerald-400", label: "statusOnline" },
+  DEPLOYED: { dot: "bg-emerald-400", label: "statusDeployed" },
   STANDBY: { dot: "bg-amber-300", label: "statusStandby" },
   OFFLINE: { dot: "bg-rose-400", label: "statusOffline" },
 };
@@ -78,7 +78,7 @@ export default function AgentListItem({
         )}
         <span
           aria-hidden
-          className={`absolute -bottom-[1px] -right-[1px] w-2.5 h-2.5 rounded-full border border-background ${status.dot} ${agent.status === "ONLINE" ? "mv-status-dot" : ""}`}
+          className={`absolute -bottom-[1px] -right-[1px] w-2.5 h-2.5 rounded-full border border-background ${status.dot} ${agent.status === "DEPLOYED" ? "mv-status-dot" : ""}`}
         />
       </div>
       <div className="min-w-0 flex-1">
@@ -98,7 +98,7 @@ export default function AgentListItem({
       </div>
       <span
         className={`font-label text-[9px] tracking-[0.25em] uppercase ${
-          agent.status === "ONLINE" ? "text-emerald-400" : agent.status === "STANDBY" ? "text-amber-200" : "text-rose-300"
+          agent.status === "DEPLOYED" ? "text-emerald-400" : agent.status === "STANDBY" ? "text-amber-200" : "text-rose-300"
         }`}
       >
         {label}

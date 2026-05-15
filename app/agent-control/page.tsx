@@ -74,6 +74,7 @@ export default async function AgentControlPage() {
         contextFields: def.contextFields,
         outputFields: def.outputFields,
         via: "binding",
+        hasSampleCtx: def.hasSampleCtx,
       });
       return acc;
     },
@@ -98,6 +99,7 @@ export default async function AgentControlPage() {
         contextFields: def.contextFields,
         outputFields: def.outputFields,
         via: "intent",
+        hasSampleCtx: def.hasSampleCtx,
       });
     }
   }
@@ -201,6 +203,7 @@ export default async function AgentControlPage() {
     agentCapabilities: b.agent?.capabilities ?? [],
     enabled: b.enabled,
     notes: b.notes,
+    customLabel: b.customLabel,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
   }));

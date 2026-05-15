@@ -462,7 +462,7 @@ async function ensureForgeAgent(
         nameEn: "Lens Forge",
         nameZh: "镜瞳熔炉",
         mode: "MECHANICAL",
-        status: "ONLINE",
+        status: "DEPLOYED",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
         capabilities: ["lens-reverse-search", "vision-scoring"],
         pipelineConfig: TOP_LEVEL_PIPELINE as unknown as Prisma.InputJsonValue,

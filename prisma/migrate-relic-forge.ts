@@ -402,7 +402,7 @@ async function ensureRelicForgeAgent(
         nameEn: "Relic Forge",
         nameZh: "圣物熔炉",
         mode: "MECHANICAL",
-        status: "ONLINE",
+        status: "DEPLOYED",
         avatarUrl: "/images/agent-control/avatars/placeholder.svg",
         capabilities: CAPABILITIES,
         pipelineConfig,

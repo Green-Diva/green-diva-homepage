@@ -123,8 +123,10 @@ function SceneRow({
   onEdit: () => void;
 }) {
   const t = useT();
-  const label = scene.label[locale] ?? scene.label.en;
-  const description = scene.description?.[locale] ?? scene.description?.en;
+  const codeLabel = scene.label[locale] ?? scene.label.en;
+  const label = binding?.customLabel?.trim() || codeLabel;
+  const codeDescription = scene.description?.[locale] ?? scene.description?.en;
+  const description = binding?.notes?.trim() || codeDescription;
 
   return (
     <CyberPanel className="p-3" markers={["tl"]}>

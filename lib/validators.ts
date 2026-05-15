@@ -263,7 +263,7 @@ export const agentCreateSchema = z.object({
   nameEn: z.string().min(1).max(80),
   nameZh: z.string().min(1).max(80),
   mode: z.enum(["MECHANICAL", "AUTONOMOUS"]).optional(),
-  status: z.enum(["ONLINE", "STANDBY", "OFFLINE"]).optional(),
+  status: z.enum(["DEPLOYED", "STANDBY", "OFFLINE"]).optional(),
   // Avatar required: accepts either a full URL or an absolute path served
   // from /public (uploads land at /images/agent-control/avatars/...).
   avatarUrl: z
@@ -502,7 +502,13 @@ export type SkillUpdateInput = z.infer<typeof skillUpdateSchema>;
 export const sceneBindingUpdateSchema = z.object({
   agentId: z.string().cuid(),
   enabled: z.boolean().default(true),
-  notes: z.string().max(500).nullable().optional(),
+  notes: z.string().max(80, "notes too long (max 80)").nullable().optional(),
+  customLabel: z
+    .string()
+    .trim()
+    .max(30, "customLabel too long (max 30)")
+    .nullable()
+    .optional(),
 });
 export type SceneBindingUpdateInput = z.infer<typeof sceneBindingUpdateSchema>;
 

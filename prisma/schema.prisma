@@ -341,7 +341,7 @@ model RelicUnlock {
 }
 
 enum AgentStatus {
-  ONLINE
+  DEPLOYED
   STANDBY
   OFFLINE
 }
@@ -570,6 +570,7 @@ model SceneBinding {
   agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Restrict)
   enabled         Boolean  @default(true)
   notes           String?
+  customLabel     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

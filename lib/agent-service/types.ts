@@ -90,6 +90,17 @@ export type SceneDefinition<
     ctx: z.infer<TContext>,
     actor: SceneActor | null,
   ) => unknown;
+  // Smoke-test input for the Deploy gate (2026-05-15). When admin clicks
+  // Deploy on /agent-control, the endpoint runs `executeAgent` against
+  // each bound scene's sampleCtx; if any returns ok:false, deploy is
+  // blocked (bindings + status DEPLOYED are rolled back). Scenes without
+  // sampleCtx skip the gate.
+  //
+  // Validated against contextSchema at execution time (so a malformed
+  // sampleCtx surfaces during the smoke test, not silently). Side effects
+  // ARE invoked — write fixtures that minimize external cost (small
+  // images, cheap LLM prompts) or omit sampleCtx for expensive scenes.
+  sampleCtx?: z.infer<TContext>;
 };
 
 // Type-level extractors so callers get full inference from sceneKey.

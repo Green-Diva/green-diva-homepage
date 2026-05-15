@@ -48,6 +48,32 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   try {
+    // Withdrawal / kill-switch semantics (2026-05-15):
+    //   - STANDBY: "pull this agent back to draft" — drop live SceneBindings,
+    //     clear deployedAt, keep intentSceneKeys so admin can re-deploy.
+    //   - OFFLINE: "kill this agent" — same DB effect (drop bindings + clear
+    //     deployedAt + keep intent), distinguished only by status flag.
+    //     UI greys out the detail view and disables everything except EDIT.
+    // All in one txn so production routing never sees a half-detached agent.
+    const willWithdraw =
+      parsed.data.status === "STANDBY" || parsed.data.status === "OFFLINE";
+    if (willWithdraw) {
+      const current = await prisma.agent.findUnique({
+        where: { id },
+        select: { deployedAt: true },
+      });
+      if (current?.deployedAt) {
+        const updated = await prisma.$transaction(async (tx) => {
+          await tx.sceneBinding.deleteMany({ where: { agentId: id } });
+          return tx.agent.update({
+            where: { id },
+            data: { ...data, deployedAt: null },
+          });
+        });
+        return NextResponse.json(updated);
+      }
+    }
+
     const updated = await prisma.agent.update({
       where: { id },
       data,

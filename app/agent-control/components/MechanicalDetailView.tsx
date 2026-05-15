@@ -5,13 +5,17 @@ import DeployButton from "./DeployButton";
 import BaseStatsBar from "./BaseStatsBar";
 import AgentHeroPortrait from "./AgentHeroPortrait";
 import SkillsControlPanel from "./SkillsControlPanel";
-import type { AgentRow, EquipRow, SkillRow } from "../types";
+import type { AgentRow, EquipRow, SkillRow, SceneBindingRow } from "../types";
+import type { SerializableSceneDef } from "@/lib/agent-service/serialize";
 
 export default function MechanicalDetailView({
   agent,
   equips,
   allSkills,
   isAdmin,
+  sceneDefs,
+  sceneBindings,
+  autoDeployNonce,
   onEdit,
   onShowJobs,
 }: {
@@ -19,26 +23,55 @@ export default function MechanicalDetailView({
   equips: EquipRow[];
   allSkills: SkillRow[];
   isAdmin: boolean;
+  sceneDefs: SerializableSceneDef[];
+  sceneBindings: SceneBindingRow[];
+  autoDeployNonce: number | null;
   onEdit: () => void;
   onShowJobs?: () => void;
 }) {
+  // OFFLINE = kill switch: greyscale + pointer-events-none on everything
+  // except the EDIT button (so admin can flip it back). DeployButton /
+  // TestRunButton / JOBS / SkillsControlPanel / HeroPortrait all sit
+  // under the dimmed wrapper.
+  const isOffline = agent.status === "OFFLINE";
+  const dimmed = isOffline ? "opacity-50 grayscale pointer-events-none select-none" : "";
   return (
     <div className="flex flex-col h-full gap-3 min-h-0">
       <div className="flex items-start justify-between gap-3 shrink-0">
-        <DetailHeader agent={agent} equips={equips} isAdmin={isAdmin} onEdit={onEdit} onShowJobs={onShowJobs} />
-        <DeployButton agent={agent} isAdmin={isAdmin} />
+        {/* DetailHeader keeps EDIT clickable when offline by wrapping just
+            the non-EDIT siblings in the dimmed class via the prop below. */}
+        <DetailHeader
+          agent={agent}
+          equips={equips}
+          isAdmin={isAdmin}
+          onEdit={onEdit}
+          onShowJobs={onShowJobs}
+          dimNonEdit={isOffline}
+        />
+        {/* DeployButton handles its own OFFLINE styling (rose + disabled),
+            no parent dim wrapper — otherwise the red lifecycle color gets
+            washed out by the grayscale. */}
+        <DeployButton
+          agent={agent}
+          isAdmin={isAdmin}
+          sceneDefs={sceneDefs}
+          sceneBindings={sceneBindings}
+          autoOpenNonce={autoDeployNonce}
+        />
       </div>
-      <BaseStatsBar agent={agent} />
-      <div className="flex-1 min-h-0 grid grid-cols-[calc((100%+48px)/4)_minmax(0,1fr)] gap-x-4 items-stretch">
-        <AgentHeroPortrait agent={agent} />
-        <div className="min-h-0">
-          <SkillsControlPanel
-            key={`scp-${agent.id}`}
-            agent={agent}
-            equips={equips}
-            allSkills={allSkills}
-            isAdmin={isAdmin}
-          />
+      <div className={`flex flex-col gap-3 flex-1 min-h-0 ${dimmed}`}>
+        <BaseStatsBar agent={agent} />
+        <div className="flex-1 min-h-0 grid grid-cols-[calc((100%+48px)/4)_minmax(0,1fr)] gap-x-4 items-stretch">
+          <AgentHeroPortrait agent={agent} />
+          <div className="min-h-0">
+            <SkillsControlPanel
+              key={`scp-${agent.id}`}
+              agent={agent}
+              equips={equips}
+              allSkills={allSkills}
+              isAdmin={isAdmin}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -21,9 +21,15 @@ type Props = {
   sceneBindings: SceneBindingRow[];
   onClose: () => void;
   onSaved: () => void;
+  // Called when admin saves with STATUS = DEPLOYED on an agent that
+  // isn't currently DEPLOYED. The editor strips the status field from
+  // its PATCH (server stays whatever it was) and asks the parent to
+  // open the standard Deploy confirm modal. Optional — create flow
+  // doesn't have an agent id to deploy yet.
+  onRequestDeploy?: (agentId: string) => void;
 };
 
-const STATUSES: AgentStatus[] = ["ONLINE", "STANDBY", "OFFLINE"];
+const STATUSES: AgentStatus[] = ["DEPLOYED", "STANDBY", "OFFLINE"];
 const MODES: AgentMode[] = ["AUTONOMOUS", "MECHANICAL"];
 
 type DropdownOption = { value: string; label: string };
@@ -33,11 +39,13 @@ function ThemedDropdown({
   options,
   onChange,
   isMech,
+  disabled,
 }: {
   value: string;
   options: DropdownOption[];
   onChange: (v: string) => void;
   isMech: boolean;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -78,11 +86,15 @@ function ThemedDropdown({
   void accent;
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={`relative ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}>
       <button
         type="button"
-        className={triggerCls}
-        onClick={() => setOpen((s) => !s)}
+        className={`${triggerCls} ${disabled ? "cursor-not-allowed" : ""}`}
+        onClick={() => {
+          if (disabled) return;
+          setOpen((s) => !s);
+        }}
+        disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -125,6 +137,7 @@ function SceneClaimList({
   agentCapabilities,
   isMech,
   onChange,
+  disabled,
 }: {
   sceneDefs: SerializableSceneDef[];
   sceneBindings: SceneBindingRow[];
@@ -133,6 +146,7 @@ function SceneClaimList({
   agentCapabilities: string[];
   isMech: boolean;
   onChange: (next: string[]) => void;
+  disabled?: boolean;
 }) {
   const t = useT();
   const ownerBySceneKey = useMemo(() => {
@@ -185,7 +199,7 @@ function SceneClaimList({
   }
 
   return (
-    <div className={`mt-1 rounded-md border ${accentBorder} bg-surface-container/40 divide-y divide-outline-variant/20`}>
+    <div className={`mt-1 rounded-md border ${accentBorder} bg-surface-container/40 divide-y divide-outline-variant/20 ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}>
       {visibleScenes.map((s) => {
         const isOn = selected.includes(s.key);
         const owner = ownerBySceneKey.get(s.key);
@@ -195,7 +209,8 @@ function SceneClaimList({
             key={s.key}
             type="button"
             onClick={() => toggle(s.key)}
-            className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-container/70 ${isOn ? accentBg : ""}`}
+            disabled={disabled}
+            className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent ${disabled ? "" : "hover:bg-surface-container/70"} ${isOn ? accentBg : ""}`}
           >
             <span
               className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isOn ? `${accentText} border-current` : "border-outline-variant"}`}
@@ -251,13 +266,29 @@ function blankFromInitial(initial: AgentRow | null) {
   };
 }
 
-export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, onClose, onSaved }: Props) {
+export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, onClose, onSaved, onRequestDeploy }: Props) {
   const t = useT();
   const [values, setValues] = useState(() => blankFromInitial(initial));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  // Holds the prepared PATCH body while the in-app OFFLINE confirm modal is up.
+  // Null = no pending confirmation; non-null = modal shown, `busy` stays true.
+  const [offlinePending, setOfflinePending] = useState<Record<string, unknown> | null>(null);
+  // In-app REMOVE confirm modal. Two-stage to mirror the legacy
+  // window.confirm flow: "initial" asks once, then if the agent owns
+  // SceneBindings the API returns 409 + sceneKeys and we promote to
+  // "cascade" stage to surface the list before the second confirm.
+  // Both stages enforce a 5s countdown before the destructive button
+  // enables — guards against muscle-memory double-confirms.
+  type RemoveStage =
+    | { kind: "initial" }
+    | { kind: "cascade"; sceneKeys: string[] }
+    | { kind: "running" }
+    | { kind: "error"; message: string };
+  const [removeModal, setRemoveModal] = useState<RemoveStage | null>(null);
+  const [removeCountdown, setRemoveCountdown] = useState(0);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -274,15 +305,53 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
     };
   }, [onClose]);
 
+  // 5s countdown gate on the REMOVE confirm. Resets every time the
+  // modal opens or its stage transitions (initial → cascade) so admin
+  // re-reads the new scene list before the button re-enables.
+  useEffect(() => {
+    if (!removeModal || removeModal.kind === "running" || removeModal.kind === "error") {
+      setRemoveCountdown(0);
+      return;
+    }
+    setRemoveCountdown(5);
+    const tick = setInterval(() => {
+      setRemoveCountdown((n) => (n > 0 ? n - 1 : 0));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [removeModal?.kind]);
+
   const portal = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
   if (!portal) return null;
+
+  // Lock semantics (2026-05-15): in edit mode the form's non-status fields
+  // are read-only when admin has picked a TO DEPLOY or OFFLINE transition
+  // (those are pure lifecycle flips — no data edits travel with them), or
+  // when the agent is persisted DEPLOYED and admin hasn't picked any
+  // transition (live agent: must withdraw to STANDBY before editing).
+  //
+  // Picking STANDBY (from DEPLOYED or OFFLINE) UNLOCKS the form — admin
+  // edits + the status flip commit together on save, and the editor's
+  // CANCEL button is the discard path. Create mode is never locked.
+  const initialStatus = initial?.status ?? null;
+  const pendingTransition = mode === "edit" && initialStatus !== null && values.status !== initialStatus;
+  const isStandbyTarget = values.status === "STANDBY";
+  const lockedByDeployed = mode === "edit" && initialStatus === "DEPLOYED";
+  const locked =
+    (pendingTransition && !isStandbyTarget) ||
+    (lockedByDeployed && !pendingTransition);
+  // SAVE is meaningless when locked-by-DEPLOYED AND no transition is picked
+  // — admin hasn't changed anything that can be persisted. Disable instead
+  // of swallowing the click.
+  const saveDisabled = busy || (lockedByDeployed && !pendingTransition);
 
   // Mode-driven accent: AUTONOMOUS = primary (green/cyan), MECHANICAL = secondary (gold).
   const isMech = values.mode === "MECHANICAL";
   const inputBase = isMech
     ? "mt-1 w-full rounded-md border border-secondary/20 bg-surface-container text-sm text-on-surface focus:border-secondary/60 focus:outline-none transition-colors"
     : "mt-1 w-full rounded-md border border-primary/20 bg-surface-container text-sm text-on-surface focus:border-primary/60 focus:outline-none transition-colors";
-  const inputCls = `${inputBase} h-10 px-3.5`;
+  // `disabled:` utilities give locked inputs both the visual cue (darker)
+  // and the standard "not-allowed" cursor on hover.
+  const inputCls = `${inputBase} h-10 px-3.5 disabled:opacity-50 disabled:cursor-not-allowed`;
   const labelCls = isMech
     ? "text-[11px] font-label uppercase tracking-[0.25em] text-secondary/70"
     : "text-[11px] font-label uppercase tracking-[0.25em] text-primary/60";
@@ -352,15 +421,48 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
       return;
     }
 
+    // Status transitions own the entire save. When pending, the rest of
+    // the form is locked (no data edits possible), so the only thing the
+    // save can commit is the lifecycle flip — gated by a confirm modal.
+    //
+    //   TO DEPLOY  → hand off to the DeployButton modal (plan + takeovers)
+    //   OFFLINE    → in-app rose modal, then PATCH (server runs withdraw txn)
+    //   STANDBY    → in-app rose modal (from DEPLOYED only — withdraw txn)
+    //   (no change) → normal PATCH with all form fields
+    const wantsDeploy =
+      mode === "edit" &&
+      values.status === "DEPLOYED" &&
+      initial?.status !== "DEPLOYED" &&
+      !!initial?.id;
+    const wentOffline =
+      mode === "edit" &&
+      values.status === "OFFLINE" &&
+      initial?.status !== "OFFLINE";
+    // STANDBY transitions intentionally do NOT route through a confirm
+    // modal: admin picked STANDBY precisely to unlock + edit fields, and
+    // SAVE commits the combined data + status flip in one PATCH (server
+    // runs the withdraw txn when transitioning from DEPLOYED). The
+    // editor's own CANCEL button is the discard path.
+
+    if (wantsDeploy && initial?.id && onRequestDeploy) {
+      // Fields are locked during the transition, so there's nothing to
+      // PATCH first — skip straight to the deploy confirm modal. Cancel
+      // there leaves the agent untouched; confirm runs the deploy txn.
+      setBusy(false);
+      onClose();
+      onRequestDeploy(initial.id);
+      return;
+    }
+
     const body: Record<string, unknown> = {
       codename: values.codename.trim(),
       codenameZh: values.codenameZh.trim() || null,
       nameEn: values.nameEn.trim(),
       nameZh: values.nameZh.trim(),
       mode: values.mode,
-      status: values.status,
       avatarUrl: values.avatarUrl.trim(),
       intentSceneKeys: values.intentSceneKeys,
+      status: values.status,
     };
     if (mode === "create" && !body.codename) {
       setBusy(false);
@@ -368,6 +470,19 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
       return;
     }
 
+    if (wentOffline) {
+      setOfflinePending(body);
+      return;
+    }
+
+    await submitBody(body);
+  }
+
+  // Single PATCH/POST commit path. The DEPLOYED transition has its own
+  // handoff (onRequestDeploy → DeployButton modal) and never reaches this
+  // function; OFFLINE / STANDBY transitions get here after their respective
+  // in-app confirm modals.
+  async function submitBody(body: Record<string, unknown>) {
     const url = mode === "create" ? "/api/agents" : `/api/agents/${initial?.id}`;
     const httpMethod = mode === "create" ? "POST" : "PATCH";
     const r = await fetch(url, {
@@ -385,37 +500,51 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
     onClose();
   }
 
-  async function onDelete() {
+  function onDelete() {
     if (!initial) return;
-    if (!confirm(format(t.agentControl.confirmRemove, { name: initial.codename }))) return;
-    // First attempt: no cascade. If the agent is bound to scenes the
-    // endpoint returns 409 + sceneKeys[] in the body, and we surface a
-    // second confirm listing the affected scenes before retrying with
-    // ?cascade=1 (atomic unbind + delete in one transaction).
-    let r = await fetch(`/api/agents/${initial.id}`, { method: "DELETE" });
-    if (r.status === 409) {
-      const j: { sceneKeys?: string[]; errorMessage?: string; error?: string } =
-        await r.json().catch(() => ({}));
-      if (Array.isArray(j.sceneKeys) && j.sceneKeys.length > 0) {
-        const confirmMsg = format(t.agentControl.confirmCascadeDelete, {
-          name: initial.codename,
-          n: String(j.sceneKeys.length),
-          scenes: j.sceneKeys.join("\n  • "),
-        });
-        if (!confirm(confirmMsg)) return;
-        r = await fetch(`/api/agents/${initial.id}?cascade=1`, { method: "DELETE" });
-      } else {
-        alert(`${t.agentControl.deleteFailed}: ${j.errorMessage ?? j.error ?? r.statusText}`);
-        return;
-      }
-    }
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      alert(`${t.agentControl.deleteFailed}: ${j.errorMessage ?? j.error ?? r.statusText}`);
+    setRemoveModal({ kind: "initial" });
+  }
+
+  // Initial DELETE (no cascade). The API returns 409 + sceneKeys when
+  // the agent still owns SceneBindings; we promote the modal to the
+  // "cascade" stage so admin can review the affected list before the
+  // second, atomic delete-with-unbind.
+  async function runDeleteInitial() {
+    if (!initial) return;
+    setRemoveModal({ kind: "running" });
+    const r = await fetch(`/api/agents/${initial.id}`, { method: "DELETE" });
+    if (r.ok) {
+      onSaved();
+      onClose();
       return;
     }
-    onSaved();
-    onClose();
+    const j: { sceneKeys?: string[]; errorMessage?: string; error?: string } =
+      await r.json().catch(() => ({}));
+    if (r.status === 409 && Array.isArray(j.sceneKeys) && j.sceneKeys.length > 0) {
+      setRemoveModal({ kind: "cascade", sceneKeys: j.sceneKeys });
+      return;
+    }
+    setRemoveModal({
+      kind: "error",
+      message: `${t.agentControl.deleteFailed}: ${j.errorMessage ?? j.error ?? r.statusText}`,
+    });
+  }
+
+  // Atomic unbind + delete. Only reachable from the cascade stage.
+  async function runDeleteCascade() {
+    if (!initial) return;
+    setRemoveModal({ kind: "running" });
+    const r = await fetch(`/api/agents/${initial.id}?cascade=1`, { method: "DELETE" });
+    if (r.ok) {
+      onSaved();
+      onClose();
+      return;
+    }
+    const j = await r.json().catch(() => ({}));
+    setRemoveModal({
+      kind: "error",
+      message: `${t.agentControl.deleteFailed}: ${j.errorMessage ?? j.error ?? r.statusText}`,
+    });
   }
 
   return createPortal(
@@ -457,15 +586,17 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
             <span className={labelCls}>{t.agentControl.fieldAvatar} *</span>
             <label
               className={[
-                "mt-1 relative block w-full aspect-[131/304] rounded-md overflow-hidden cursor-pointer group",
+                "mt-1 relative block w-full aspect-[131/304] rounded-md overflow-hidden group",
                 "border border-dashed transition-colors",
                 dashedCls,
+                locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
               ].join(" ")}
             >
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/avif"
                 className="sr-only"
+                disabled={locked}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) void onAvatarPick(f);
@@ -515,13 +646,37 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
                 }))}
                 onChange={(v) => update("mode", v as AgentMode)}
                 isMech={isMech}
+                disabled={locked}
               />
             </div>
             <div className="block">
               <span className={labelCls}>{t.agentControl.fieldStatus}</span>
               <ThemedDropdown
                 value={values.status}
-                options={STATUSES.map((s) => ({ value: s, label: s }))}
+                options={STATUSES.map((s) => {
+                  // Labels are derived from the *persisted* status (initial),
+                  // not the current dropdown value. So picking "TO DEPLOY"
+                  // and then cancelling the confirm modal puts the option
+                  // label back to "TO DEPLOY" — it stays an action label as
+                  // long as the row in DB isn't actually DEPLOYED yet.
+                  // Symmetric for OFFLINE: when the agent is persisted
+                  // OFFLINE the current-state label reads "OFFLINED" (same
+                  // word the DetailHeader badge + DeployButton use); for
+                  // other persisted states OFFLINE remains the action label.
+                  const persisted = initialStatus ?? values.status;
+                  const isDeployAction = s === "DEPLOYED" && persisted !== "DEPLOYED";
+                  const isOfflinedState = s === "OFFLINE" && persisted === "OFFLINE";
+                  const label = isDeployAction
+                    ? t.agentControl.deploy
+                    : isOfflinedState
+                      ? t.agentControl.offlined
+                      : s === "DEPLOYED"
+                        ? t.agentControl.statusDeployed
+                        : s === "STANDBY"
+                          ? t.agentControl.statusStandby
+                          : t.agentControl.statusOffline;
+                  return { value: s, label };
+                })}
                 onChange={(v) => update("status", v as AgentStatus)}
                 isMech={isMech}
               />
@@ -537,7 +692,7 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
                 required
                 maxLength={32}
                 pattern="[A-Z0-9-]+"
-                disabled={mode === "edit"}
+                disabled={locked}
               />
             </label>
             <label className="block">
@@ -547,17 +702,18 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
                 value={values.codenameZh}
                 onChange={(e) => update("codenameZh", e.target.value)}
                 maxLength={32}
+                disabled={locked}
               />
             </label>
 
             {/* Row 3: Role (EN, nameEn) | Role (ZH, nameZh) */}
             <label className="block">
               <span className={labelCls}>{t.agentControl.fieldNameEn}</span>
-              <input className={inputCls} value={values.nameEn} onChange={(e) => update("nameEn", e.target.value)} required />
+              <input className={inputCls} value={values.nameEn} onChange={(e) => update("nameEn", e.target.value)} required disabled={locked} />
             </label>
             <label className="block">
               <span className={labelCls}>{t.agentControl.fieldNameZh}</span>
-              <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required />
+              <input className={inputCls} value={values.nameZh} onChange={(e) => update("nameZh", e.target.value)} required disabled={locked} />
             </label>
 
             {/* Scene-claim multi-select: drives BackboneFlowEditor's contract
@@ -573,6 +729,7 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
                 agentCapabilities={initial?.capabilities ?? []}
                 isMech={isMech}
                 onChange={(next) => update("intentSceneKeys", next)}
+                disabled={locked}
               />
             </div>
 
@@ -596,7 +753,7 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
               </button>
               <button
                 type="submit"
-                disabled={busy}
+                disabled={saveDisabled}
                 className={submitCls}
               >
                 {busy ? t.agentControl.saving : t.agentControl.save}
@@ -614,6 +771,132 @@ export default function AgentEditor({ mode, initial, sceneDefs, sceneBindings, o
           onCancel={() => setCropSrc(null)}
           onApply={(blob) => void uploadCroppedBlob(blob)}
         />
+      ) : null}
+      {removeModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={
+            removeModal.kind === "cascade"
+              ? t.agentControl.confirmCascadeDeleteTitle
+              : t.agentControl.confirmRemoveTitle
+          }
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && removeModal.kind !== "running") {
+              setRemoveModal(null);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-lg border border-rose-400/40 bg-surface-container p-6 shadow-2xl">
+            <h2 className="font-label text-[12px] tracking-[0.3em] uppercase text-rose-300 mb-3">
+              {removeModal.kind === "cascade"
+                ? t.agentControl.confirmCascadeDeleteTitle
+                : t.agentControl.confirmRemoveTitle}
+            </h2>
+            {removeModal.kind === "initial" ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-on-surface-variant">
+                {format(t.agentControl.confirmRemove, { name: initial?.codename ?? "" })}
+              </p>
+            ) : removeModal.kind === "cascade" ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-on-surface-variant">
+                {format(t.agentControl.confirmCascadeDelete, {
+                  name: initial?.codename ?? "",
+                  n: String(removeModal.sceneKeys.length),
+                  scenes: removeModal.sceneKeys.join("\n  • "),
+                })}
+              </p>
+            ) : removeModal.kind === "running" ? (
+              <p className="text-sm text-on-surface-variant">{t.agentControl.saving}</p>
+            ) : (
+              <p className="text-sm text-rose-300">{removeModal.message}</p>
+            )}
+            <div className="mt-5 flex justify-end gap-3">
+              {removeModal.kind === "error" ? (
+                <button
+                  type="button"
+                  onClick={() => setRemoveModal(null)}
+                  className="min-h-[40px] px-5 py-1.5 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container/70 transition-colors"
+                >
+                  {t.agentControl.cancel}
+                </button>
+              ) : removeModal.kind === "running" ? null : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRemoveModal(null)}
+                    className="min-h-[40px] px-5 py-1.5 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container/70 transition-colors"
+                  >
+                    {t.agentControl.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={removeCountdown > 0}
+                    onClick={() => {
+                      if (removeModal.kind === "initial") void runDeleteInitial();
+                      else if (removeModal.kind === "cascade") void runDeleteCascade();
+                    }}
+                    className="min-h-[40px] px-5 py-1.5 border-2 border-rose-400 text-rose-300 bg-rose-400/10 font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-rose-400/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-rose-400/10"
+                  >
+                    {removeCountdown > 0
+                      ? `${t.agentControl.remove} (${removeCountdown})`
+                      : t.agentControl.remove}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {offlinePending ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.agentControl.confirmOfflineTitle}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setOfflinePending(null);
+              setBusy(false);
+              if (initial) update("status", initial.status);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-lg border border-rose-400/40 bg-surface-container p-6 shadow-2xl">
+            <h2 className="font-label text-[12px] tracking-[0.3em] uppercase text-rose-300 mb-3">
+              {t.agentControl.confirmOfflineTitle}
+            </h2>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-on-surface-variant">
+              {format(t.agentControl.confirmOffline, { name: initial?.codename ?? "" })}
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  // Revert the dropdown so the form releases its lock —
+                  // admin lands back in the pre-transition state.
+                  setOfflinePending(null);
+                  setBusy(false);
+                  if (initial) update("status", initial.status);
+                }}
+                className="min-h-[40px] px-5 py-1.5 border border-outline-variant text-on-surface-variant font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-surface-container/70 transition-colors"
+              >
+                {t.agentControl.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const body = offlinePending;
+                  setOfflinePending(null);
+                  void submitBody(body);
+                }}
+                className="min-h-[40px] px-5 py-1.5 border-2 border-rose-400 text-rose-300 bg-rose-400/10 font-label text-[10px] tracking-[0.3em] uppercase rounded-md hover:bg-rose-400/20 transition-colors"
+              >
+                {t.agentControl.confirmOfflineAction}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>,
     portal,

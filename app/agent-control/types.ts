@@ -11,7 +11,7 @@ import type {
 // 2026-05-10 collapse.
 export type HandlerKind = AgentSkillKind;
 
-export type AgentStatus = "ONLINE" | "STANDBY" | "OFFLINE";
+export type AgentStatus = "DEPLOYED" | "STANDBY" | "OFFLINE";
 export type AgentMode = "MECHANICAL" | "AUTONOMOUS";
 
 export interface AgentRow {
@@ -102,6 +102,7 @@ export interface SceneBindingRow {
   agentCapabilities: string[];
   enabled: boolean;
   notes: string | null;
+  customLabel: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -135,6 +136,10 @@ export interface BoundSceneSummary {
   //             is materialized. Rendered with a distinct style in
   //             BackboneFlowEditor's BEGIN/END nodes.
   via: "binding" | "intent";
+  // True when the scene def carries a `sampleCtx` (Test Run can exercise
+  // it). False → Test Run modal disables the checkbox with a "no
+  // sampleCtx" hint.
+  hasSampleCtx: boolean;
 }
 
 // Compact agent reference for the scene-binding agent picker (no

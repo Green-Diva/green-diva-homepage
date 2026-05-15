@@ -359,7 +359,7 @@ export interface Dictionary {
     pageSubtitle: string; // {{filled}}/{{total}}
     agentRoster: string;
     ordainAgent: string;
-    statusOnline: string;
+    statusDeployed: string;
     statusStandby: string;
     statusOffline: string;
     modeMechanical: string;
@@ -391,6 +391,8 @@ export interface Dictionary {
     avatarRequired: string;
     deploy: string;
     redeploy: string;
+    deployed: string;
+    offlined: string;
     deploying: string;
     deploySuccess: string;
     deployFailed: string;
@@ -399,6 +401,42 @@ export interface Dictionary {
     deployTakeoverFromPrefix: string;
     deployTakeoverLiveBadge: string;
     deployTakeoverConfirm: string;
+    deployConfirmTitle: string;
+    deployConfirmBody: string; // {codename}
+    deployConfirmIntent: string;
+    deployConfirmIntentEmpty: string;
+    deployConfirmTakeovers: string;
+    deployConfirmOrphans: string;
+    deployConfirmTestBadge: string;
+    deployConfirmSkipBadge: string;
+    deployConfirmAction: string;
+    deployRunningTitle: string;
+    deployRunningBody: string;
+    deployRunningTesting: string;
+    deploySuccessTitle: string;
+    deploySuccessBody: string;
+    deploySuccessTested: string;
+    deploySuccessSkipped: string;
+    deployFailureTitle: string;
+    deployFailureBody: string;
+    deployFailureError: string;
+    deployFailureRunLog: string;
+    deployRetry: string;
+    close: string;
+    testRun: string;
+    testRunTitle: string;
+    testRunSelectTitle: string;
+    testRunSelectBody: string;
+    testRunStart: string;
+    testRunRunningTitle: string;
+    testRunRunningBody: string;
+    testRunResultTitle: string;
+    testRunBack: string;
+    testRunNoBindings: string;
+    testRunNoSampleCtx: string;
+    testRunTestBadge: string;
+    testRunSkipBadge: string;
+    testRunIntentBadge: string;
     deployedAt: string; // {{when}}
     deployStatusDraft: string;
     deployStatusDeployed: string;
@@ -425,6 +463,11 @@ export interface Dictionary {
     remove: string;
     confirmRemove: string; // {{name}}
     confirmCascadeDelete: string; // {{name}} {{n}} {{scenes}}
+    confirmOffline: string; // {{name}}
+    confirmOfflineTitle: string;
+    confirmOfflineAction: string;
+    confirmRemoveTitle: string;
+    confirmCascadeDeleteTitle: string;
     deleteFailed: string;
     emptyState: string;
     noAgentSelected: string;
@@ -478,11 +521,19 @@ export interface Dictionary {
     sceneStateAgentMissing: string;
     sceneStateAgentNotDeployed: string;
     sceneEditorTitle: string; // {{key}}
+    sceneEditorCustomLabelHint: string; // {{label}}
+    sceneEditorSceneName: string;
+    sceneEditorEditLabel: string;
+    sceneEditorEditNotes: string;
+    sceneEditorNotesEmpty: string;
+    sceneEditorNotesHint: string;
     sceneEditorAgent: string;
     sceneEditorAgentHint: string;
     sceneEditorAgentMissing: string;
     sceneEditorEnabled: string;
     sceneEditorEnabledHint: string;
+    sceneEditorToggleEnabled: string;
+    sceneEditorToggleDisabled: string;
     sceneEditorNotes: string;
     sceneEditorContextFields: string;
     sceneEditorOutputFields: string;
@@ -493,6 +544,11 @@ export interface Dictionary {
     sceneEditorRunning: string;
     sceneEditorResultOk: string;
     sceneEditorResultErr: string;
+    sceneEditorResultSkip: string;
+    sceneEditorResultRunLog: string;
+    sceneEditorResultOutput: string;
+    sceneEditorSampleRunNoCtx: string;
+    sceneEditorSampleRunMissingBadge: string;
     sceneEditorSampleCtxInvalid: string;
     skillLibraryTitle: string;
     skillLevel: string;

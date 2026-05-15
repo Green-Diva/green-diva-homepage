@@ -33,6 +33,10 @@ export type SerializableSceneDef = {
   // runLog).
   contextFields: SchemaFieldHint[];
   outputFields: SchemaFieldHint[];
+  // True when the scene defines a sampleCtx (Deploy gate will run a
+  // smoke test against it). False when admin will see "skipped" in the
+  // deploy result for this scene.
+  hasSampleCtx: boolean;
 };
 
 type ZodLike = { _def?: { typeName?: string; innerType?: ZodLike; type?: ZodLike } };
@@ -111,6 +115,7 @@ export function serializeScene(scene: AnySceneDefinition): SerializableSceneDef 
     requiredCapabilities: scene.requiredCapabilities,
     contextFields: describeZod(scene.contextSchema),
     outputFields: describeZod(scene.outputSchema),
+    hasSampleCtx: scene.sampleCtx !== undefined,
   };
 }
 

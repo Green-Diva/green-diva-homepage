@@ -14,6 +14,7 @@
 import "server-only";
 import { z } from "zod";
 import { registerScene, registerSceneAlias } from "@/lib/agent-service";
+import { SMOKE_PHOTO_DATA_URI } from "@/lib/relics/smokeFixtures";
 
 // — Shared structural primitives — ——————————————————————————————————
 //
@@ -107,6 +108,19 @@ export const relicDraftMetadataScene = registerScene({
     imageAbsPaths: ctx.imageAbsPaths,
     textExcerpts: ctx.textExcerpts,
   }),
+  // Deploy-gate / Test-Run smoke ctx (2026-05-15). Uses an empty image
+  // set + fictional brief so the Lore Forge DAG exercises Gemini metadata
+  // derivation without needing real workspace files. The downstream
+  // pipeline step that writes metadata back to RelicDraft is NOT invoked
+  // (test runs `executeAgent` directly, not the draft pipeline runner),
+  // so this is fs-safe.
+  sampleCtx: {
+    workspaceSlug: "_smoke-test",
+    userBrief: "A fictional relic used only for agent smoke-testing. Generate plausible bilingual metadata.",
+    fileSummary: "(smoke test — no workspace files)",
+    imageAbsPaths: [],
+    textExcerpts: "",
+  },
 });
 
 // Legacy alias — drop after SceneBinding.sceneKey rows have been migrated.
@@ -172,6 +186,19 @@ export const relicNetworkImageSearchScene = registerScene({
     referenceImageAbs: ctx.referenceImageAbs,
     relicSlug: ctx.relicSlug,
   }),
+  // Test-Run smoke ctx (2026-05-15). Reference image is a 1×1 PNG; this
+  // is deliberately useless as a Vision query (zero matches expected),
+  // but the call path through Vision API + Gemini scoring still
+  // exercises end-to-end. ensureSmokeFixtures() in lib/relics/smokeFixtures.ts
+  // writes the reference PNG to disk before each test run so the Gemini
+  // vision skill (imagePathsField) can read it.
+  sampleCtx: {
+    relicId: "_smoke-test-id",
+    relicSlug: "_smoke-test",
+    referenceImageBase64:
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P//PwAFBwIAnwEYjwAAAABJRU5ErkJggg==",
+    referenceImageAbs: "/tmp/_smoke-test-ref.png",
+  },
 });
 
 // — relic.regenMetadata —
@@ -218,6 +245,17 @@ export const relicRegenMetadataScene = registerScene({
     existingLore: ctx.existingLore,
     feedback: ctx.feedback,
   }),
+  // Deploy-gate smoke test (2026-05-15). Pure LLM path — no FS lookups
+  // against relicSlug, no _relicWriteback. Burns one Gemini call per
+  // deploy of any agent claiming this scene; cost is bounded.
+  sampleCtx: {
+    relicSlug: "_smoke-test",
+    existingLore: {
+      zh: "这是一件用于部署冒烟测试的虚构圣物。它通体由墨绿色辉石雕成，表面刻有失传文字,据传能在持有者梦中低语未完成的承诺。",
+      en: "A fictional relic used solely for deploy smoke-testing. Carved from a single piece of dark green olivine, its surface bears glyphs from a lost script said to whisper unfulfilled promises into the dreams of whoever holds it.",
+    },
+    feedback: "",
+  },
 });
 
 // — relic.enhance2d —
@@ -275,6 +313,17 @@ export const relicEnhance2dScene = registerScene({
     mode: "2dEnhance",
     kind: "enhanced",
   }),
+  // Test-Run smoke ctx (2026-05-15). 128×128 JPEG with a clear foreground
+  // subject (see SMOKE_PHOTO_DATA_URI). Will trigger fal.ai cutout (~$0.01)
+  // + write a persist-output file under
+  // private/relics/_smoke-test/derived/enhanced-*.png. `_relicId` points
+  // at a non-existent relic id so the runner's _relicWriteback hook
+  // silently no-ops (relic row not found → update skipped, no DB churn).
+  sampleCtx: {
+    relicId: "_smoke-test-id",
+    relicSlug: "_smoke-test",
+    imageDataUri: SMOKE_PHOTO_DATA_URI,
+  },
 });
 
 // — relic.create3d —
@@ -351,4 +400,22 @@ export const relicCreate3dScene = registerScene({
     kind: "model",
     opts: ctx.opts,
   }),
+  // Test-Run smoke ctx (2026-05-15). ⚠️ EXPENSIVE — submits a real Meshy
+  // image-to-3D task (~$0.20-$0.50, 3-15 min). Use this sparingly. The
+  // 128×128 SMOKE_PHOTO_DATA_URI will produce a low-fidelity model but
+  // exercises the submit → poll → download → persist path end-to-end.
+  // Admin should uncheck this scene in Test Run unless explicitly
+  // validating the Meshy pipeline.
+  sampleCtx: {
+    relicId: "_smoke-test-id",
+    relicSlug: "_smoke-test",
+    imageDataUri: SMOKE_PHOTO_DATA_URI,
+    // Mirror the production /api/relics/[id]/create-3d defaulting (opts = {}).
+    // Without this, prepareAgentInput injects `opts: undefined` into agent.input,
+    // the meshy node's merge surfaces `{ opts: undefined }`, and the skill
+    // inputSchema validator (`"opts" in value` is true for an `undefined`-valued
+    // key) rejects it as `expected object, got undefined` — failing the smoke
+    // test at 0.0s before any Meshy submit.
+    opts: {},
+  },
 });

@@ -160,6 +160,15 @@ export default function AgentClient({
     [orderedAgents, activeId],
   );
 
+  // After a remove (or any external refresh that drops the row), the
+  // activeId can dangle. Auto-snap to the first remaining roster entry so
+  // admin sees the next agent instead of the empty "Pick an agent" state.
+  useEffect(() => {
+    if (activeId && !orderedAgents.find((a) => a.id === activeId)) {
+      setActiveId(orderedAgents[0]?.id ?? null);
+    }
+  }, [orderedAgents, activeId]);
+
   const activeEquips: EquipRow[] = useMemo(
     () => (activeId ? (equipsByAgentId[activeId] ?? []) : []),
     [activeId, equipsByAgentId],
@@ -174,6 +183,16 @@ export default function AgentClient({
   }
   function onSaved() {
     router.refresh();
+  }
+
+  // "Save in Tune Agent with STATUS = DEPLOYED" should drop into the
+  // normal Deploy confirm flow. AgentEditor strips the status field from
+  // its PATCH (server stays STANDBY), then calls this to nudge the
+  // DeployButton's confirm modal open. We key by Date.now() so the same
+  // user picking DEPLOYED twice in a row still re-triggers the effect.
+  const [autoDeploy, setAutoDeploy] = useState<{ agentId: string; nonce: number } | null>(null);
+  function requestDeploy(agentId: string) {
+    setAutoDeploy({ agentId, nonce: Date.now() });
   }
 
   return (
@@ -316,6 +335,9 @@ export default function AgentClient({
                   equips={activeEquips}
                   allSkills={skills}
                   isAdmin={isAdmin}
+                  sceneDefs={sceneDefs}
+                  sceneBindings={sceneBindings}
+                  autoDeployNonce={autoDeploy?.agentId === activeAgent.id ? autoDeploy.nonce : null}
                   onEdit={openEdit}
                   onShowJobs={() => setJobsOpen(true)}
                 />
@@ -325,6 +347,9 @@ export default function AgentClient({
                   equips={activeEquips}
                   allSkills={skills}
                   isAdmin={isAdmin}
+                  sceneDefs={sceneDefs}
+                  sceneBindings={sceneBindings}
+                  autoDeployNonce={autoDeploy?.agentId === activeAgent.id ? autoDeploy.nonce : null}
                   onEdit={openEdit}
                   onShowJobs={() => setJobsOpen(true)}
                 />
@@ -347,6 +372,7 @@ export default function AgentClient({
           sceneBindings={sceneBindings}
           onClose={() => setEditor((s) => ({ ...s, open: false }))}
           onSaved={onSaved}
+          onRequestDeploy={requestDeploy}
         />
       ) : null}
 

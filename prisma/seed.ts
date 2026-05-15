@@ -213,7 +213,7 @@ const AGENT_SEEDS = [
     nameEn: "Neural Operator",
     nameZh: "神经网络接线员",
     mode: "MECHANICAL" as const,
-    status: "ONLINE" as const,
+    status: "DEPLOYED" as const,
     syncLevel: 98.6,
     matrixLevel: 14,
     quickness: 82,
