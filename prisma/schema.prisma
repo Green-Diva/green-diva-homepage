@@ -133,10 +133,18 @@ model Relic {
   // 2D form: best-pick image (post-Smart Image Picker). Admin can change
   // which candidate is the primary in the review UI.
   primaryImagePath   String?
-  // 2D-enhanced (post-cutout, transparent PNG). Set by the Background
-  // Cutout skill via the "2dEnhance" agent path. Required input for the
-  // 3D create path.
-  enhancedImagePath  String?
+  // 2D-enhance history. Array of
+  //   { path, sourceCandidatePath, model, operatingResolution, refineForeground, createdAt, jobId? }
+  // capped at 16 entries (oldest evicted). Set by the runner's writeback
+  // hook in lib/skills/runtime/runner.ts when an enhance2d agent emits
+  // _relicWriteback.fields.enhancedItem — runner performs a read-modify-
+  // write upsert keyed on sourceCandidatePath (same source re-enhanced
+  // overwrites its previous entry). Required-non-empty for the 3D path.
+  //
+  // Replaces the legacy single-string `enhancedImagePath` column
+  // (retired 2026-05-19 via migrate-replace-enhanced-image-path.ts);
+  // any reader needing "the primary enhance" should take enhancedImages[0].
+  enhancedImages     Json?
   // Smart Image Picker's full candidate set (user uploads + downloaded
   // network images), with admin's per-item delete + primary toggle state.
   // See lib/skills/handlers/internal/smartImagePicker.ts for shape.

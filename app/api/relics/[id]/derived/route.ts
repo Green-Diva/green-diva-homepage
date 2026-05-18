@@ -88,16 +88,21 @@ export async function GET(
     }
   }
 
-  // 5. enhanced — current 2D-enhance asset (one per relic).
-  if (relic.enhancedImagePath) {
-    const abs = resolveRelicAsset(relic.enhancedImagePath);
-    if (abs) {
-      try {
-        zip.file(`enhanced/${path.basename(abs)}`, await fs.readFile(abs));
-        added++;
-      } catch (e) {
-        console.warn("[api/relics/derived] enhanced read failed", e);
-      }
+  // 5. enhanced — all 2D-enhance assets (Relic.enhancedImages array,
+  // up to 16 entries). Each file's basename is unique (ts+rand), so we
+  // can dump them flat under enhanced/ without collisions.
+  const enhancedList: Array<{ path?: string }> = Array.isArray(relic.enhancedImages)
+    ? (relic.enhancedImages as Array<{ path?: string }>)
+    : [];
+  for (const entry of enhancedList) {
+    if (typeof entry?.path !== "string") continue;
+    const abs = resolveRelicAsset(entry.path);
+    if (!abs) continue;
+    try {
+      zip.file(`enhanced/${path.basename(abs)}`, await fs.readFile(abs));
+      added++;
+    } catch (e) {
+      console.warn("[api/relics/derived] enhanced read failed", e);
     }
   }
 
@@ -132,7 +137,7 @@ export async function GET(
       status: relic.status,
       draftNote: relic.draftNote,
       primaryImagePath: relic.primaryImagePath,
-      enhancedImagePath: relic.enhancedImagePath,
+      enhancedImages: relic.enhancedImages,
       modelPath: relic.modelPath,
       candidateImages: relic.candidateImages,
       materials: relic.materials,

@@ -20,6 +20,13 @@ import { readRelicImageAsDataUri, ReadImageError } from "@/lib/relics/readImageA
 // Body schema for the pre-flight 3D config dialog. All fields optional —
 // missing keys fall back to the meshy3d handler's defaults (PBR / HD /
 // auto-size all on, GLB only, auto symmetry, standard model_type).
+//
+// `items: [{enhancedPath}, ...]` is a protocol-level placeholder for the
+// future "multi-view fusion" Meshy endpoint — the modal allows admin to
+// multi-select enhanced sources to convey "use these views for back/side
+// detail". For now the server still calls single-image Meshy and just
+// uses the FIRST enhanced entry, regardless of items[]. Reserving the
+// shape here means future swap-in is API-compatible.
 const Body = z
   .object({
     enablePbr: z.boolean().optional(),
@@ -30,6 +37,11 @@ const Body = z
     targetPolycount: z.number().int().min(100).max(300_000).optional(),
     symmetryMode: z.enum(["off", "auto", "on"]).optional(),
     modelType: z.enum(["standard", "lowpoly"]).optional(),
+    items: z
+      .array(z.object({ enhancedPath: z.string().min(1) }).strict())
+      .min(1)
+      .max(16)
+      .optional(),
   })
   .strict();
 
@@ -64,23 +76,35 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const relic = await prisma.relic.findUnique({
     where: { id },
-    select: { id: true, slug: true, nameEn: true, enhancedImagePath: true, modelPath: true },
+    select: { id: true, slug: true, nameEn: true, enhancedImages: true, modelPath: true },
   });
   if (!relic) return NextResponse.json({ error: "relic not found" }, { status: 404 });
-  if (!relic.enhancedImagePath) {
+  const enhancedList: Array<{ path?: string }> = Array.isArray(relic.enhancedImages)
+    ? (relic.enhancedImages as Array<{ path?: string }>)
+    : [];
+  if (enhancedList.length === 0) {
     return NextResponse.json(
-      { error: "需要先完成 2D 增强 (Relic.enhancedImagePath is null)" },
+      { error: "需要先完成 2D 增强 (Relic.enhancedImages is empty)" },
+      { status: 409 },
+    );
+  }
+
+  // Single-image Meshy: just take the first entry. items[] from the body
+  // is intentionally ignored — see Body schema comment for the future
+  // multi-view fusion plan.
+  const enhancedPath = enhancedList[0].path;
+  if (!enhancedPath) {
+    return NextResponse.json(
+      { error: "enhancedImages[0] has no path" },
       { status: 409 },
     );
   }
 
   // Pipeline-layer read: pull the enhanced PNG off disk and base64-
-  // encode it here so the agent DAG never has to. Replaces the slot-0
-  // image-to-data-uri INTERNAL skill that used to live inside
-  // MESHY-FORGE-001.
+  // encode it here so the agent DAG never has to.
   let imageDataUri: string;
   try {
-    const enc = await readRelicImageAsDataUri(relic.enhancedImagePath);
+    const enc = await readRelicImageAsDataUri(enhancedPath);
     imageDataUri = enc.dataUri;
   } catch (e) {
     if (e instanceof ReadImageError) {
@@ -91,6 +115,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "image read failed" }, { status: 500 });
   }
 
+  // Don't forward items[] into the scene ctx — the scene's contextSchema
+  // doesn't know about it and the dispatcher would reject. Items is a
+  // protocol-level placeholder, not a scene input.
+  const { items: _ignored, ...meshyOpts } = opts;
+  void _ignored;
+
   let dispatch;
   try {
     dispatch = await dispatchScene(
@@ -99,7 +129,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         relicId: relic.id,
         relicSlug: relic.slug,
         imageDataUri,
-        opts,
+        opts: meshyOpts,
       },
       { actor: { userId: me.id, level: me.level, name: me.name } },
     );

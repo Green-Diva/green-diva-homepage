@@ -348,8 +348,12 @@ function isObject(v: unknown): v is Record<string, unknown> {
 // `_relicWriteback.fields` channel. Anything else is dropped with a
 // warning — we don't let agents write arbitrary columns (passwordHash,
 // extractedById, status…) through this hook.
+//
+// `enhancedItem` is special: it's a single object envelope (not a Relic
+// column directly) that gets upserted into the `enhancedImages` Json
+// array column via a read-modify-write below.
 const ALLOWED_WRITEBACK_FIELDS = new Set<string>([
-  "enhancedImagePath",
+  "enhancedItem",
   "modelPath",
   "primaryImagePath",
   "loreZh",
@@ -364,6 +368,38 @@ const ALLOWED_WRITEBACK_FIELDS = new Set<string>([
   "pipelineTrace",
 ]);
 
+// Max entries kept in Relic.enhancedImages. When a new item arrives and
+// the array is at the cap, the oldest entry (by createdAt asc) is evicted.
+const ENHANCED_IMAGES_CAP = 16;
+
+type EnhancedImageEntry = {
+  path: string;
+  sourceCandidatePath: string;
+  model: string;
+  operatingResolution: string;
+  refineForeground: boolean;
+  createdAt: string;
+  jobId?: string;
+};
+
+function coerceEnhancedItem(v: unknown): EnhancedImageEntry | null {
+  if (!isObject(v)) return null;
+  const path = typeof v.path === "string" ? v.path : null;
+  const sourceCandidatePath =
+    typeof v.sourceCandidatePath === "string" ? v.sourceCandidatePath : null;
+  if (!path || !sourceCandidatePath) return null;
+  return {
+    path,
+    sourceCandidatePath,
+    model: typeof v.model === "string" ? v.model : "General Use (Light)",
+    operatingResolution:
+      typeof v.operatingResolution === "string" ? v.operatingResolution : "1024x1024",
+    refineForeground: v.refineForeground === false ? false : true,
+    createdAt: typeof v.createdAt === "string" ? v.createdAt : new Date().toISOString(),
+    ...(typeof v.jobId === "string" ? { jobId: v.jobId } : {}),
+  };
+}
+
 async function maybeWriteRelicAsset(rawOutput: unknown): Promise<void> {
   if (!isObject(rawOutput)) return;
   const wb = rawOutput._relicWriteback;
@@ -372,7 +408,9 @@ async function maybeWriteRelicAsset(rawOutput: unknown): Promise<void> {
   const fields = isObject(wb.fields) ? wb.fields : null;
   if (!id || !fields) return;
 
-  const safe: Record<string, unknown> = {};
+  // Split fields: direct (set column) vs. special (enhancedItem upsert).
+  const direct: Record<string, unknown> = {};
+  let enhancedItem: EnhancedImageEntry | null = null;
   for (const [k, v] of Object.entries(fields)) {
     if (!ALLOWED_WRITEBACK_FIELDS.has(k)) {
       console.warn(
@@ -380,17 +418,71 @@ async function maybeWriteRelicAsset(rawOutput: unknown): Promise<void> {
       );
       continue;
     }
-    safe[k] = v;
+    if (k === "enhancedItem") {
+      enhancedItem = coerceEnhancedItem(v);
+      if (!enhancedItem) {
+        console.warn(
+          `[agent-job:run] enhancedItem missing path/sourceCandidatePath for relic ${id} — skipped`,
+        );
+      }
+      continue;
+    }
+    direct[k] = v;
   }
-  if (Object.keys(safe).length === 0) return;
 
-  try {
-    await prisma.relic.update({
-      where: { id },
-      data: safe as unknown as Prisma.RelicUpdateInput,
-    });
-  } catch (e) {
-    console.error(`[agent-job:run] writeback failed for relic ${id}:`, e);
+  // Direct fields: single .update() like before.
+  if (Object.keys(direct).length > 0) {
+    try {
+      await prisma.relic.update({
+        where: { id },
+        data: direct as unknown as Prisma.RelicUpdateInput,
+      });
+    } catch (e) {
+      console.error(`[agent-job:run] writeback failed for relic ${id}:`, e);
+    }
+  }
+
+  // enhancedItem: read-modify-write upsert keyed on sourceCandidatePath.
+  // Same source re-enhanced → replace that entry. New source → append.
+  // Cap at ENHANCED_IMAGES_CAP, evicting oldest by createdAt.
+  if (enhancedItem) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const current = await tx.relic.findUnique({
+          where: { id },
+          select: { enhancedImages: true },
+        });
+        if (!current) return;
+        const arr: EnhancedImageEntry[] = Array.isArray(current.enhancedImages)
+          ? (current.enhancedImages as unknown[])
+              .map(coerceEnhancedItem)
+              .filter((e): e is EnhancedImageEntry => e !== null)
+          : [];
+        const idx = arr.findIndex(
+          (e) => e.sourceCandidatePath === enhancedItem!.sourceCandidatePath,
+        );
+        if (idx >= 0) {
+          arr[idx] = enhancedItem!;
+        } else {
+          arr.push(enhancedItem!);
+        }
+        // Evict oldest entries when over cap. Sort ascending by createdAt,
+        // drop the head until length === cap.
+        if (arr.length > ENHANCED_IMAGES_CAP) {
+          arr.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+          arr.splice(0, arr.length - ENHANCED_IMAGES_CAP);
+        }
+        await tx.relic.update({
+          where: { id },
+          data: { enhancedImages: arr as unknown as Prisma.InputJsonValue },
+        });
+      });
+    } catch (e) {
+      console.error(
+        `[agent-job:run] enhancedImages upsert failed for relic ${id}:`,
+        e,
+      );
+    }
   }
 }
 

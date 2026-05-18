@@ -45,7 +45,21 @@ export const relicCreateSchema = z.object({
   password: z.string().min(4).max(128).optional().nullable(),
   // Phase 5+ fields. Admin can edit them in the review UI.
   primaryImagePath: slugScopedPath.optional().nullable(),
-  enhancedImagePath: slugScopedPath.optional().nullable(),
+  enhancedImages: z
+    .array(
+      z.object({
+        path: slugScopedPath,
+        sourceCandidatePath: z.string().min(1).max(512),
+        model: z.string().min(1).max(64),
+        operatingResolution: z.string().min(1).max(32),
+        refineForeground: z.boolean(),
+        createdAt: z.string().min(1).max(64),
+        jobId: z.string().min(1).max(64).optional(),
+      }),
+    )
+    .max(16)
+    .optional()
+    .nullable(),
   candidateImages: z.array(candidateImageSchema).max(40).optional().nullable(),
   materials: z
     .array(

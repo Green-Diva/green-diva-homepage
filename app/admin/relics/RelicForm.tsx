@@ -44,10 +44,38 @@ type FormState = {
   archivePath: string;
   derivedArchivePath: string;
   primaryImagePath: string | null;
-  enhancedImagePath: string | null;
   candidateImages: CandidateImage[] | null;
+  enhancedImages: EnhancedImageEntry[];
   materials: Material[];
 };
+
+// Mirrors Relic.enhancedImages JSON shape. The runner upserts entries
+// keyed on sourceCandidatePath; PATCH cascade prune drops entries whose
+// source is now soft-deleted in candidateImages.
+export type EnhancedImageEntry = {
+  path: string;
+  sourceCandidatePath: string;
+  model: string;
+  operatingResolution: string;
+  refineForeground: boolean;
+  createdAt: string;
+  jobId?: string;
+};
+
+// Drop enhancedImages entries whose source candidate is now soft-deleted.
+// Mirror of the server-side PATCH cascade prune in
+// app/api/relics/[id]/route.ts — kept here so admin sees the effect
+// instantly without waiting for 镌刻.
+function pruneEnhancedAgainstCandidates(
+  enhanced: EnhancedImageEntry[],
+  candidates: CandidateImage[],
+): EnhancedImageEntry[] {
+  const deletedSet = new Set(
+    candidates.filter((c) => c.deleted === true).map((c) => c.path),
+  );
+  if (deletedSet.size === 0) return enhanced;
+  return enhanced.filter((e) => !deletedSet.has(e.sourceCandidatePath));
+}
 
 const EMPTY: FormState = {
   slot: 1,
@@ -67,7 +95,7 @@ const EMPTY: FormState = {
   archivePath: "",
   derivedArchivePath: "",
   primaryImagePath: null,
-  enhancedImagePath: null,
+  enhancedImages: [],
   candidateImages: null,
   materials: [],
 };
@@ -177,7 +205,9 @@ export default function RelicForm({
           archivePath: d.archivePath ?? "",
           derivedArchivePath: d.derivedArchivePath ?? "",
           primaryImagePath: typeof d.primaryImagePath === "string" ? d.primaryImagePath : null,
-          enhancedImagePath: typeof d.enhancedImagePath === "string" ? d.enhancedImagePath : null,
+          enhancedImages: Array.isArray(d.enhancedImages)
+            ? (d.enhancedImages as EnhancedImageEntry[])
+            : [],
           candidateImages: Array.isArray(d.candidateImages)
             ? (d.candidateImages as CandidateImage[])
             : null,
@@ -210,7 +240,9 @@ export default function RelicForm({
           archivePath: d.archivePath ?? "",
           derivedArchivePath: d.derivedArchivePath ?? "",
           primaryImagePath: typeof d.primaryImagePath === "string" ? d.primaryImagePath : null,
-          enhancedImagePath: typeof d.enhancedImagePath === "string" ? d.enhancedImagePath : null,
+          enhancedImages: Array.isArray(d.enhancedImages)
+            ? (d.enhancedImages as EnhancedImageEntry[])
+            : [],
           candidateImages: Array.isArray(d.candidateImages)
             ? (d.candidateImages as CandidateImage[])
             : null,
@@ -240,6 +272,11 @@ export default function RelicForm({
       loreEn: state.loreEn || null,
       loreZh: state.loreZh || null,
       ...(state.candidateImages !== null ? { candidateImages: state.candidateImages } : {}),
+      // Always round-trip enhancedImages so a client-side cascade prune
+      // (admin soft-deleted a candidate → matching enhance dropped from
+      // state) actually persists. The server PATCH endpoint repeats the
+      // prune as a safety net but expects the client to send the array.
+      enhancedImages: state.enhancedImages,
       materials: state.materials,
       ...(state.primaryImagePath !== null ? { primaryImagePath: state.primaryImagePath } : {}),
       // modelPath / archivePath / derivedArchivePath are not editable in this
@@ -303,7 +340,7 @@ export default function RelicForm({
                 mode="edit"
                 resourceId={initial.id}
                 hasPrimary={!!state.primaryImagePath}
-                hasEnhanced={!!state.enhancedImagePath}
+                hasEnhanced={state.enhancedImages.length > 0}
                 hasModel={!!state.modelPath}
                 nameZh={state.meta.nameZh}
                 nameEn={state.meta.nameEn}
@@ -315,6 +352,21 @@ export default function RelicForm({
                 isAdmin
                 detailSlug={state.slug}
                 onAssetUpdated={() => void refetchRelic()}
+                candidates={(state.candidateImages ?? [])
+                  .filter((c) => c.deleted !== true)
+                  .map((c) => ({
+                    path: c.path,
+                    source: c.source,
+                    ...(c.originalFilename ? { originalFilename: c.originalFilename } : {}),
+                  }))}
+                enhancedItems={state.enhancedImages.map((e) => ({
+                  path: e.path,
+                  sourceCandidatePath: e.sourceCandidatePath,
+                  model: e.model,
+                  operatingResolution: e.operatingResolution,
+                  refineForeground: e.refineForeground,
+                  createdAt: e.createdAt,
+                }))}
                 t={t}
               />
             ) : null}
@@ -416,10 +468,19 @@ export default function RelicForm({
                     primaryPath={state.primaryImagePath}
                     onChange={(next) => {
                       const others = (state.candidateImages ?? []).filter((c) => c.source !== "user");
+                      const mergedCandidates = [...others, ...next.candidates];
                       setState((s) => ({
                         ...s,
-                        candidateImages: [...others, ...next.candidates],
+                        candidateImages: mergedCandidates,
                         primaryImagePath: next.primaryPath,
+                        // Cascade: dropping a candidate via soft-delete also
+                        // drops its corresponding enhance entry (matching
+                        // sourceCandidatePath). The PATCH endpoint repeats
+                        // this prune as a server-side safety net.
+                        enhancedImages: pruneEnhancedAgainstCandidates(
+                          s.enhancedImages,
+                          mergedCandidates,
+                        ),
                       }));
                     }}
                     onAddRequest={() => fileInputRef.current?.click()}
@@ -442,12 +503,19 @@ export default function RelicForm({
                   primaryPath={state.primaryImagePath}
                   onChange={(next) => {
                     const others = (state.candidateImages ?? []).filter((c) => c.source !== "network");
+                    const mergedCandidates = [...others, ...next.candidates];
                     setState((s) => ({
                       ...s,
-                      candidateImages: [...others, ...next.candidates],
+                      candidateImages: mergedCandidates,
                       // Network reorder/delete must not touch the relic's
                       // primaryImagePath (which lives in the user module).
                       primaryImagePath: s.primaryImagePath,
+                      // Cascade prune mirrors the user-module path (see comment
+                      // there). Same source-keyed match for enhanced entries.
+                      enhancedImages: pruneEnhancedAgainstCandidates(
+                        s.enhancedImages,
+                        mergedCandidates,
+                      ),
                     }));
                   }}
                   // Empty-slot click opens the dual-tab modal (manual URL

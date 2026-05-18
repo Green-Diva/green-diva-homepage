@@ -8,15 +8,26 @@
 //
 // Heavy 3D viewing stays in the relic detail page — this card only shows
 // generation status + a link out to the detail page when ready.
+//
+// 2D enhance is multi-job (admin batches N candidates at once via the
+// dual-column Cutout2dConfigModal); we track concurrent enhance jobs in
+// a Map and surface a "running N" badge. 3D stays single-job.
 
 import { useEffect, useRef, useState } from "react";
 import type { Dictionary } from "@/lib/i18n/types";
 import Meshy3dConfigModal, { type Meshy3dOptions } from "./Meshy3dConfigModal";
+import Cutout2dConfigModal, {
+  type Cutout2dBatchPayload,
+  type CutoutCandidateInput,
+  type CutoutEnhancedInput,
+} from "./Cutout2dConfigModal";
 
 type JobState =
   | { kind: "idle" }
   | { kind: "running"; jobId: string; startedAt: number }
   | { kind: "error"; message: string };
+
+type EnhanceJobEntry = { jobId: string; startedAt: number; candidatePath?: string };
 
 const POLL_MS = 3000;
 
@@ -47,6 +58,11 @@ type Props = {
   detailSlug?: string;
   /** Notify parent to refetch when an async job succeeds. */
   onAssetUpdated?: (kind: "enhanced" | "model") => void;
+  /** Non-deleted candidate pool for the 2D enhance modal's source picker.
+   * Pass empty in draft mode. */
+  candidates?: CutoutCandidateInput[];
+  /** Current Relic.enhancedImages history for the modal's lower grid. */
+  enhancedItems?: CutoutEnhancedInput[];
   t: Dictionary;
 };
 
@@ -66,19 +82,26 @@ export default function AssetCard({
   isAdmin,
   detailSlug,
   onAssetUpdated,
+  candidates,
+  enhancedItems,
   t,
 }: Props) {
-  const [enhanceJob, setEnhanceJob] = useState<JobState>({ kind: "idle" });
+  // Multi-job: 2D enhance can fan out to N AgentJobs (one per source).
+  // Map keyed on jobId; size 0 means no enhance in flight.
+  const [enhanceJobs, setEnhanceJobs] = useState<Map<string, EnhanceJobEntry>>(
+    () => new Map(),
+  );
+  const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const [modelJob, setModelJob] = useState<JobState>({ kind: "idle" });
-  // Pre-flight 3D config dialog. Clicking the 3D row's "Start" button opens
-  // it; the actual /create-3d POST only fires from inside its onConfirm.
   const [showMeshyConfig, setShowMeshyConfig] = useState(false);
+  const [showCutoutConfig, setShowCutoutConfig] = useState(false);
 
-  const enhanceJobRef = useRef(enhanceJob);
+  const enhanceRunningCount = enhanceJobs.size;
+  const enhanceJobsRef = useRef(enhanceJobs);
   const modelJobRef = useRef(modelJob);
   useEffect(() => {
-    enhanceJobRef.current = enhanceJob;
-  }, [enhanceJob]);
+    enhanceJobsRef.current = enhanceJobs;
+  }, [enhanceJobs]);
   useEffect(() => {
     modelJobRef.current = modelJob;
   }, [modelJob]);
@@ -88,84 +111,126 @@ export default function AssetCard({
     if (mode !== "edit") return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
+
+    async function pollOne(jobId: string): Promise<{
+      status: string;
+      errorMessage?: string | null;
+    } | null> {
+      const r = await fetch(`/api/relics/${resourceId}/asset-job/${jobId}`, {
+        credentials: "include",
+      });
+      if (!r.ok) {
+        return null;
+      }
+      return (await r.json()) as { status: string; errorMessage?: string | null };
+    }
+
     async function tick() {
-      const e = enhanceJobRef.current;
+      const enhanceRunning = enhanceJobsRef.current;
       const m = modelJobRef.current;
-      const running = e.kind === "running" ? e : m.kind === "running" ? m : null;
-      if (!running) return;
-      try {
-        const r = await fetch(`/api/relics/${resourceId}/asset-job/${running.jobId}`, {
-          credentials: "include",
-        });
+      let anyEnhanceDone = false;
+      let anyModelDone = false;
+
+      if (enhanceRunning.size > 0) {
+        const results = await Promise.all(
+          Array.from(enhanceRunning.values()).map((e) =>
+            pollOne(e.jobId).then((d) => ({ entry: e, data: d })),
+          ),
+        );
         if (cancelled) return;
-        if (!r.ok) {
-          const j = (await r.json().catch(() => ({}))) as { error?: string };
-          const msg = j.error ?? `HTTP ${r.status}`;
-          if (e.kind === "running" && e.jobId === running.jobId)
-            setEnhanceJob({ kind: "error", message: msg });
-          if (m.kind === "running" && m.jobId === running.jobId)
-            setModelJob({ kind: "error", message: msg });
-          return;
-        }
-        const data = (await r.json()) as {
-          status: string;
-          errorMessage?: string | null;
-        };
-        if (data.status === "SUCCESS") {
-          if (e.kind === "running" && e.jobId === running.jobId) {
-            setEnhanceJob({ kind: "idle" });
-            onAssetUpdated?.("enhanced");
+        const nextMap = new Map(enhanceRunning);
+        let lastError: string | null = null;
+        for (const { entry, data } of results) {
+          if (!data) continue;
+          if (data.status === "SUCCESS") {
+            nextMap.delete(entry.jobId);
+            anyEnhanceDone = true;
+            continue;
           }
-          if (m.kind === "running" && m.jobId === running.jobId) {
+          if (data.status === "FAILED" || data.status === "CANCELLED") {
+            nextMap.delete(entry.jobId);
+            lastError = data.errorMessage ?? `job ${data.status.toLowerCase()}`;
+            anyEnhanceDone = true;
+            continue;
+          }
+        }
+        setEnhanceJobs(nextMap);
+        if (lastError) setEnhanceError(lastError);
+        if (anyEnhanceDone) onAssetUpdated?.("enhanced");
+      }
+
+      if (m.kind === "running") {
+        const data = await pollOne(m.jobId);
+        if (cancelled) return;
+        if (data) {
+          if (data.status === "SUCCESS") {
             setModelJob({ kind: "idle" });
+            anyModelDone = true;
             onAssetUpdated?.("model");
+          } else if (data.status === "FAILED" || data.status === "CANCELLED") {
+            setModelJob({
+              kind: "error",
+              message: data.errorMessage ?? `job ${data.status.toLowerCase()}`,
+            });
           }
-          return;
         }
-        if (data.status === "FAILED" || data.status === "CANCELLED") {
-          const msg = data.errorMessage ?? `job ${data.status.toLowerCase()}`;
-          if (e.kind === "running" && e.jobId === running.jobId)
-            setEnhanceJob({ kind: "error", message: msg });
-          if (m.kind === "running" && m.jobId === running.jobId)
-            setModelJob({ kind: "error", message: msg });
-          return;
-        }
+      }
+
+      void anyModelDone;
+      if (
+        !cancelled &&
+        (enhanceJobsRef.current.size > 0 || modelJobRef.current.kind === "running")
+      ) {
         timer = setTimeout(tick, POLL_MS);
-      } catch (err) {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "poll failed";
-        if (e.kind === "running") setEnhanceJob({ kind: "error", message: msg });
-        if (m.kind === "running") setModelJob({ kind: "error", message: msg });
       }
     }
-    if (enhanceJob.kind === "running" || modelJob.kind === "running") {
+
+    if (enhanceJobs.size > 0 || modelJob.kind === "running") {
       timer = setTimeout(tick, POLL_MS);
     }
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [enhanceJob, modelJob, resourceId, onAssetUpdated, mode]);
+  }, [enhanceJobs, modelJob, resourceId, onAssetUpdated, mode]);
 
-  async function startEnhance() {
-    setEnhanceJob({ kind: "running", jobId: "...", startedAt: Date.now() });
+  async function startEnhance(payload: Cutout2dBatchPayload) {
+    // Don't auto-close the modal — admin stays in it during runtime so
+    // they can watch the per-job progress under step 1 and see results
+    // populate step 3. They close via the step-3 "完成" button.
+    setEnhanceError(null);
     try {
       const r = await fetch(`/api/relics/${resourceId}/enhance-2d`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
-        setEnhanceJob({ kind: "error", message: j.error ?? `HTTP ${r.status}` });
+        setEnhanceError(j.error ?? `HTTP ${r.status}`);
         return;
       }
-      const j = (await r.json()) as { jobId: string };
-      setEnhanceJob({ kind: "running", jobId: j.jobId, startedAt: Date.now() });
+      const j = (await r.json()) as {
+        jobs?: Array<{ jobId?: string; candidatePath?: string; error?: string }>;
+      };
+      const next = new Map<string, EnhanceJobEntry>(enhanceJobs);
+      let anyError: string | null = null;
+      for (const job of j.jobs ?? []) {
+        if (job.jobId) {
+          next.set(job.jobId, {
+            jobId: job.jobId,
+            startedAt: Date.now(),
+            candidatePath: job.candidatePath,
+          });
+        } else if (job.error) {
+          anyError = job.error;
+        }
+      }
+      setEnhanceJobs(next);
+      if (anyError) setEnhanceError(anyError);
     } catch (err) {
-      setEnhanceJob({
-        kind: "error",
-        message: err instanceof Error ? err.message : "request failed",
-      });
+      setEnhanceError(err instanceof Error ? err.message : "request failed");
     }
   }
 
@@ -194,11 +259,45 @@ export default function AssetCard({
     }
   }
 
-  // Idle entry: opens the config dialog. Re-trigger from the error state's
-  // "retry" button also goes through here so admin can adjust options after
-  // a Meshy failure (e.g. drop polycount, switch model_type).
+  async function uploadGlb(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const r = await fetch(`/api/relics/${resourceId}/model/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!r.ok) {
+      const j = (await r.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? `HTTP ${r.status}`);
+    }
+    // Same parent refresh path as a finished Meshy job — the new modelPath
+    // flows back through refetchRelic → AssetCard hasModel prop → modal
+    // step 3 re-renders with the freshly-uploaded GLB.
+    onAssetUpdated?.("model");
+  }
+
+  async function deleteEnhancedItem(path: string) {
+    try {
+      const r = await fetch(
+        `/api/relics/${resourceId}/enhanced-item?path=${encodeURIComponent(path)}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      if (!r.ok) {
+        console.warn("[AssetCard] delete enhanced-item failed", await r.text());
+        return;
+      }
+      onAssetUpdated?.("enhanced");
+    } catch (e) {
+      console.warn("[AssetCard] delete enhanced-item threw", e);
+    }
+  }
+
   function openCreate3dDialog() {
     setShowMeshyConfig(true);
+  }
+  function openEnhance2dDialog() {
+    setShowCutoutConfig(true);
   }
 
   const rarityAccent =
@@ -218,12 +317,26 @@ export default function AssetCard({
     : primaryPathOverride
       ? `/api/relics/${resourceId}/candidate?path=${encodeURIComponent(primaryPathOverride)}`
       : `/api/relics/${resourceId}/primary`;
-  const enhancedThumbUrl = `/api/relics/${resourceId}/enhanced`;
   const model3dGated = !hasEnhanced && !hasModel;
+
+  // Synthetic JobState for the 2D chip — preserves the existing AssetChip
+  // contract (one JobState per chip) while we track N concurrent jobs
+  // internally. Status precedence: error > running > idle.
+  // startedAt is unread by AssetChip — feeding 0 keeps render pure
+  // (Date.now in render is a react-hooks/impure-function lint error).
+  const enhanceChipState: JobState =
+    enhanceError && enhanceRunningCount === 0
+      ? { kind: "error", message: enhanceError }
+      : enhanceRunningCount > 0
+        ? { kind: "running", jobId: "(batch)", startedAt: 0 }
+        : { kind: "idle" };
+  const enhanceRunningLabel =
+    enhanceRunningCount > 1
+      ? `${t.relicCollection.enhanceRunning} · ${enhanceRunningCount}`
+      : t.relicCollection.enhanceRunning;
 
   return (
     <div className="border border-primary/20 bg-background/40 p-3">
-      {/* Single-row layout: thumbnail + icon + name/classif + asset chips */}
       <div className="flex items-center gap-3">
         {hasPrimary ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -254,20 +367,19 @@ export default function AssetCard({
           </p>
         </div>
 
-        {/* Asset chips — compact inline */}
         <div className="flex items-center gap-2 shrink-0 pl-3 ml-auto border-l border-primary/15">
           <AssetChip
             label={t.relicCollection.tab2dEnhance}
             done={hasEnhanced}
-            running={enhanceJob.kind === "running"}
-            errored={enhanceJob.kind === "error"}
+            running={enhanceRunningCount > 0}
+            errored={enhanceChipState.kind === "error"}
             isDraft={isDraft}
             isAdmin={isAdmin}
-            jobState={enhanceJob}
-            onStart={startEnhance}
+            jobState={enhanceChipState}
+            onStart={openEnhance2dDialog}
             etaText={t.relicCollection.enhanceEta}
             startLabel={t.relicCollection.enhanceStart}
-            runningLabel={t.relicCollection.enhanceRunning}
+            runningLabel={enhanceRunningLabel}
             t={t}
           />
           <AssetChip
@@ -294,6 +406,43 @@ export default function AssetCard({
           t={t}
           onCancel={() => setShowMeshyConfig(false)}
           onConfirm={(opts) => void startCreate3d(opts)}
+          enhancedItems={(enhancedItems ?? []).map((e) => ({
+            path: e.path,
+            sourceCandidatePath: e.sourceCandidatePath,
+            model: e.model,
+            operatingResolution: e.operatingResolution,
+            createdAt: e.createdAt,
+          }))}
+          enhancedThumbUrl={(p) =>
+            `/api/relics/${resourceId}/enhanced?path=${encodeURIComponent(p)}`
+          }
+          hasModel={hasModel}
+          running={modelJob.kind === "running"}
+          modelUrl={hasModel ? `/api/relics/${resourceId}/model` : undefined}
+          modelAlt={nameZh || nameEn || undefined}
+          onUploadGlb={uploadGlb}
+        />
+      ) : null}
+      {showCutoutConfig ? (
+        <Cutout2dConfigModal
+          t={t}
+          relicId={resourceId}
+          candidates={candidates ?? []}
+          enhancedItems={enhancedItems ?? []}
+          candidateThumbUrl={(p) =>
+            `/api/relics/${resourceId}/candidate?path=${encodeURIComponent(p)}`
+          }
+          enhancedThumbUrl={(p) =>
+            `/api/relics/${resourceId}/enhanced?path=${encodeURIComponent(p)}`
+          }
+          onEnhancedDelete={deleteEnhancedItem}
+          runningJobs={Array.from(enhanceJobs.values()).map((e) => ({
+            jobId: e.jobId,
+            candidatePath: e.candidatePath,
+          }))}
+          runningError={enhanceError}
+          onCancel={() => setShowCutoutConfig(false)}
+          onConfirm={(payload) => void startEnhance(payload)}
         />
       ) : null}
     </div>
@@ -311,7 +460,7 @@ function AssetChip({
   jobState,
   onStart,
   etaText,
-  startLabel,
+  startLabel: _startLabel,
   runningLabel,
   thumbnailWhenReady,
   detailHref,
@@ -336,6 +485,7 @@ function AssetChip({
   gateMessage?: string;
   t?: Dictionary;
 }) {
+  void _startLabel;
   let icon: React.ReactNode;
   if (errored) {
     icon = (
@@ -366,6 +516,7 @@ function AssetChip({
     );
   }
 
+  const displayLabel = running && runningLabel ? runningLabel : label;
   const labelTone = done
     ? "text-secondary"
     : errored
@@ -374,7 +525,6 @@ function AssetChip({
         ? "text-on-surface"
         : "text-on-surface-variant";
 
-  // Determine right-side trailing element
   let trailing: React.ReactNode = null;
   let title: string | undefined;
   let clickable: (() => void) | null = null;
@@ -406,13 +556,16 @@ function AssetChip({
         </a>
       );
     }
+    // Even when done, allow admin to open the dialog for re-enhance.
+    if (isAdmin && !isDraft && !disabledByGate && onStart) {
+      clickable = onStart;
+    }
   } else if (jobState?.kind === "running") {
     title = etaText;
   } else if (jobState?.kind === "error") {
     title = jobState.message;
     if (isAdmin && onStart) clickable = onStart;
   } else {
-    // idle
     if (!isDraft && isAdmin && !disabledByGate && onStart) {
       clickable = onStart;
       title = etaText;
@@ -438,7 +591,7 @@ function AssetChip({
   const content = (
     <>
       {icon}
-      <span className={labelTone}>{label}</span>
+      <span className={labelTone}>{displayLabel}</span>
       {trailing}
     </>
   );

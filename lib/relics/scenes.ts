@@ -279,16 +279,57 @@ export const relicEnhance2dScene = registerScene({
     // an INTERNAL slot-0 image-to-data-uri node. New bindings should
     // forward this straight into agent.input via inputMap.
     imageDataUri: z.string().regex(/^data:image\/[a-z+.-]+;base64,/, "expected image data URI"),
+    // The candidate path that this enhance was generated FROM. Carried
+    // through the DAG so the shape transform can stamp it into
+    // enhancedItem, and the runner's writeback hook uses it as the upsert
+    // key — re-enhancing the same candidate overwrites its previous entry
+    // in Relic.enhancedImages instead of appending a new row.
+    sourceCandidatePath: z.string().min(1),
+    // fal.ai BiRefNet input knobs surfaced to admin via Cutout2dConfigModal
+    // (app/admin/relics/Cutout2dConfigModal.tsx). All optional with sane
+    // defaults so existing callers (or smoke test) get the previous
+    // behaviour without changes. Cross-field constraint (2304 needs
+    // Dynamic) is enforced at the trigger endpoint, not here, because
+    // zod's chained refinement would conflict with `.default()`.
+    model: z
+      .enum([
+        "General Use (Light)",
+        "General Use (Light 2K)",
+        "General Use (Heavy)",
+        "Matting",
+        "Portrait",
+        "General Use (Dynamic)",
+      ])
+      .optional()
+      .default("General Use (Light)"),
+    operatingResolution: z
+      .enum(["1024x1024", "2048x2048", "2304x2304"])
+      .optional()
+      .default("1024x1024"),
+    refineForeground: z.boolean().optional().default(true),
   }),
   // `.passthrough()` is essential — the agent's leaf transform also emits
   // `_relicWriteback` which the runner consumes (lib/skills/runtime/runner.ts
   // maybeWriteRelicAsset). Stripping unknowns would break the writeback hook.
+  //
+  // Returns an `enhancedItem` envelope (path + source + params) — the runner
+  // takes it and does a read-modify-write upsert into Relic.enhancedImages
+  // keyed by sourceCandidatePath, capped at 16 entries.
   outputSchema: z
     .object({
-      enhancedImagePath: z
-        .string()
-        .min(1)
-        .regex(/^\/[A-Za-z0-9_./-]+\.(png|webp|jpg|jpeg)$/i, "expected derived asset path"),
+      enhancedItem: z
+        .object({
+          path: z
+            .string()
+            .min(1)
+            .regex(/^\/[A-Za-z0-9_./-]+\.(png|webp|jpg|jpeg)$/i, "expected derived asset path"),
+          sourceCandidatePath: z.string().min(1),
+          model: z.string().min(1),
+          operatingResolution: z.string().min(1),
+          refineForeground: z.boolean(),
+          createdAt: z.string().min(1),
+        })
+        .passthrough(),
     })
     .passthrough(),
   invocation: "async",
@@ -306,12 +347,22 @@ export const relicEnhance2dScene = registerScene({
   // `kind` is consumed by the shared save-asset-relic skill's bodyTemplate
   // — tells /api/internal/save-asset to write the cutout PNG under
   // private/relics/<slug>/derived/enhanced-*.png.
+  //
+  // model / operatingResolution / refineForeground are forwarded to the
+  // fal-cutout-http skill via the cutout DAG node's inputFrom merge
+  // (prisma/migrate-relic-forge.ts). camelCase here; fal expects snake_case
+  // (operating_resolution / refine_foreground) — bodyTemplate in
+  // prisma/migrate-cutout-forge.ts does the translation.
   prepareAgentInput: (ctx) => ({
     relicSlug: ctx.relicSlug,
     imageDataUri: ctx.imageDataUri,
+    sourceCandidatePath: ctx.sourceCandidatePath,
     _relicId: ctx.relicId,
     mode: "2dEnhance",
     kind: "enhanced",
+    model: ctx.model,
+    operatingResolution: ctx.operatingResolution,
+    refineForeground: ctx.refineForeground,
   }),
   // Test-Run smoke ctx (2026-05-15). 128×128 JPEG with a clear foreground
   // subject (see SMOKE_PHOTO_DATA_URI). Will trigger fal.ai cutout (~$0.01)
@@ -323,6 +374,10 @@ export const relicEnhance2dScene = registerScene({
     relicId: "_smoke-test-id",
     relicSlug: "_smoke-test",
     imageDataUri: SMOKE_PHOTO_DATA_URI,
+    sourceCandidatePath: "/_smoke-test/source/smoke.jpg",
+    model: "General Use (Light)",
+    operatingResolution: "1024x1024",
+    refineForeground: true,
   },
 });
 

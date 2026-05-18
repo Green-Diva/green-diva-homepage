@@ -27,9 +27,15 @@ const SKILL_FAL_CUTOUT = {
     authScheme: "Key",
     timeoutMs: 60_000,
     bodyTemplate: {
-      // Input shape (from agent.input via scene.prepareAgentInput):
-      //   { dataUri }
+      // Input shape (from agent.input via scene.prepareAgentInput, fanned
+      // into this skill by RELIC-FORGE-001's `cutout` node inputFrom merge):
+      //   { dataUri, model, operatingResolution, refineForeground }
+      // fal expects snake_case — we translate from camelCase here. Admin
+      // tweaks the values via app/admin/relics/Cutout2dConfigModal.tsx.
       image_url: "{{dataUri}}",
+      model: "{{model}}",
+      operating_resolution: "{{operatingResolution}}",
+      refine_foreground: "{{refineForeground}}",
     },
     download: {
       urlPath: "image.url",
@@ -48,6 +54,30 @@ const SKILL_FAL_CUTOUT = {
       dataUri: {
         type: "string",
         description: "Image as a data URI (data:image/<type>;base64,<...>). The image whose background should be removed.",
+      },
+      model: {
+        type: "string",
+        enum: [
+          "General Use (Light)",
+          "General Use (Light 2K)",
+          "General Use (Heavy)",
+          "Matting",
+          "Portrait",
+          "General Use (Dynamic)",
+        ],
+        description:
+          "BiRefNet variant. Light = fast/cheap default; Heavy = ~2× cost, cleaner edges on complex materials; Matting = best for hair/feathers/mesh; Portrait = people; Dynamic = unlocks 2304 resolution.",
+      },
+      operatingResolution: {
+        type: "string",
+        enum: ["1024x1024", "2048x2048", "2304x2304"],
+        description:
+          "Inference resolution. Higher = better small-detail retention at higher time/VRAM cost. 2304x2304 only valid with the Dynamic model.",
+      },
+      refineForeground: {
+        type: "boolean",
+        description:
+          "Second-pass foreground refinement for smoother edges and translucent transitions. Default true.",
       },
     },
     required: ["dataUri"],

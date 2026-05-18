@@ -11,7 +11,11 @@ import { canAccessRelic, getUnlockedRelicIds } from "@/lib/relicAccess";
 import { getSharedRelicIds } from "@/lib/relicShare";
 import { getGrantedRelicIds } from "@/lib/relicGrant";
 import UserMenu from "@/components/UserMenu";
-import AssetTabs from "./_components/AssetTabs";
+import AssetTabs, {
+  type OriginCarouselItem,
+  type EnhancedImageItem,
+} from "./_components/AssetTabs";
+import type { CutoutCandidateInput } from "@/app/admin/relics/Cutout2dConfigModal";
 import AdminToolbar from "./_components/AdminToolbar";
 import LogPanel from "./_components/LogPanel";
 import RelicProcessingBanner from "./_components/RelicProcessingBanner";
@@ -178,6 +182,93 @@ export default async function RelicDetailPage({
   const access = canAccessRelic(relic, user, unlockedIds, sharedIds, grantedIds);
   const isExtracted = !!relic.extractedAt;
 
+  // Build the "原图" tab carousel feed: primary at index 0, then every
+  // non-deleted candidate (deduped against the primary's path). Cap at
+  // 16 total — matches the curator's 8×2 admin grid (8 user + 8 network)
+  // and keeps the UI from sprawling if a relic gathers many network
+  // candidates over time. Order: primary → user candidates (creation
+  // order) → network candidates (creation order).
+  const originItems: OriginCarouselItem[] = (() => {
+    const raw = Array.isArray(relic.candidateImages)
+      ? (relic.candidateImages as Array<{
+          path?: string;
+          source?: string;
+          sourceUrl?: string;
+          deleted?: boolean;
+        }>)
+      : [];
+    const visible = raw.filter(
+      (
+        c,
+      ): c is { path: string; source?: string; sourceUrl?: string; deleted?: boolean } =>
+        typeof c?.path === "string" && c.path.length > 0 && c.deleted !== true,
+    );
+    const out: OriginCarouselItem[] = [];
+    if (relic.primaryImagePath) {
+      out.push({ kind: "primary", path: relic.primaryImagePath });
+    }
+    const users = visible
+      .filter((c) => c.source !== "network" && c.path !== relic.primaryImagePath)
+      .map<OriginCarouselItem>((c) => ({ kind: "user", path: c.path }));
+    const networks = visible
+      .filter((c) => c.source === "network" && c.path !== relic.primaryImagePath)
+      .map<OriginCarouselItem>((c) => ({
+        kind: "network",
+        path: c.path,
+        sourceUrl:
+          typeof c.sourceUrl === "string" && c.sourceUrl.length > 0
+            ? c.sourceUrl
+            : undefined,
+      }));
+    return [...out, ...users, ...networks].slice(0, 16);
+  })();
+
+  // Non-deleted candidate list for the 2D enhance modal's source picker.
+  // Plain shape that maps 1-1 to CutoutCandidateInput. Don't dedupe the
+  // primary out — admin may want to re-enhance the primary explicitly.
+  const candidatesForEnhance: CutoutCandidateInput[] = (() => {
+    const raw = Array.isArray(relic.candidateImages)
+      ? (relic.candidateImages as Array<{
+          path?: string;
+          source?: string;
+          originalFilename?: string;
+          deleted?: boolean;
+        }>)
+      : [];
+    return raw
+      .filter(
+        (c): c is { path: string; source?: string; originalFilename?: string } =>
+          typeof c?.path === "string" && c.path.length > 0 && c.deleted !== true,
+      )
+      .map((c) => ({
+        path: c.path,
+        source: c.source === "network" ? ("network" as const) : ("user" as const),
+        ...(c.originalFilename ? { originalFilename: c.originalFilename } : {}),
+      }));
+  })();
+
+  // Already-capped (runner caps at 16) enhanced list for the enhance2d
+  // carousel + the modal's history grid.
+  const enhancedItemsForTabs: EnhancedImageItem[] = Array.isArray(relic.enhancedImages)
+    ? (relic.enhancedImages as Array<Record<string, unknown>>)
+        .map((e): EnhancedImageItem | null => {
+          if (typeof e?.path !== "string" || typeof e?.sourceCandidatePath !== "string") {
+            return null;
+          }
+          return {
+            path: e.path,
+            sourceCandidatePath: e.sourceCandidatePath,
+            model: typeof e.model === "string" ? e.model : "General Use (Light)",
+            operatingResolution:
+              typeof e.operatingResolution === "string" ? e.operatingResolution : "1024x1024",
+            refineForeground: e.refineForeground === false ? false : true,
+            createdAt:
+              typeof e.createdAt === "string" ? e.createdAt : new Date().toISOString(),
+          };
+        })
+        .filter((e): e is EnhancedImageItem => e !== null)
+    : [];
+
   const name = locale === "zh" ? relic.nameZh : relic.nameEn;
   const classif = locale === "zh" ? relic.classifZh : relic.classifEn;
   const lore = locale === "zh" ? relic.loreZh : relic.loreEn;
@@ -334,12 +425,13 @@ export default async function RelicDetailPage({
               <div className="lg:col-span-7 lg:min-h-0 lg:flex lg:flex-col">
                 <AssetTabs
                   relicId={relic.id}
-                  hasPrimary={!!relic.primaryImagePath}
-                  hasEnhanced={!!relic.enhancedImagePath}
                   hasModel={!!relic.modelPath}
                   alt={name}
                   isAdmin={isAdmin}
                   t={t}
+                  originItems={originItems}
+                  enhancedItems={enhancedItemsForTabs}
+                  candidatesForEnhance={candidatesForEnhance}
                 />
               </div>
 

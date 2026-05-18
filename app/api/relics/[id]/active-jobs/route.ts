@@ -1,14 +1,14 @@
-// GET /api/relics/[id]/active-jobs — admin-only, returns the latest
-// enhance2d / create3d AgentJob for this relic so the detail page can
-// restore "running" / "error" UI after a refresh.
+// GET /api/relics/[id]/active-jobs — admin-only, returns recent in-flight
+// jobs for this relic so the detail page can restore UI after a refresh.
 //
-// Job state previously lived only in AssetTabs React state; closing the
-// tab lost the jobId and the in-flight run looked idle on return. This
-// endpoint surfaces server-side truth.
+// Enhance is now batchable (1 AgentJob per candidate), so this returns an
+// array of recent enhance jobs. Model stays single (one Meshy job per
+// click; previously a 1:1 relationship).
 //
-// Returns: { enhance: JobSummary | null, model: JobSummary | null }
-//   - latest job per sceneKey is returned regardless of status
-//   - frontend ignores SUCCESS (covered by Relic.enhancedImagePath / modelPath)
+// Returns: { enhance: JobSummary[], model: JobSummary | null }
+//   - enhance: jobs within the last hour (RUNNING / PENDING / FAILED).
+//     Frontend filters & polls each.
+//   - model: latest job regardless of status; same as before.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -26,16 +26,13 @@ type JobSummary = {
   status: string;
   errorMessage: string | null;
   startedAt: string | null;
-  // Business-level SLA from the scene definition. Frontend treats
-  // `RUNNING` past this window as "agent didn't return in time" and
-  // shows the retry block. Late agent success still writes back via the
-  // runner hook, so the relic eventually picks up the asset on its own.
   slaMs: number | null;
-  // Intra-step progress so a refresh mid-run restores the % bar without
-  // waiting for the next poll-tick. Both null until a handler emits.
   progressPercent: number | null;
   progressLabel: string | null;
+  sourceCandidatePath: string | null;
 };
+
+const ENHANCE_RECENT_MS = 60 * 60 * 1000; // 1 hour
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
@@ -48,49 +45,65 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const relic = await prisma.relic.findUnique({ where: { id }, select: { id: true } });
   if (!relic) return NextResponse.json({ error: "relic not found" }, { status: 404 });
 
-  // Postgres JSON path query: input->>'_relicId' = id. Filter by sceneKey
-  // and take the latest per scene via a single query + JS reduce (small
-  // result set; no need for DISTINCT ON).
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      sceneKey: string;
-      status: string;
-      errorMessage: string | null;
-      startedAt: Date | null;
-      createdAt: Date;
-      progressPercent: number | null;
-      progressLabel: string | null;
-    }>
-  >`
+  type Row = {
+    id: string;
+    sceneKey: string;
+    status: string;
+    errorMessage: string | null;
+    startedAt: Date | null;
+    createdAt: Date;
+    progressPercent: number | null;
+    progressLabel: string | null;
+    input: unknown;
+  };
+
+  const rows = await prisma.$queryRaw<Row[]>`
     SELECT id, "sceneKey", status::text AS status, "errorMessage", "startedAt", "createdAt",
-           "progressPercent", "progressLabel"
+           "progressPercent", "progressLabel", input
     FROM "AgentJob"
     WHERE "sceneKey" IN ('relic.enhance2d', 'relic.create3d')
       AND input->>'_relicId' = ${id}
     ORDER BY "createdAt" DESC
   `;
 
-  const latest: Record<SceneKey, JobSummary | null> = {
-    "relic.enhance2d": null,
-    "relic.create3d": null,
+  const sourceOf = (input: unknown): string | null => {
+    if (input && typeof input === "object" && !Array.isArray(input)) {
+      const v = (input as Record<string, unknown>).sourceCandidatePath;
+      return typeof v === "string" ? v : null;
+    }
+    return null;
   };
+  const toSummary = (r: Row, key: SceneKey): JobSummary => ({
+    jobId: r.id,
+    status: r.status,
+    errorMessage: r.errorMessage,
+    startedAt: r.startedAt?.toISOString() ?? null,
+    slaMs: getScene(key)?.slaMs ?? null,
+    progressPercent: r.progressPercent,
+    progressLabel: r.progressLabel,
+    sourceCandidatePath: sourceOf(r.input),
+  });
+
+  // Enhance: keep recent jobs (within 1h) so the carousel + chip can
+  // resume after refresh. Older finished jobs aren't relevant — the
+  // success state is already reflected in Relic.enhancedImages.
+  const cutoff = Date.now() - ENHANCE_RECENT_MS;
+  const enhance: JobSummary[] = rows
+    .filter(
+      (r) =>
+        r.sceneKey === "relic.enhance2d" &&
+        r.createdAt.getTime() >= cutoff,
+    )
+    .map((r) => toSummary(r, "relic.enhance2d"));
+
+  // Model: latest only — single-job semantics unchanged.
+  let model: JobSummary | null = null;
   for (const r of rows) {
-    const key = r.sceneKey as SceneKey;
-    if (latest[key]) continue; // rows are DESC, first hit wins
-    latest[key] = {
-      jobId: r.id,
-      status: r.status,
-      errorMessage: r.errorMessage,
-      startedAt: r.startedAt?.toISOString() ?? null,
-      slaMs: getScene(key)?.slaMs ?? null,
-      progressPercent: r.progressPercent,
-      progressLabel: r.progressLabel,
-    };
+    if (r.sceneKey === "relic.create3d") {
+      model = toSummary(r, "relic.create3d");
+      break;
+    }
   }
 
-  return NextResponse.json({
-    enhance: latest["relic.enhance2d"],
-    model: latest["relic.create3d"],
-  });
+  return NextResponse.json({ enhance, model });
 }

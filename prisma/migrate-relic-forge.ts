@@ -95,17 +95,34 @@ const WRAP_RESEARCH_EXPRESSION = `{
   }
 }`;
 
-// 2dEnhance leaf: produces { enhancedImagePath, _relicWriteback } per
-// relic.enhance2d scene contract + runner writeback hook.
-const SHAPE_CUTOUT_EXPRESSION = `{
-  "enhancedImagePath": save.savedPath,
-  "_relicWriteback": {
-    "id": relicId,
-    "fields": {
-      "enhancedImagePath": save.savedPath
+// 2dEnhance leaf: produces { enhancedItem, _relicWriteback } per
+// relic.enhance2d scene contract. The runner's writeback hook reads
+// _relicWriteback.fields.enhancedItem and performs a read-modify-write
+// upsert into Relic.enhancedImages keyed on sourceCandidatePath
+// (same source re-enhanced overwrites its previous entry; cap 16).
+//
+// The flat top-level `enhancedItem` mirrors what's nested under
+// _relicWriteback.fields — scene.outputSchema validates the flat shape;
+// the writeback envelope is what the runner actually consumes.
+const SHAPE_CUTOUT_EXPRESSION = `(
+  $item := {
+    "path": save.savedPath,
+    "sourceCandidatePath": sourceCandidatePath,
+    "model": model,
+    "operatingResolution": operatingResolution,
+    "refineForeground": refineForeground,
+    "createdAt": $now()
+  };
+  {
+    "enhancedItem": $item,
+    "_relicWriteback": {
+      "id": relicId,
+      "fields": {
+        "enhancedItem": $item
+      }
     }
   }
-}`;
+)`;
 
 // 3dCreate leaf: produces { modelPath, taskId, previewImageUrl,
 // _relicWriteback } per relic.create3d scene contract.
@@ -221,7 +238,14 @@ function buildForgePipeline(): Prisma.InputJsonValue {
         id: "cutout",
         type: "skill" as const,
         slotIndex: 3,
-        inputFrom: { merge: { dataUri: "agent.input.imageDataUri" } },
+        inputFrom: {
+          merge: {
+            dataUri: "agent.input.imageDataUri",
+            model: "agent.input.model",
+            operatingResolution: "agent.input.operatingResolution",
+            refineForeground: "agent.input.refineForeground",
+          },
+        },
         position: { x: 320, y: 480 },
       },
       {
@@ -244,6 +268,10 @@ function buildForgePipeline(): Prisma.InputJsonValue {
           merge: {
             save: "save-cutout.output",
             relicId: "agent.input._relicId",
+            sourceCandidatePath: "agent.input.sourceCandidatePath",
+            model: "agent.input.model",
+            operatingResolution: "agent.input.operatingResolution",
+            refineForeground: "agent.input.refineForeground",
           },
         },
         expression: SHAPE_CUTOUT_EXPRESSION,

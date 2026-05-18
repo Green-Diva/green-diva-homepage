@@ -50,12 +50,45 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     update.passwordHash = data.password ? await bcrypt.hash(data.password, 12) : null;
     delete update.password;
   }
-  // capture before-state for diff log
+  // capture before-state for diff log + cascade prune base
   const before = await prisma.relic.findUnique({
     where: { id },
-    select: { id: true, slug: true, nameEn: true, slot: true, rarity: true, passwordHash: true },
+    select: {
+      id: true,
+      slug: true,
+      nameEn: true,
+      slot: true,
+      rarity: true,
+      passwordHash: true,
+      enhancedImages: true,
+    },
   });
   if (!before) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  // Cascade prune: when the candidate list has soft-deletes (deleted=true),
+  // drop the matching enhancedImages entries (keyed on sourceCandidatePath).
+  // Server-side bottleneck — even if a client forgets to prune its own copy
+  // of enhancedImages, the DB stays consistent.
+  if (Array.isArray(data.candidateImages)) {
+    const deletedPaths = new Set(
+      data.candidateImages
+        .filter((c) => c.deleted === true && typeof c.path === "string")
+        .map((c) => c.path as string),
+    );
+    if (deletedPaths.size > 0) {
+      const base = Array.isArray(update.enhancedImages)
+        ? (update.enhancedImages as Array<{ sourceCandidatePath?: string }>)
+        : Array.isArray(before.enhancedImages)
+          ? (before.enhancedImages as Array<{ sourceCandidatePath?: string }>)
+          : [];
+      const pruned = base.filter(
+        (e) =>
+          typeof e?.sourceCandidatePath !== "string" ||
+          !deletedPaths.has(e.sourceCandidatePath),
+      );
+      update.enhancedImages = pruned;
+    }
+  }
   // Rarity transition: SPECIAL → non-SPECIAL clears any retained passwordHash;
   // non-SPECIAL → SPECIAL without a fresh password is rejected (admin must
   // supply a passphrase to lock the relic).
