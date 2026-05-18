@@ -5,11 +5,16 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useT, useI18n } from "@/lib/i18n/client";
 import { format } from "@/lib/i18n/format";
-import type { SkillRow, HandlerKind } from "../types";
+import type { SkillRow, HandlerKind, EquipRow, AgentRow } from "../types";
+import { collectEquippedBy } from "@/lib/agentControl/equippedBy";
 
 type Props = {
   mode: "create" | "edit";
   initial?: SkillRow | null;
+  // Optional — only passed by SkillLibrary so the editor can render an
+  // "Equipped by" list in edit mode. Create mode doesn't need them.
+  equipsByAgentId?: Record<string, EquipRow[]>;
+  agents?: AgentRow[];
   onClose: () => void;
   onSaved: () => void;
 };
@@ -184,7 +189,14 @@ function pretty(v: unknown): string {
   return JSON.stringify(v, null, 2);
 }
 
-export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) {
+export default function SkillEditor({
+  mode,
+  initial,
+  equipsByAgentId,
+  agents,
+  onClose,
+  onSaved,
+}: Props) {
   const t = useT();
   const { locale } = useI18n();
   const router = useRouter();
@@ -227,6 +239,13 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
   }, [onClose, busy]);
 
   const portal = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
+
+  // Aggregate which agents currently equip this skill. Edit-mode only —
+  // create mode has no id to match against. Keeps the agent.mode for
+  // accent coloring (MECHANICAL gold vs AUTONOMOUS teal).
+  const equippedBy =
+    mode === "edit" ? collectEquippedBy(initial?.id, equipsByAgentId, agents) : [];
+
   if (!portal) return null;
 
   function upd<K extends keyof typeof v>(key: K, val: (typeof v)[K]) {
@@ -664,6 +683,70 @@ export default function SkillEditor({ mode, initial, onClose, onSaved }: Props) 
                 </p>
               )}
             </div>
+
+            {mode === "edit" && initial?.id && (
+              <div className={sectionCls}>
+                <h3 className={sectionTitleCls}>{t.agentControl.skillEquippedBy}</h3>
+                {equippedBy.length === 0 ? (
+                  <p className="text-on-surface-variant/70 text-[12px]">
+                    {t.agentControl.skillEquippedByEmpty}
+                  </p>
+                ) : (
+                  <ul className="flex flex-wrap gap-2">
+                    {equippedBy.map(({ agent, slotIndex }) => {
+                      const isMech = agent.mode === "MECHANICAL";
+                      const accentBorder = isMech ? "border-secondary/40" : "border-primary/40";
+                      const accentText = isMech ? "text-secondary" : "text-primary";
+                      const codename =
+                        locale === "zh" && agent.codenameZh ? agent.codenameZh : agent.codename;
+                      const slotLabel =
+                        slotIndex === null
+                          ? t.agentControl.skillEquippedUnslotted
+                          : format(t.agentControl.skillEquippedSlotLabel, { n: slotIndex + 1 });
+                      return (
+                        <li
+                          key={agent.id}
+                          className={[
+                            "flex items-center gap-2 border rounded-sm pl-1.5 pr-2.5 py-1",
+                            "bg-surface-variant/20",
+                            accentBorder,
+                          ].join(" ")}
+                          title={`${agent.codename} · ${slotLabel}`}
+                        >
+                          {agent.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={agent.avatarUrl}
+                              alt=""
+                              className="w-6 h-8 object-cover rounded-sm border border-on-surface-variant/20"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span
+                              aria-hidden
+                              className="w-6 h-8 rounded-sm border border-on-surface-variant/20 bg-surface-variant/40"
+                            />
+                          )}
+                          <span className="flex flex-col leading-tight">
+                            <span
+                              className={[
+                                "font-label text-[10px] tracking-[0.15em] uppercase",
+                                accentText,
+                              ].join(" ")}
+                            >
+                              {codename}
+                            </span>
+                            <span className="font-label text-[9px] tracking-[0.1em] uppercase text-on-surface-variant/60">
+                              {slotLabel}
+                            </span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {err && <p className="text-error text-sm">{err}</p>}
 

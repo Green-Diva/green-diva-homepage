@@ -236,6 +236,7 @@ export default function AgentClient({
             skills={skills}
             equipsByAgentId={equipsByAgentId}
             activeAgentId={activeId}
+            agents={orderedAgents}
             isAdmin={isAdmin}
           />
         </div>

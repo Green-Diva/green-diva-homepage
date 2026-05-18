@@ -1145,3 +1145,384 @@ button:disabled,
 [role="button"][aria-disabled="true"] {
   cursor: not-allowed;
 }
+
+/* === Skill Library · Cyber-Grimoire (3D flip book) === */
+.book-stage {
+  perspective: 2200px;
+  perspective-origin: center 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.book-spread {
+  position: relative;
+  /* Height-led sizing — book grows from available vertical room then
+     derives width via aspect-ratio. Caps width to keep landscape readable
+     on ultrawide. */
+  height: 100%;
+  aspect-ratio: 16 / 10;
+  max-width: min(960px, 100%);
+  /* Derived height shrinks if max-width clamps width. */
+  max-height: 100%;
+  transform-style: preserve-3d;
+}
+.book-spread-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 767px) {
+  .book-spread {
+    aspect-ratio: 4 / 5;
+    max-width: 100%;
+  }
+  .book-spread-layer {
+    grid-template-columns: 1fr;
+  }
+  .book-spread-layer .book-page--left {
+    display: none;
+  }
+}
+.book-page {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(40, 38, 30, 0.55) 0%, rgba(18, 20, 20, 0.92) 100%),
+    radial-gradient(ellipse at top, rgba(233, 193, 118, 0.06), transparent 55%);
+  border: 1px solid rgba(144, 222, 205, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(233, 193, 118, 0.05),
+    inset 0 0 60px rgba(0, 0, 0, 0.55),
+    0 0 22px rgba(144, 222, 205, 0.06);
+  backface-visibility: hidden;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.book-page::before {
+  /* Parchment grain — inline SVG noise turbulence at low opacity. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.83  0 0 0 0 0.55  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 220px 220px;
+}
+.book-page::after {
+  /* Vignette + spine shadow — actual spine side set per-side below. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+.book-page--left {
+  border-radius: 6px 0 0 6px;
+  background-image:
+    linear-gradient(to right, transparent 92%, rgba(0, 0, 0, 0.45) 100%),
+    linear-gradient(135deg, rgba(40, 38, 30, 0.55) 0%, rgba(18, 20, 20, 0.92) 100%);
+}
+.book-page--right {
+  border-radius: 0 6px 6px 0;
+  background-image:
+    linear-gradient(to left, transparent 92%, rgba(0, 0, 0, 0.45) 100%),
+    linear-gradient(135deg, rgba(40, 38, 30, 0.55) 0%, rgba(18, 20, 20, 0.92) 100%);
+}
+.book-page-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 22px;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+.book-page--left .book-page-content {
+  padding-right: 28px;
+}
+.book-page--right .book-page-content {
+  padding-left: 28px;
+}
+.book-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 14px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.0) 18%,
+      rgba(0, 0, 0, 0.0) 82%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+}
+.book-spine::before,
+.book-spine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(233, 193, 118, 0.35);
+}
+.book-spine::before {
+  left: 0;
+}
+.book-spine::after {
+  right: 0;
+}
+.book-stack-edge {
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  width: 10px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(233, 193, 118, 0.18) 0px,
+      rgba(233, 193, 118, 0.18) 1px,
+      rgba(18, 20, 20, 0.85) 1px,
+      rgba(18, 20, 20, 0.85) 3px
+    );
+  border: 1px solid rgba(233, 193, 118, 0.22);
+}
+.book-stack-edge--left {
+  left: -14px;
+  border-radius: 3px 0 0 3px;
+  border-right: none;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.5);
+}
+.book-stack-edge--right {
+  right: -14px;
+  border-radius: 0 3px 3px 0;
+  border-left: none;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Flipping overlay — absolute over the active half, rotates around the spine. */
+.book-flipper {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  transform-style: preserve-3d;
+  transition: transform 720ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  z-index: 3;
+}
+.book-flipper--next {
+  /* Sits on the right half, hinges at the spine (its own left edge). */
+  right: 0;
+  transform-origin: left center;
+  transform: rotateY(0deg);
+}
+.book-flipper--next.is-flipping {
+  transform: rotateY(-180deg);
+}
+.book-flipper--prev {
+  /* Sits on the left half, hinges at the spine (its own right edge). */
+  left: 0;
+  transform-origin: right center;
+  transform: rotateY(0deg);
+}
+.book-flipper--prev.is-flipping {
+  transform: rotateY(180deg);
+}
+.book-flipper-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.book-flipper-face--back {
+  transform: rotateY(180deg);
+}
+.book-flipper-face > .book-page {
+  position: absolute;
+  inset: 0;
+}
+/* Subtle traveling shadow on the moving face — peaks mid-flip. */
+.book-flipper-face > .book-page::after {
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-flipper {
+    transition: opacity 200ms linear;
+    transform: none !important;
+  }
+  .book-flipper.is-flipping {
+    opacity: 0;
+  }
+}
+
+/* Bookmark / chapter banner on each page header. */
+.book-chapter-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid rgba(233, 193, 118, 0.4);
+  background: linear-gradient(
+    to right,
+    rgba(233, 193, 118, 0.12),
+    rgba(233, 193, 118, 0.02) 80%
+  );
+  color: rgba(233, 193, 118, 0.92);
+  font-family: var(--font-label, inherit);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* Page corner sigil — decorative SVG-free filigree using box-shadow only. */
+.book-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  z-index: 2;
+}
+.book-corner--tl {
+  top: 8px;
+  left: 8px;
+  border-top: 1px solid rgba(233, 193, 118, 0.55);
+  border-left: 1px solid rgba(233, 193, 118, 0.55);
+}
+.book-corner--tr {
+  top: 8px;
+  right: 8px;
+  border-top: 1px solid rgba(233, 193, 118, 0.55);
+  border-right: 1px solid rgba(233, 193, 118, 0.55);
+}
+.book-corner--bl {
+  bottom: 8px;
+  left: 8px;
+  border-bottom: 1px solid rgba(233, 193, 118, 0.55);
+  border-left: 1px solid rgba(233, 193, 118, 0.55);
+}
+.book-corner--br {
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 1px solid rgba(233, 193, 118, 0.55);
+  border-right: 1px solid rgba(233, 193, 118, 0.55);
+}
+
+/* Bottom-corner page-turn hot zone — invisible until hover. */
+.book-corner-nav {
+  position: absolute;
+  bottom: 0;
+  /* Hit area stays strictly within the page-number footer band (below
+     the divider line, ~40px tall) so it never overlaps the Test / Edit
+     action buttons that live above the divider in the same corner. */
+  width: 56px;
+  height: 40px;
+  z-index: 5;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+.book-corner-nav--bl {
+  left: 0;
+  border-bottom-left-radius: 6px;
+  background-image:
+    radial-gradient(circle at 0% 100%, rgba(233, 193, 118, 0) 0%, transparent 60%);
+}
+.book-corner-nav--br {
+  right: 0;
+  border-bottom-right-radius: 6px;
+  background-image:
+    radial-gradient(circle at 100% 100%, rgba(233, 193, 118, 0) 0%, transparent 60%);
+}
+.book-corner-nav:hover:not(:disabled) {
+  background-image:
+    radial-gradient(circle at var(--corner-x, 100% 100%), rgba(233, 193, 118, 0.22) 0%, transparent 65%);
+}
+.book-corner-nav--bl:hover:not(:disabled) {
+  --corner-x: 0% 100%;
+}
+.book-corner-nav--br:hover:not(:disabled) {
+  --corner-x: 100% 100%;
+}
+.book-corner-nav:disabled {
+  cursor: default;
+}
+.book-corner-nav:disabled:hover {
+  /* No glow — but the hint label is still revealed so the user learns
+     they're at the first / last page. */
+  background-image: none;
+}
+.book-corner-nav:disabled:hover .book-corner-nav-hint {
+  opacity: 1;
+  color: rgba(233, 193, 118, 0.55);
+}
+.book-corner-nav-hint {
+  /* Positioned absolutely so we can align it with the L-shaped corner
+     mark (which sits at left/right:8, bottom:8, 28×28 → its center is
+     22px from page corner). The vertical center of the text always
+     lines up with the corner mark's center. */
+  position: absolute;
+  bottom: 22px;
+  display: inline-block;
+  font-family: var(--font-label, inherit);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(233, 193, 118, 0.7);
+  opacity: 0;
+  transition: opacity 200ms ease, color 200ms ease;
+  line-height: 1.5;
+}
+/* English label — stacks each word on its own line, left/right-aligned
+   to the corner mark's outside edge so it grows inward from the L. */
+.book-corner-nav-hint--stacked {
+  max-width: 72px;
+  white-space: normal;
+  word-spacing: 100vw; /* forces each word onto its own line */
+  transform: translateY(50%);
+}
+.book-corner-nav--bl .book-corner-nav-hint--stacked {
+  left: 18px;
+  text-align: left;
+}
+.book-corner-nav--br .book-corner-nav-hint--stacked {
+  right: 18px;
+  text-align: right;
+}
+/* Chinese label — single line, anchored at the same outside-edge offset
+   as the English stacked version so the two locales line up identically
+   relative to the L corner. */
+.book-corner-nav-hint--inline {
+  white-space: nowrap;
+}
+.book-corner-nav--bl .book-corner-nav-hint--inline {
+  left: 18px;
+  text-align: left;
+  transform: translateY(50%);
+}
+.book-corner-nav--br .book-corner-nav-hint--inline {
+  right: 18px;
+  text-align: right;
+  transform: translateY(50%);
+}
+.book-corner-nav:hover:not(:disabled) .book-corner-nav-hint {
+  opacity: 1;
+  color: rgba(233, 193, 118, 1);
+}

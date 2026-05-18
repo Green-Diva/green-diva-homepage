@@ -573,6 +573,21 @@ export interface Dictionary {
     skillStatusOffline: string;
     skillTestInvoke: string;
     skillTestInvokeTitle: string;
+    skillEquippedBy: string;
+    skillEquippedByEmpty: string;
+    skillEquippedSlotLabel: string;
+    skillEquippedUnslotted: string;
+    skillBookPrev: string;
+    skillBookNext: string;
+    skillBookChapter: string;
+    skillBookProgress: string;
+    skillBookEmpty: string;
+    skillBookCreateInline: string;
+    skillBookToc: string;
+    skillBookTocLevel: string;
+    skillBookFirstPage: string;
+    skillBookLastPage: string;
+    skillBookProgressRange: string;
   };
   adminRelics: {
     pageTitle: string;
