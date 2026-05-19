@@ -416,6 +416,7 @@ export const zh: Dictionary = {
     meshy3dExistingHas: "已有 3D 模型",
     meshy3dExistingNone: "暂无 3D 模型",
     meshy3dExistingOverride: "覆盖重生 (已勾选)",
+    meshy3dExistingInitial: "初始创建",
     meshy3dRegenToggleHint: "点击切换：勾选后下方参数可调，准备重新生成",
     originBadgePrimary: "主图",
     originBadgeCandidate: "候选",

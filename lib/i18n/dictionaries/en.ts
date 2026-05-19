@@ -424,6 +424,7 @@ export const en: Dictionary = {
     meshy3dExistingHas: "3D model present",
     meshy3dExistingNone: "No 3D model yet",
     meshy3dExistingOverride: "Override · regen ready",
+    meshy3dExistingInitial: "Initial creation",
     meshy3dRegenToggleHint: "Click to toggle: ticked unlocks params for a fresh Meshy run",
     originBadgePrimary: "Primary",
     originBadgeCandidate: "Curated",

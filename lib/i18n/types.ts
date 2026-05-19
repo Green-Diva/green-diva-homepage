@@ -416,6 +416,7 @@ export interface Dictionary {
     meshy3dExistingHas: string;
     meshy3dExistingNone: string;
     meshy3dExistingOverride: string;
+    meshy3dExistingInitial: string;
     meshy3dRegenToggleHint: string;
     originBadgePrimary: string;
     originBadgeCandidate: string;

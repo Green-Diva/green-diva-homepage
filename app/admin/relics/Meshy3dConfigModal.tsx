@@ -219,17 +219,17 @@ export default function Meshy3dConfigModal({
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  // "Override existing" toggle. When hasModel=true the modal opens in
-  // locked mode (everything below greyed) because there's already a model
-  // on disk and admin probably opened the dialog just to inspect. Clicking
-  // the existing-model tile flips this to true → params light up so admin
-  // can configure a Meshy regen; the upload tab simultaneously greys out
-  // (mutex: regen path active means upload path is the discarded choice).
-  // When hasModel=false the toggle has no effect — params/upload are
-  // always enabled.
-  const [regenOverride, setRegenOverride] = useState(false);
-  const paramsLocked = hasModel && !regenOverride;
-  const uploadLocked = hasModel && regenOverride;
+  // "Generate via Meshy" toggle — mutex with the GLB upload path.
+  //   checked  → params active, upload greyed (admin wants Meshy to build it)
+  //   unchecked → params greyed, upload active (admin wants to bring their own GLB)
+  // Default depends on lifecycle stage:
+  //   - hasModel=false (initial creation): default checked. Most admins arrive
+  //     here to generate, so prime the params; can untick to switch to direct upload.
+  //   - hasModel=true (regen path): default unchecked. Admin opened the dialog
+  //     to inspect existing model; toggling on declares intent to overwrite.
+  const [regenOverride, setRegenOverride] = useState(!hasModel);
+  const paramsLocked = !regenOverride;
+  const uploadLocked = regenOverride;
   async function handleGlbPick(file: File | null) {
     if (!file || !onUploadGlb) return;
     setUploadError(null);
@@ -397,35 +397,24 @@ export default function Meshy3dConfigModal({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => hasModel && setRegenOverride((v) => !v)}
-                  disabled={!hasModel}
-                  title={
-                    hasModel
-                      ? t.relicCollection.meshy3dRegenToggleHint
-                      : undefined
-                  }
+                  onClick={() => setRegenOverride((v) => !v)}
+                  title={t.relicCollection.meshy3dRegenToggleHint}
                   className={[
                     "flex items-center gap-2 pl-1.5 pr-3 py-2 border transition-colors",
-                    !hasModel
-                      ? "border-primary/15 bg-background/40 text-on-surface-variant/70 cursor-default"
-                      : regenOverride
-                        ? "border-secondary bg-secondary/15 text-secondary"
-                        : "border-secondary/40 bg-background/40 text-secondary hover:bg-secondary/5",
+                    regenOverride
+                      ? "border-secondary bg-secondary/15 text-secondary hover:bg-secondary/20"
+                      : "border-secondary/40 bg-background/40 text-secondary hover:bg-secondary/5",
                   ].join(" ")}
                 >
                   <span className="material-symbols-outlined text-[16px] shrink-0">
-                    {!hasModel
-                      ? "radio_button_unchecked"
-                      : regenOverride
-                        ? "check_box"
-                        : "check_circle"}
+                    {regenOverride ? "check_box" : "check_box_outline_blank"}
                   </span>
                   <span className="font-label text-[10px] tracking-[0.22em] uppercase truncate">
-                    {!hasModel
-                      ? t.relicCollection.meshy3dExistingNone
-                      : regenOverride
+                    {hasModel
+                      ? regenOverride
                         ? t.relicCollection.meshy3dExistingOverride
-                        : t.relicCollection.meshy3dExistingHas}
+                        : t.relicCollection.meshy3dExistingHas
+                      : t.relicCollection.meshy3dExistingInitial}
                   </span>
                 </button>
                 {onUploadGlb ? (
