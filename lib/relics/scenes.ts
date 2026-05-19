@@ -398,10 +398,15 @@ export const relicCreate3dScene = registerScene({
   contextSchema: z.object({
     relicId: z.string().min(1),
     relicSlug: z.string().min(1),
-    // Pre-encoded by the trigger endpoint (lib/relics/readImageAsDataUri).
-    // Replaces the old `enhancedImagePath` field — agent DAG no longer
-    // needs an INTERNAL slot-0 image-to-data-uri node.
-    imageDataUri: z.string().regex(/^data:image\/[a-z+.-]+;base64,/, "expected image data URI"),
+    // 2026-05-20: multi-image — 1..4 transparent PNG data URIs pre-encoded
+    // by the trigger endpoint (lib/relics/readImageAsDataUri). Admin picks
+    // 1-4 enhance sources in Meshy3dConfigModal; the API loads all and
+    // hands them to Meshy's /multi-image-to-3d endpoint for multi-view
+    // fusion. A single-image flow = array of length 1.
+    imageDataUris: z
+      .array(z.string().regex(/^data:image\/[a-z+.-]+;base64,/, "expected image data URI"))
+      .min(1)
+      .max(4),
     // Mirrors the Body schema in app/api/relics/[id]/create-3d/route.ts.
     // Plumbed from admin's pre-flight config dialog (Meshy3dConfigModal).
     // The default binding's inputMap fans these out to flat input fields
@@ -449,7 +454,7 @@ export const relicCreate3dScene = registerScene({
   // envelope for the runner's writeback hook.
   prepareAgentInput: (ctx) => ({
     relicSlug: ctx.relicSlug,
-    imageDataUri: ctx.imageDataUri,
+    imageDataUris: ctx.imageDataUris,
     _relicId: ctx.relicId,
     mode: "3dCreate",
     kind: "model",
@@ -464,7 +469,7 @@ export const relicCreate3dScene = registerScene({
   sampleCtx: {
     relicId: "_smoke-test-id",
     relicSlug: "_smoke-test",
-    imageDataUri: SMOKE_PHOTO_DATA_URI,
+    imageDataUris: [SMOKE_PHOTO_DATA_URI],
     // Mirror the production /api/relics/[id]/create-3d defaulting (opts = {}).
     // Without this, prepareAgentInput injects `opts: undefined` into agent.input,
     // the meshy node's merge surfaces `{ opts: undefined }`, and the skill

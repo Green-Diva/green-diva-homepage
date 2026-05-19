@@ -456,14 +456,23 @@ export default function AssetTabs({
     }
   }
 
-  async function startCreate3d(opts: Meshy3dOptions) {
+  async function startCreate3d(opts: Meshy3dOptions, selectedPaths: string[]) {
     setModelJob({ kind: "running", jobId: "...", startedAt: Date.now(), slaMs: null });
     try {
+      // Modal returns 1-4 selected enhance paths; forward as items[]. The
+      // API expands each into an image data URI and posts them to Meshy
+      // /multi-image-to-3d for multi-view fusion.
+      const body = {
+        ...opts,
+        ...(selectedPaths.length > 0
+          ? { items: selectedPaths.map((p) => ({ enhancedPath: p })) }
+          : {}),
+      };
       const r = await fetch(`/api/relics/${relicId}/create-3d`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(opts),
+        body: JSON.stringify(body),
       });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
@@ -596,9 +605,9 @@ export default function AssetTabs({
         <Meshy3dConfigModal
           t={t}
           onCancel={() => setShow3dConfig(false)}
-          onConfirm={(opts) => {
+          onConfirm={(opts, selectedPaths) => {
             setShow3dConfig(false);
-            void startCreate3d(opts);
+            void startCreate3d(opts, selectedPaths);
           }}
           enhancedItems={enhancedItems.map((e) => ({
             path: e.path,

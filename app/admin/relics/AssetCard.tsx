@@ -234,15 +234,21 @@ export default function AssetCard({
     }
   }
 
-  async function startCreate3d(opts: Meshy3dOptions) {
+  async function startCreate3d(opts: Meshy3dOptions, selectedPaths: string[]) {
     setShowMeshyConfig(false);
     setModelJob({ kind: "running", jobId: "...", startedAt: Date.now() });
     try {
+      const body = {
+        ...opts,
+        ...(selectedPaths.length > 0
+          ? { items: selectedPaths.map((p) => ({ enhancedPath: p })) }
+          : {}),
+      };
       const r = await fetch(`/api/relics/${resourceId}/create-3d`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(opts),
+        body: JSON.stringify(body),
       });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
@@ -405,7 +411,7 @@ export default function AssetCard({
         <Meshy3dConfigModal
           t={t}
           onCancel={() => setShowMeshyConfig(false)}
-          onConfirm={(opts) => void startCreate3d(opts)}
+          onConfirm={(opts, selectedPaths) => void startCreate3d(opts, selectedPaths)}
           enhancedItems={(enhancedItems ?? []).map((e) => ({
             path: e.path,
             sourceCandidatePath: e.sourceCandidatePath,

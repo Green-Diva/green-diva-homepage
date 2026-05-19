@@ -387,7 +387,7 @@ export const zh: Dictionary = {
     cutout2dCancelConfirmNo: "返回",
     enhanceBadgeLabel: "增强",
     meshy3dSourceTitle: "选择 enhance 源",
-    meshy3dSourcePlaceholder: "多视角融合生成即将上线 — 当前仍取第一张 enhance",
+    meshy3dSourcePlaceholder: "可选 1-4 张 enhance — 多张时走 Meshy 多视角融合，单张走标准 image-to-3D",
     meshy3dStep1: "步骤 1 · 选择 enhance 源",
     meshy3dStep2: "步骤 2 · 生成设置",
     meshy3dStep3: "步骤 3 · 3D 预览",

@@ -23,14 +23,21 @@ const SKILL_MESHY_HTTP = {
   kind: "HTTP_API" as const,
   handlerConfig: {
     method: "POST",
-    url: "https://api.meshy.ai/openapi/v1/image-to-3d",
+    // 2026-05-20: switched from single-image to multi-image endpoint.
+    // Accepts 1-4 images; single-image admin flow now just sends an
+    // array of length 1.
+    url: "https://api.meshy.ai/openapi/v1/multi-image-to-3d",
     authEnv: "MESHY_API_KEY",
     authScheme: "Bearer",
     timeoutMs: 60_000,
     bodyTemplate: {
       // Input shape (from agent.input merged with opts):
-      //   { dataUri, opts: { enablePbr, hdTexture, ... } }
-      image_url: "{{dataUri}}",
+      //   { dataUris: string[1..4], opts: { enablePbr, hdTexture, ... } }
+      // `{{dataUris}}` is a whole-string template ref → the engine
+      // returns the raw array value (see lib/agent-service/template.ts
+      // FULL_REF_RE), so image_urls ends up as a JSON array, not a
+      // stringified blob.
+      image_urls: "{{dataUris}}",
       ai_model: "meshy-6",
       enable_pbr: "{{opts.enablePbr}}",
       hd_texture: "{{opts.hdTexture}}",
@@ -46,7 +53,7 @@ const SKILL_MESHY_HTTP = {
       // Meshy GET poll bodies don't carry `result`, so using {{response.X}}
       // would silently rewrite the URL to the LIST endpoint on iteration 2
       // (see lib/skills/handlers/httpApi.ts pollUntilDone notes).
-      url: "https://api.meshy.ai/openapi/v1/image-to-3d/{{initialResponse.result}}",
+      url: "https://api.meshy.ai/openapi/v1/multi-image-to-3d/{{initialResponse.result}}",
       method: "GET",
       intervalMs: 10_000,
       timeoutMs: 15 * 60_000,
@@ -78,7 +85,13 @@ const SKILL_MESHY_HTTP = {
   inputSchema: {
     type: "object",
     properties: {
-      dataUri: { type: "string", description: "Source image as a data URI (typically the transparent PNG from CUTOUT)." },
+      dataUris: {
+        type: "array",
+        minItems: 1,
+        maxItems: 4,
+        items: { type: "string" },
+        description: "1-4 source images as data URIs (transparent PNGs from CUTOUT). Multi-image fusion uses additional views for back/side detail.",
+      },
       opts: {
         type: "object",
         description: "Meshy generation options. All optional.",
@@ -94,7 +107,7 @@ const SKILL_MESHY_HTTP = {
         },
       },
     },
-    required: ["dataUri"],
+    required: ["dataUris"],
   } as Prisma.InputJsonValue,
 };
 

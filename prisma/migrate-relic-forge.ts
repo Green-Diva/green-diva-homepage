@@ -284,7 +284,10 @@ function buildForgePipeline(): Prisma.InputJsonValue {
         slotIndex: 4,
         inputFrom: {
           merge: {
-            dataUri: "agent.input.imageDataUri",
+            // Multi-image since 2026-05-20: scene ctx exposes
+            // imageDataUris (1..4) and the meshy skill posts to
+            // /multi-image-to-3d. Single-image flow = array of 1.
+            dataUris: "agent.input.imageDataUris",
             opts: "agent.input.opts",
           },
         },

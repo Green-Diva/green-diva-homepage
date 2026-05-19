@@ -1,9 +1,16 @@
 // POST /api/relics/[id]/create-3d — admin-only, async via SceneBinding.
 //
 // Routes through the agent-service's "relic.create3d" scene. Hard
-// precondition: Relic.enhancedImagePath must be set (i.e. 2D 增强 has
-// already run). Meshy gets the transparent PNG, not the original snapshot,
+// precondition: Relic.enhancedImages must contain ≥1 entry (i.e. 2D 增强
+// has already run). Meshy gets transparent PNGs, not the original snapshot,
 // so 3D quality stays high. 409 if precondition fails.
+//
+// 2026-05-20 multi-image: body can include `items: [{enhancedPath}, ...]`
+// (1-4). All listed paths must already exist in Relic.enhancedImages. The
+// endpoint loads each as a data URI and hands the array to Meshy's
+// /multi-image-to-3d for multi-view fusion. When `items` is missing,
+// falls back to the first enhanced image (single-view, back-compat with
+// older clients).
 //
 // Returns `{ jobId, agentId, status, createdAt }`; frontend polls
 // /api/agent-jobs/[jobId]. Runner's writeback hook fills Relic.modelPath
@@ -17,16 +24,14 @@ import { recordRelicLog } from "@/lib/relicLog";
 import { dispatchScene, SceneError } from "@/lib/agent-service";
 import { readRelicImageAsDataUri, ReadImageError } from "@/lib/relics/readImageAsDataUri";
 
-// Body schema for the pre-flight 3D config dialog. All fields optional —
-// missing keys fall back to the meshy3d handler's defaults (PBR / HD /
-// auto-size all on, GLB only, auto symmetry, standard model_type).
+// Body schema for the pre-flight 3D config dialog. All Meshy fields
+// optional — missing keys fall back to the meshy3d handler's defaults
+// (PBR / HD / auto-size all on, GLB only, auto symmetry, standard
+// model_type).
 //
-// `items: [{enhancedPath}, ...]` is a protocol-level placeholder for the
-// future "multi-view fusion" Meshy endpoint — the modal allows admin to
-// multi-select enhanced sources to convey "use these views for back/side
-// detail". For now the server still calls single-image Meshy and just
-// uses the FIRST enhanced entry, regardless of items[]. Reserving the
-// shape here means future swap-in is API-compatible.
+// `items: [{enhancedPath}, ...]` (1-4) selects which enhanced images
+// feed multi-view fusion. When omitted, the first enhanced image is
+// used (single-view back-compat).
 const Body = z
   .object({
     enablePbr: z.boolean().optional(),
@@ -40,7 +45,7 @@ const Body = z
     items: z
       .array(z.object({ enhancedPath: z.string().min(1) }).strict())
       .min(1)
-      .max(16)
+      .max(4)
       .optional(),
   })
   .strict();
@@ -89,35 +94,58 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // Single-image Meshy: just take the first entry. items[] from the body
-  // is intentionally ignored — see Body schema comment for the future
-  // multi-view fusion plan.
-  const enhancedPath = enhancedList[0].path;
-  if (!enhancedPath) {
-    return NextResponse.json(
-      { error: "enhancedImages[0] has no path" },
-      { status: 409 },
-    );
+  // Resolve the 1-4 enhanced paths to feed Meshy multi-view fusion.
+  // items[] from the body picks specific enhance sources; without it
+  // we fall back to the first enhanced entry (single-view).
+  const allowedPaths = new Set(
+    enhancedList.map((e) => e.path).filter((p): p is string => typeof p === "string"),
+  );
+  let selectedPaths: string[];
+  if (opts.items && opts.items.length > 0) {
+    const requested = opts.items.map((it) => it.enhancedPath);
+    const unknown = requested.filter((p) => !allowedPaths.has(p));
+    if (unknown.length > 0) {
+      return NextResponse.json(
+        { error: `items[] contains paths not in Relic.enhancedImages: ${unknown.join(", ")}` },
+        { status: 400 },
+      );
+    }
+    // Dedupe while preserving caller order — admin picked them in this order.
+    selectedPaths = Array.from(new Set(requested));
+  } else {
+    const first = enhancedList[0]?.path;
+    if (!first) {
+      return NextResponse.json(
+        { error: "enhancedImages[0] has no path" },
+        { status: 409 },
+      );
+    }
+    selectedPaths = [first];
   }
 
-  // Pipeline-layer read: pull the enhanced PNG off disk and base64-
-  // encode it here so the agent DAG never has to.
-  let imageDataUri: string;
-  try {
-    const enc = await readRelicImageAsDataUri(enhancedPath);
-    imageDataUri = enc.dataUri;
-  } catch (e) {
-    if (e instanceof ReadImageError) {
-      const status = e.code === "NOT_FOUND" ? 404 : e.code === "TOO_LARGE" ? 413 : 400;
-      return NextResponse.json({ error: `image read failed: ${e.message}` }, { status });
+  // Pipeline-layer read: base64-encode every selected enhance image here
+  // so the agent DAG never has to. Read serially; up to 4 images keeps
+  // the total well under fal/Meshy body limits.
+  const imageDataUris: string[] = [];
+  for (const p of selectedPaths) {
+    try {
+      const enc = await readRelicImageAsDataUri(p);
+      imageDataUris.push(enc.dataUri);
+    } catch (e) {
+      if (e instanceof ReadImageError) {
+        const status = e.code === "NOT_FOUND" ? 404 : e.code === "TOO_LARGE" ? 413 : 400;
+        return NextResponse.json(
+          { error: `image read failed (${p}): ${e.message}` },
+          { status },
+        );
+      }
+      console.error("[api/relics/create-3d] image read threw", e);
+      return NextResponse.json({ error: "image read failed" }, { status: 500 });
     }
-    console.error("[api/relics/create-3d] image read threw", e);
-    return NextResponse.json({ error: "image read failed" }, { status: 500 });
   }
 
   // Don't forward items[] into the scene ctx — the scene's contextSchema
-  // doesn't know about it and the dispatcher would reject. Items is a
-  // protocol-level placeholder, not a scene input.
+  // doesn't know about it. items resolved → imageDataUris above.
   const { items: _ignored, ...meshyOpts } = opts;
   void _ignored;
 
@@ -128,7 +156,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       {
         relicId: relic.id,
         relicSlug: relic.slug,
-        imageDataUri,
+        imageDataUris,
         opts: meshyOpts,
       },
       { actor: { userId: me.id, level: me.level, name: me.name } },

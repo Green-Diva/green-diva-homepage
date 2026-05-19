@@ -395,7 +395,7 @@ export const en: Dictionary = {
     enhanceBadgeLabel: "Enhanced",
     meshy3dSourceTitle: "Choose enhance sources",
     meshy3dSourcePlaceholder:
-      "Multi-view fusion coming soon — currently uses the first enhance only",
+      "Pick 1–4 enhances — multiple feeds Meshy multi-view fusion, single goes through standard image-to-3D",
     meshy3dStep1: "Step 1 · Pick enhance source",
     meshy3dStep2: "Step 2 · Configure",
     meshy3dStep3: "Step 3 · 3D preview",

@@ -60,7 +60,11 @@ export type Meshy3dEnhancedInput = {
 };
 
 type Props = {
-  onConfirm: (opts: Meshy3dOptions) => void;
+  // Multi-image since 2026-05-20: selected 1-4 enhance paths drive
+  // Meshy /multi-image-to-3d. Caller forwards them to /create-3d as
+  // items[]. When `enhancedItems` is omitted (legacy single-column
+  // mode), selectedPaths is just an empty array.
+  onConfirm: (opts: Meshy3dOptions, selectedPaths: string[]) => void;
   onCancel: () => void;
   t: Dictionary;
   // Opt-in dual-column: pass enhancedItems + thumb url + relic context
@@ -84,7 +88,11 @@ type Props = {
   onUploadGlb?: (file: File) => Promise<void>;
 };
 
+// Meshy /multi-image-to-3d accepts 1-4 images. We still render up to 16
+// thumbnail tiles so admin sees the full enhance history, but the
+// confirm button enforces selection ≤ MAX_SELECTED.
 const SOURCE_SLOTS = 16;
+const MAX_SELECTED = 4;
 
 // Parsed metadata pulled out of the GLB's JSON chunk. All counts are
 // "raw scene stats" — same shape that model-viewer / three.js would
@@ -259,8 +267,12 @@ export default function Meshy3dConfigModal({
   function toggleSource(path: string) {
     setSelectedSources((prev) => {
       const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        if (next.size >= MAX_SELECTED) return prev; // cap; user must deselect first
+        next.add(path);
+      }
       return next;
     });
   }
@@ -292,7 +304,12 @@ export default function Meshy3dConfigModal({
       out.texturePrompt = out.texturePrompt.trim().slice(0, 600);
       if (!out.texturePrompt) delete out.texturePrompt;
     }
-    onConfirm(out);
+    // Preserve thumbnail render order — enhancedSorted is newest-first,
+    // so the array matches what admin saw in the grid.
+    const picked = dualColumn
+      ? enhancedSorted.filter((e) => selectedSources.has(e.path)).map((e) => e.path)
+      : [];
+    onConfirm(out, picked);
   }
 
   return createPortal(
@@ -534,7 +551,12 @@ export default function Meshy3dConfigModal({
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={running || enhancedSorted.length === 0 || paramsLocked}
+                disabled={
+                  running ||
+                  enhancedSorted.length === 0 ||
+                  paramsLocked ||
+                  selectedSources.size === 0
+                }
                 className="mt-auto w-full px-5 py-2.5 font-label text-[10px] tracking-[0.25em] uppercase text-background bg-secondary hover:bg-secondary/90 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {t.relicCollection.meshy3dConfirm}

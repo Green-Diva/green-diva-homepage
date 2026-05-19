@@ -216,8 +216,13 @@ const EXPR_MK_RESULT = `{
   "score": ($exists(score) and score >= 0 and score <= 100 ? score : 0)
 }`;
 
+// $append([], ...) guarantees the value is an array even when the mapping
+// yields an empty sequence (Vision returned 0 usable matches). Without this
+// guard JSONata drops the `matches` key entirely and the scene outputSchema
+// rejects the agent output with "matches: Required". Same trick as
+// EXPR_NORMALIZE above.
 const EXPR_FINAL_SHAPE = `{
-  "matches": (
+  "matches": $append([],
     $sort($, function($a, $b) { $b.score > $a.score })
       [[0..${TOP_N_RESULTS - 1}]]
       ~> | $ | {
